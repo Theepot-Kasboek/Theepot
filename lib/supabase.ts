@@ -28,3 +28,31 @@ export interface Profiel {
   actief: boolean
   aangemaakt_op: string
 }
+
+export interface Activiteit {
+  id: string
+  created_at: string
+  naam: string
+  beschrijving: string
+  categorie: string
+  thema: string
+  leeftijd: string
+  tijdsduur: number
+  groepsgrootte: string
+  materialen: string[]
+  stappen: string[]
+  materiaal_aanwezig: boolean
+  ai_gegenereerd: boolean
+}
+
+export interface KasboekEntry {
+  id: string
+  periode: string
+  categorie: string | null
+  omschrijving: string | null
+  bedrag: number
+  type: 'inkomst' | 'uitgave'
+  aangemaakt_door: string | null
+  aangemaakt_op: string
+  medewerker_naam?: string
+}
