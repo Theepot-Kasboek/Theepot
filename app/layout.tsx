@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import './globals.css'
 import { AuthProvider } from '@/components/AuthProvider'
+import { ThemeProvider } from '@/components/ThemeProvider'
 import LayoutShell from '@/components/LayoutShell'
 
 export const metadata: Metadata = {
@@ -12,9 +13,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="nl">
       <body>
-        <AuthProvider>
-          <LayoutShell>{children}</LayoutShell>
-        </AuthProvider>
+        <ThemeProvider>
+          <AuthProvider>
+            <LayoutShell>{children}</LayoutShell>
+          </AuthProvider>
+        </ThemeProvider>
       </body>
     </html>
   )

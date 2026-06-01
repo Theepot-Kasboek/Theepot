@@ -12,8 +12,11 @@ import {
   ShieldCheck,
   Users,
   LogOut,
+  Sun,
+  Moon,
 } from 'lucide-react'
 import { useAuth } from './AuthProvider'
+import { useTheme } from './ThemeProvider'
 import { ROL_LABELS } from '@/lib/supabase'
 
 interface NavItem {
@@ -63,6 +66,7 @@ const navGroepen: { label: string; items: NavItem[] }[] = [
 export default function Sidebar() {
   const pathname = usePathname()
   const { profiel, isSuperadmin, loading, signOut } = useAuth()
+  const { theme, toggleTheme } = useTheme()
 
   const initialen = profiel?.naam
     ? profiel.naam.split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase()
@@ -115,8 +119,43 @@ export default function Sidebar() {
         })}
       </nav>
 
-      {/* Gebruiker onderaan */}
+      {/* Footer: darkmode toggle + gebruiker */}
       <div className="sidebar-footer">
+        {/* Darkmode toggle */}
+        <button
+          onClick={toggleTheme}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 9,
+            width: '100%', padding: '7px 10px', borderRadius: 8,
+            background: 'none', border: 'none', cursor: 'pointer',
+            color: 'var(--text-muted)', fontSize: 13,
+            marginBottom: 4, transition: 'background 0.12s',
+          }}
+          onMouseEnter={e => (e.currentTarget.style.background = 'var(--primary-xlight)')}
+          onMouseLeave={e => (e.currentTarget.style.background = 'none')}
+        >
+          {theme === 'dark'
+            ? <Sun size={15} color="var(--primary)" />
+            : <Moon size={15} />
+          }
+          <span>{theme === 'dark' ? 'Lichte modus' : 'Donkere modus'}</span>
+          {/* Toggle pill */}
+          <div style={{
+            marginLeft: 'auto',
+            width: 32, height: 18, borderRadius: 9,
+            background: theme === 'dark' ? 'var(--primary)' : 'var(--border-dark)',
+            position: 'relative', transition: 'background 0.2s', flexShrink: 0,
+          }}>
+            <div style={{
+              position: 'absolute', top: 2,
+              left: theme === 'dark' ? 16 : 2,
+              width: 14, height: 14, borderRadius: '50%',
+              background: '#fff', transition: 'left 0.2s',
+            }} />
+          </div>
+        </button>
+
+        {/* Gebruikerskaart */}
         <div className="user-card">
           <div className="avatar">
             {loading ? '…' : initialen}

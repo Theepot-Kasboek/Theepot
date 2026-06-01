@@ -4,7 +4,7 @@
 @tailwind utilities;
 
 :root {
-  /* Primaire kleur — De Molen groen */
+  /* Primaire kleur — De Theepot groen */
   --primary:        #8CC63F;
   --primary-dark:   #6FA832;
   --primary-darker: #5A9022;
@@ -12,15 +12,15 @@
   --primary-xlight: #F3FAE8;
   --primary-text:   #3D6B1A;
 
-  /* Achtergronden */
+  /* Achtergronden — Light */
   --bg:             #F4F6F3;
   --bg-card:        #FFFFFF;
 
-  /* Tekst */
+  /* Tekst — Light */
   --text:           #0F1A08;
   --text-muted:     #5A6B52;
 
-  /* Borders */
+  /* Borders — Light */
   --border:         #D9EAC0;
   --border-dark:    #C4DB9E;
 
@@ -33,6 +33,31 @@
   --warning:        #BA7517;
   --danger:         #A32D2D;
   --info:           #185FA5;
+}
+
+/* ─── DARK MODE ──────────────────────────────── */
+
+[data-theme="dark"] {
+  --primary:        #8CC63F;
+  --primary-dark:   #6FA832;
+  --primary-darker: #5A9022;
+  --primary-light:  #1E2E10;
+  --primary-xlight: #172209;
+  --primary-text:   #A8D96A;
+
+  --bg:             #0E1209;
+  --bg-card:        #161D0E;
+
+  --text:           #E8F0DC;
+  --text-muted:     #7A9060;
+
+  --border:         #2A3A1A;
+  --border-dark:    #3A5020;
+
+  --success:        #7EC745;
+  --warning:        #E8A830;
+  --danger:         #E05555;
+  --info:           #5B9FD4;
 }
 
 * {
