@@ -364,11 +364,11 @@ export default function KasboekPage() {
             {/* Saldo kaarten */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 20 }}>
               {[
-                { label: 'Inkomsten', bedrag: inkomsten, kleur: '#16A34A', bg: '#F0FDF4', icoon: '↑' },
-                { label: 'Uitgaven',  bedrag: uitgaven,  kleur: '#DC2626', bg: '#FEF2F2', icoon: '↓' },
-                { label: 'Saldo',     bedrag: saldo,     kleur: saldo >= 0 ? '#3D6B1A' : '#DC2626', bg: saldo >= 0 ? 'var(--primary-light)' : '#FEF2F2', icoon: '=' },
+                { label: 'Inkomsten', bedrag: inkomsten, kleur: 'var(--success)', bg: 'color-mix(in srgb, var(--success) 12%, var(--bg-card))', icoon: '↑' },
+                { label: 'Uitgaven',  bedrag: uitgaven,  kleur: 'var(--danger)',  bg: 'color-mix(in srgb, var(--danger) 12%, var(--bg-card))',  icoon: '↓' },
+                { label: 'Saldo',     bedrag: saldo,     kleur: saldo >= 0 ? 'var(--primary-text)' : 'var(--danger)', bg: saldo >= 0 ? 'var(--primary-light)' : 'color-mix(in srgb, var(--danger) 12%, var(--bg-card))', icoon: '=' },
               ].map(k => (
-                <div key={k.label} className="stat-card" style={{ background: k.bg, borderColor: k.bg }}>
+                <div key={k.label} className="stat-card" style={{ background: k.bg, border: '1px solid var(--border)' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
                     <span style={{ fontSize: 16, fontWeight: 700, color: k.kleur }}>{k.icoon}</span>
                     <span style={{ fontSize: 11, fontWeight: 600, color: k.kleur, textTransform: 'uppercase', letterSpacing: '0.06em', opacity: 0.8 }}>{k.label}</span>
@@ -396,7 +396,7 @@ export default function KasboekPage() {
                             style={{
                               flex: 1, padding: '7px 0', borderRadius: 7, border: 'none',
                               fontSize: 13, fontWeight: 600, cursor: 'pointer', transition: 'all 0.12s',
-                              background: type === t ? (t === 'inkomst' ? '#16A34A' : '#DC2626') : 'transparent',
+                              background: type === t ? (t === 'inkomst' ? 'var(--success)' : 'var(--danger)') : 'transparent',
                               color: type === t ? '#fff' : 'var(--text-muted)',
                             }}
                           >{t === 'inkomst' ? '↑ Inkomst' : '↓ Uitgave'}</button>
@@ -521,7 +521,7 @@ export default function KasboekPage() {
                       >
                         <div style={{
                           width: 36, height: 36, borderRadius: 10, flexShrink: 0,
-                          background: entry.type === 'inkomst' ? '#16A34A' : '#DC2626',
+                          background: entry.type === 'inkomst' ? 'var(--success)' : 'var(--danger)',
                           color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
                           fontSize: 15, fontWeight: 700,
                         }}>
