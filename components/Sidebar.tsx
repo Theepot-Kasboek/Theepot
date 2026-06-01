@@ -72,10 +72,10 @@ export default function Sidebar() {
     <aside className="sidebar">
       {/* Logo */}
       <Link href="/" className="sidebar-logo">
-        <div className="logo-icon">DM</div>
+        <div className="logo-icon">DT</div>
         <div>
-          <div className="logo-name">De Molen</div>
-          <div className="logo-sub">BSO Beheer</div>
+          <div className="logo-name">De Theepot</div>
+          <div className="logo-sub">Dashboard</div>
         </div>
       </Link>
 

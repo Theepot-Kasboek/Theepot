@@ -4,8 +4,8 @@ import { AuthProvider } from '@/components/AuthProvider'
 import LayoutShell from '@/components/LayoutShell'
 
 export const metadata: Metadata = {
-  title: 'De Molen — BSO Beheer',
-  description: 'Intern beheerprogramma voor BSO De Molen',
+  title: 'De Theepot — Dashboard',
+  description: 'Intern dashboard voor BSO De Theepot',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
