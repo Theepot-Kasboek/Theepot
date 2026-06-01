@@ -8,7 +8,6 @@ interface AuthContextType {
   user: User | null
   profiel: Profiel | null
   isSuperadmin: boolean
-  isBeheerder: boolean
   loading: boolean
   signOut: () => Promise<void>
 }
@@ -17,7 +16,6 @@ const AuthContext = createContext<AuthContextType>({
   user: null,
   profiel: null,
   isSuperadmin: false,
-  isBeheerder: false,
   loading: true,
   signOut: async () => {},
 })
@@ -31,29 +29,43 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const supabase = getSupabase()
 
     async function laadProfiel(userId: string) {
-      const { data } = await supabase
-        .from('profielen')
-        .select('*')
-        .eq('id', userId)
-        .single()
-      if (data) setProfiel(data as Profiel)
+      try {
+        const { data, error } = await supabase
+          .from('profielen')
+          .select('*')
+          .eq('id', userId)
+          .single()
+
+        if (data && !error) {
+          setProfiel(data as Profiel)
+        } else {
+          setProfiel(null)
+        }
+      } catch {
+        setProfiel(null)
+      } finally {
+        setLoading(false)
+      }
     }
 
     supabase.auth.getUser().then(({ data: { user } }) => {
       setUser(user)
-      if (user) laadProfiel(user.id)
-      setLoading(false)
+      if (user) {
+        laadProfiel(user.id)
+      } else {
+        setLoading(false)
+      }
     })
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (_event, session) => {
         setUser(session?.user ?? null)
         if (session?.user) {
-          await laadProfiel(session.user.id)
+          laadProfiel(session.user.id)
         } else {
           setProfiel(null)
+          setLoading(false)
         }
-        setLoading(false)
       }
     )
 
@@ -68,10 +80,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   const isSuperadmin = profiel?.rol === 'superadmin'
-  const isBeheerder = profiel?.rol === 'superadmin' || profiel?.rol === 'beheerder'
 
   return (
-    <AuthContext.Provider value={{ user, profiel, isSuperadmin, isBeheerder, loading, signOut }}>
+    <AuthContext.Provider value={{ user, profiel, isSuperadmin, loading, signOut }}>
       {children}
     </AuthContext.Provider>
   )

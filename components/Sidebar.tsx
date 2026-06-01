@@ -10,11 +10,11 @@ import {
   Calendar,
   MessageSquare,
   ShieldCheck,
-  MoreVertical,
+  Users,
   LogOut,
-  Settings,
 } from 'lucide-react'
 import { useAuth } from './AuthProvider'
+import { ROL_LABELS } from '@/lib/supabase'
 
 interface NavItem {
   href: string
@@ -28,73 +28,45 @@ const navGroepen: { label: string; items: NavItem[] }[] = [
   {
     label: 'Overzicht',
     items: [
-      {
-        href: '/',
-        label: 'Dashboard',
-        icon: <LayoutDashboard size={16} />,
-      },
+      { href: '/', label: 'Dashboard', icon: <LayoutDashboard size={16} /> },
     ],
   },
   {
     label: 'Financieel',
     items: [
-      {
-        href: '/kasboek',
-        label: 'Kasboek',
-        icon: <Wallet size={16} />,
-      },
+      { href: '/kasboek', label: 'Kasboek', icon: <Wallet size={16} /> },
     ],
   },
   {
     label: 'Activiteiten',
     items: [
-      {
-        href: '/vakantieplanningen',
-        label: 'Vakantieplanningen',
-        icon: <Map size={16} />,
-      },
-      {
-        href: '/activiteiten',
-        label: 'Activiteitenbeheer',
-        icon: <BookOpen size={16} />,
-      },
+      { href: '/vakantieplanningen', label: 'Vakantieplanningen', icon: <Map size={16} /> },
+      { href: '/activiteiten', label: 'Activiteitenbeheer', icon: <BookOpen size={16} /> },
     ],
   },
   {
     label: 'Communicatie',
     items: [
-      {
-        href: '/agenda',
-        label: 'Agenda',
-        icon: <Calendar size={16} />,
-      },
-      {
-        href: '/chat',
-        label: 'Chat',
-        icon: <MessageSquare size={16} />,
-      },
+      { href: '/agenda', label: 'Agenda', icon: <Calendar size={16} /> },
+      { href: '/chat', label: 'Chat', icon: <MessageSquare size={16} /> },
     ],
   },
   {
     label: 'Beheer',
     items: [
-      {
-        href: '/rechten',
-        label: 'Rechtenbeheer',
-        icon: <ShieldCheck size={16} />,
-        superadminOnly: true,
-      },
+      { href: '/medewerkers', label: 'Medewerkers', icon: <Users size={16} />, superadminOnly: true },
+      { href: '/rechten', label: 'Rechtenbeheer', icon: <ShieldCheck size={16} />, superadminOnly: true },
     ],
   },
 ]
 
 export default function Sidebar() {
   const pathname = usePathname()
-  const { profiel, isSuperadmin, signOut } = useAuth()
+  const { profiel, isSuperadmin, loading, signOut } = useAuth()
 
   const initialen = profiel?.naam
     ? profiel.naam.split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase()
-    : '??'
+    : '?'
 
   return (
     <aside className="sidebar">
@@ -146,35 +118,24 @@ export default function Sidebar() {
       {/* Gebruiker onderaan */}
       <div className="sidebar-footer">
         <div className="user-card">
-          <div className="avatar">{initialen}</div>
+          <div className="avatar">
+            {loading ? '…' : initialen}
+          </div>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div
-              style={{
-                fontSize: 12,
-                fontWeight: 500,
-                whiteSpace: 'nowrap',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-              }}
-            >
-              {profiel?.naam ?? 'Laden...'}
+            <div style={{ fontSize: 12, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {loading ? 'Laden...' : (profiel?.naam ?? 'Onbekend')}
             </div>
             <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>
-              {profiel?.rol ?? ''}
+              {loading ? '' : (profiel ? ROL_LABELS[profiel.rol] : '')}
             </div>
           </div>
           <button
             onClick={signOut}
             title="Uitloggen"
             style={{
-              background: 'none',
-              border: 'none',
-              cursor: 'pointer',
-              color: 'var(--text-muted)',
-              padding: 4,
-              borderRadius: 6,
-              display: 'flex',
-              alignItems: 'center',
+              background: 'none', border: 'none', cursor: 'pointer',
+              color: 'var(--text-muted)', padding: 4, borderRadius: 6,
+              display: 'flex', alignItems: 'center',
             }}
           >
             <LogOut size={14} />

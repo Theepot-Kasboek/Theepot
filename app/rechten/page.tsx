@@ -5,15 +5,12 @@ import { ShieldCheck } from 'lucide-react'
 export default function RechtenPage() {
   return (
     <>
-      <Topbar
-        titel="Rechtenbeheer"
-        subtitel="Gebruikers & toegang per pagina"
-      />
+      <Topbar titel="Rechtenbeheer" subtitel="Toegang per pagina en functie" />
       <div className="page-content">
         <PaginaPlaceholder
           icon={<ShieldCheck size={28} />}
           titel="Rechtenbeheer"
-          beschrijving="Beheer welke medewerker welke pagina en functie kan zien en gebruiken. Rollen instellen per gebruiker: superadmin, beheerder of medewerker. Wordt binnenkort gebouwd."
+          beschrijving="Stel per rol in welke pagina's en functies zichtbaar en bruikbaar zijn. Rollen: Superadmin, Directie, Leidinggevende en Locatie. Wordt binnenkort gebouwd."
         />
       </div>
     </>

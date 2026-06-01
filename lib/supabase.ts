@@ -9,7 +9,16 @@ export function getSupabase() {
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-export type Rol = 'superadmin' | 'beheerder' | 'medewerker'
+export type Rol = 'superadmin' | 'directie' | 'leidinggevende' | 'locatie'
+
+export const ROL_LABELS: Record<Rol, string> = {
+  superadmin:     'Superadmin',
+  directie:       'Directie',
+  leidinggevende: 'Leidinggevende',
+  locatie:        'Locatie',
+}
+
+export const ROL_VOLGORDE: Rol[] = ['superadmin', 'directie', 'leidinggevende', 'locatie']
 
 export interface Profiel {
   id: string
