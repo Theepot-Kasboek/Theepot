@@ -188,12 +188,28 @@ export default function KasboekPage() {
         titel="Kasboek"
         subtitel={actieveLocatie ? `${actieveLocatie.naam} — ${periodeLabel(huidigeDatum)}` : periodeLabel(huidigeDatum)}
         acties={
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             {/* Maand navigatie */}
             <button className="btn" style={{ padding: '6px 8px' }} onClick={() => setHuidigeDatum(d => navigeerMaand(d, -1))}>
               <ChevronLeft size={16} />
             </button>
-            <button className="btn btn-sm" onClick={() => setHuidigeDatum(new Date())}>Huidig</button>
+            <button
+              onClick={() => setHuidigeDatum(new Date())}
+              style={{
+                display: 'flex', flexDirection: 'column', alignItems: 'center',
+                padding: '5px 16px', borderRadius: 8, border: '1.5px solid var(--border-dark)',
+                background: 'var(--bg-card)', cursor: 'pointer', minWidth: 110,
+                transition: 'border-color 0.12s',
+              }}
+              title="Terug naar huidige maand"
+            >
+              <span style={{ fontFamily: 'Sora, sans-serif', fontSize: 15, fontWeight: 700, color: 'var(--text)', lineHeight: 1.2, textTransform: 'capitalize' }}>
+                {huidigeDatum.toLocaleDateString('nl-NL', { month: 'long' })}
+              </span>
+              <span style={{ fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.2 }}>
+                {huidigeDatum.getFullYear()}
+              </span>
+            </button>
             <button className="btn" style={{ padding: '6px 8px' }} onClick={() => setHuidigeDatum(d => navigeerMaand(d, 1))}>
               <ChevronRight size={16} />
             </button>
