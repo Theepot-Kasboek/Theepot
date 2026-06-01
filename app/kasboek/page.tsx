@@ -7,7 +7,7 @@ import Topbar from '@/components/Topbar'
 import Toast from '@/components/Toast'
 import {
   ChevronLeft, ChevronRight, Plus, Trash2,
-  MapPin, Settings, X, Building2
+  MapPin, Settings, X, Building2, Tag
 } from 'lucide-react'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -41,7 +41,7 @@ function navigeerMaand(datum: Date, richting: number): Date {
   return d
 }
 
-const CATEGORIEEN = ['Omzet', 'Inkopen', 'Personeelskosten', 'Overige kosten', 'Materialen', 'Huisvestingskosten']
+const STANDAARD_CATEGORIEEN = ['Omzet', 'Inkopen', 'Personeelskosten', 'Overige kosten', 'Materialen', 'Huisvestingskosten']
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
@@ -59,6 +59,12 @@ export default function KasboekPage() {
   const [nieuweLocatieNaam, setNieuweLocatieNaam] = useState('')
   const [locatieLaden, setLocatieLaden] = useState(false)
 
+  // Categorieën
+  const [categorieen, setCategorieen] = useState<string[]>([])
+  const [categorieBeheerOpen, setCategorieBeheerOpen] = useState(false)
+  const [nieuweCategorieNaam, setNieuweCategorieNaam] = useState('')
+  const [categorieLaden, setCategorieLaden] = useState(false)
+
   // Boekingen
   const [entries, setEntries] = useState<KasboekEntry[]>([])
   const [laden, setLaden] = useState(false)
@@ -68,7 +74,7 @@ export default function KasboekPage() {
   // Formulier
   const [type, setType] = useState<'inkomst' | 'uitgave'>('inkomst')
   const [bedrag, setBedrag] = useState('')
-  const [categorie, setCategorie] = useState(CATEGORIEEN[0])
+  const [categorie, setCategorie] = useState('')
   const [omschrijving, setOmschrijving] = useState('')
   const [opslaan, setOpslaan] = useState(false)
 
@@ -89,6 +95,45 @@ export default function KasboekPage() {
   }, [actieveLocatie])
 
   useEffect(() => { haalLocatiesOp() }, [])
+
+  // ── Categorieën ophalen ─────────────────────────────────────────────────────
+  const haalCategorieenOp = useCallback(async () => {
+    const { data } = await getSupabase()
+      .from('kasboek_categorieen')
+      .select('naam')
+      .order('naam')
+    if (data && data.length > 0) {
+      const namen = data.map((r: { naam: string }) => r.naam)
+      setCategorieen(namen)
+      setCategorie(prev => prev || namen[0])
+    } else {
+      setCategorieen(STANDAARD_CATEGORIEEN)
+      setCategorie(prev => prev || STANDAARD_CATEGORIEEN[0])
+    }
+  }, [])
+
+  useEffect(() => { haalCategorieenOp() }, [haalCategorieenOp])
+
+  async function voegCategorieToe() {
+    if (!nieuweCategorieNaam.trim()) return
+    setCategorieLaden(true)
+    const { error } = await getSupabase().from('kasboek_categorieen').insert({ naam: nieuweCategorieNaam.trim() })
+    if (error) {
+      setToast({ bericht: 'Toevoegen mislukt: ' + error.message, type: 'error' })
+    } else {
+      setNieuweCategorieNaam('')
+      setToast({ bericht: 'Categorie toegevoegd!', type: 'success' })
+      await haalCategorieenOp()
+    }
+    setCategorieLaden(false)
+  }
+
+  async function verwijderCategorie(naam: string) {
+    if (!confirm(`Categorie "${naam}" verwijderen?`)) return
+    await getSupabase().from('kasboek_categorieen').delete().eq('naam', naam)
+    setToast({ bericht: `${naam} verwijderd.`, type: 'success' })
+    await haalCategorieenOp()
+  }
 
   // ── Boekingen ophalen ───────────────────────────────────────────────────────
   const haalOp = useCallback(async () => {
@@ -213,11 +258,16 @@ export default function KasboekPage() {
             <button className="btn" style={{ padding: '6px 8px' }} onClick={() => setHuidigeDatum(d => navigeerMaand(d, 1))}>
               <ChevronRight size={16} />
             </button>
-            {/* Locatiebeheer knop (alleen superadmin) */}
+            {/* Beheer knoppen (alleen superadmin) */}
             {isSuperadmin && (
-              <button className="btn" onClick={() => setLocatieBeheerOpen(true)}>
-                <Settings size={14} /> Locaties
-              </button>
+              <>
+                <button className="btn" onClick={() => setCategorieBeheerOpen(true)}>
+                  <Tag size={14} /> Categorieën
+                </button>
+                <button className="btn" onClick={() => setLocatieBeheerOpen(true)}>
+                  <Settings size={14} /> Locaties
+                </button>
+              </>
             )}
           </div>
         }
@@ -333,7 +383,7 @@ export default function KasboekPage() {
                         <label className="form-label">Categorie</label>
                         <select className="form-select" value={categorie} onChange={e => setCategorie(e.target.value)}>
                           <option value="">— Geen categorie —</option>
-                          {CATEGORIEEN.map(c => <option key={c} value={c}>{c}</option>)}
+                          {categorieen.map(c => <option key={c} value={c}>{c}</option>)}
                         </select>
                       </div>
 
@@ -439,6 +489,73 @@ export default function KasboekPage() {
           </>
         )}
       </div>
+
+      {/* ─── Categorieënbeheer modal ──────────────────────────────────────────────── */}
+      {categorieBeheerOpen && (
+        <div className="modal-backdrop" onClick={() => setCategorieBeheerOpen(false)}>
+          <div className="modal-box" style={{ maxWidth: 440 }} onClick={e => e.stopPropagation()}>
+            <div className="card-header">
+              <span className="card-title">Categorieën beheren</span>
+              <button onClick={() => setCategorieBeheerOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex' }}>
+                <X size={18} />
+              </button>
+            </div>
+            <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+              {/* Categorie toevoegen */}
+              <div>
+                <label className="form-label">Nieuwe categorie</label>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <input
+                    className="form-input"
+                    placeholder="Bijv. Activiteitenkosten"
+                    value={nieuweCategorieNaam}
+                    onChange={e => setNieuweCategorieNaam(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); voegCategorieToe() } }}
+                  />
+                  <button className="btn btn-primary" onClick={voegCategorieToe} disabled={categorieLaden || !nieuweCategorieNaam.trim()}>
+                    <Plus size={14} />
+                  </button>
+                </div>
+              </div>
+
+              <div className="divider" style={{ margin: 0 }} />
+
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 10 }}>
+                  Huidige categorieën
+                </div>
+                {categorieen.length === 0 && (
+                  <p style={{ fontSize: 13, color: 'var(--text-muted)', fontStyle: 'italic' }}>Nog geen categorieën.</p>
+                )}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {categorieen.map(naam => (
+                    <div key={naam} style={{
+                      display: 'flex', alignItems: 'center', gap: 10,
+                      padding: '10px 12px', borderRadius: 9,
+                      background: 'var(--bg)', border: '1px solid var(--border)',
+                    }}>
+                      <Tag size={14} color="var(--primary)" style={{ flexShrink: 0 }} />
+                      <span style={{ flex: 1, fontSize: 13, fontWeight: 500 }}>{naam}</span>
+                      <button
+                        onClick={() => verwijderCategorie(naam)}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', padding: 4, borderRadius: 6 }}
+                        title="Verwijderen"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                <button className="btn btn-primary" onClick={() => setCategorieBeheerOpen(false)}>Klaar</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ─── Locatiebeheer modal ───────────────────────────────────────────────── */}
       {locatieBeheerOpen && (
