@@ -129,10 +129,14 @@ export default function KasboekPage() {
   }
 
   async function verwijderCategorie(naam: string) {
-    if (!confirm(`Categorie "${naam}" verwijderen?`)) return
-    await getSupabase().from('kasboek_categorieen').delete().eq('naam', naam)
+    const { error } = await getSupabase().from('kasboek_categorieen').delete().eq('naam', naam)
+    if (error) {
+      setToast({ bericht: 'Verwijderen mislukt: ' + error.message, type: 'error' })
+      return
+    }
     setToast({ bericht: `${naam} verwijderd.`, type: 'success' })
-    await haalCategorieenOp()
+    // Direct state updaten zodat UI meteen reageert
+    setCategorieen(prev => prev.filter(c => c !== naam))
   }
 
   // ── Boekingen ophalen ───────────────────────────────────────────────────────
@@ -539,10 +543,16 @@ export default function KasboekPage() {
                       <span style={{ flex: 1, fontSize: 13, fontWeight: 500 }}>{naam}</span>
                       <button
                         onClick={() => verwijderCategorie(naam)}
-                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', padding: 4, borderRadius: 6 }}
-                        title="Verwijderen"
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: 5,
+                          padding: '4px 10px', borderRadius: 6, border: '1px solid #FECACA',
+                          background: 'none', cursor: 'pointer', color: '#DC2626', fontSize: 12,
+                          fontWeight: 500, transition: 'background 0.1s',
+                        }}
+                        onMouseEnter={e => (e.currentTarget.style.background = '#FEF2F2')}
+                        onMouseLeave={e => (e.currentTarget.style.background = 'none')}
                       >
-                        <Trash2 size={14} />
+                        <Trash2 size={12} /> Verwijder
                       </button>
                     </div>
                   ))}
