@@ -7,7 +7,7 @@ import Topbar from '@/components/Topbar'
 import Toast from '@/components/Toast'
 import {
   ChevronLeft, ChevronRight, Plus, Trash2,
-  MapPin, Settings, X, Building2, Tag
+  MapPin, Settings, X, Building2, Tag, Paperclip, Download, Eye
 } from 'lucide-react'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -77,6 +77,12 @@ export default function KasboekPage() {
   const [categorie, setCategorie] = useState('')
   const [omschrijving, setOmschrijving] = useState('')
   const [opslaan, setOpslaan] = useState(false)
+
+  // Bonnetje
+  const [bonnetjeBestand, setBonnetjeBestand] = useState<File | null>(null)
+  const [bonnetjeModal, setBonnetjeModal] = useState<KasboekEntry | null>(null)
+  const [bonnetjeUrl, setBonnetjeUrl] = useState<string | null>(null)
+  const [bonnetjeLaden, setBonnetjeLaden] = useState(false)
 
   // ── Locaties ophalen ────────────────────────────────────────────────────────
   const haalLocatiesOp = useCallback(async () => {
@@ -164,8 +170,22 @@ export default function KasboekPage() {
     if (!bedrag || !actieveLocatie) return
     setOpslaan(true)
     setFout(null)
+    const supabase = getSupabase()
 
-    const { error } = await getSupabase().from('kasboek_entries').insert({
+    // Upload bonnetje indien aanwezig
+    let bonnetje_pad: string | null = null
+    if (bonnetjeBestand) {
+      const pad = `${actieveLocatie.naam}/${huidigePeriode}/${Date.now()}_${bonnetjeBestand.name}`
+      const { error: uploadError } = await supabase.storage.from('bonnetjes').upload(pad, bonnetjeBestand)
+      if (uploadError) {
+        setFout('Bonnetje uploaden mislukt: ' + uploadError.message)
+        setOpslaan(false)
+        return
+      }
+      bonnetje_pad = pad
+    }
+
+    const { error } = await supabase.from('kasboek_entries').insert({
       periode: huidigePeriode,
       type,
       bedrag: parseFloat(bedrag.replace(',', '.')),
@@ -173,6 +193,7 @@ export default function KasboekPage() {
       omschrijving: omschrijving || null,
       locatie: actieveLocatie.naam,
       aangemaakt_door: profiel?.id ?? null,
+      bonnetje_pad,
     })
 
     if (error) {
@@ -180,10 +201,22 @@ export default function KasboekPage() {
     } else {
       setBedrag('')
       setOmschrijving('')
+      setBonnetjeBestand(null)
       setToast({ bericht: 'Boeking toegevoegd!', type: 'success' })
       await haalOp()
     }
     setOpslaan(false)
+  }
+
+  // ── Bonnetje inzien ─────────────────────────────────────────────────────────
+  async function openBonnetje(entry: KasboekEntry) {
+    if (!entry.bonnetje_pad) return
+    setBonnetjeModal(entry)
+    setBonnetjeUrl(null)
+    setBonnetjeLaden(true)
+    const { data } = await getSupabase().storage.from('bonnetjes').createSignedUrl(entry.bonnetje_pad, 300)
+    setBonnetjeUrl(data?.signedUrl ?? null)
+    setBonnetjeLaden(false)
   }
 
   // ── Boeking verwijderen ─────────────────────────────────────────────────────
@@ -400,6 +433,39 @@ export default function KasboekPage() {
                         />
                       </div>
 
+                      <div>
+                        <label className="form-label">Bonnetje (optioneel)</label>
+                        <div style={{ position: 'relative' }}>
+                          <input
+                            type="file"
+                            accept="image/*,.pdf"
+                            onChange={e => setBonnetjeBestand(e.target.files?.[0] ?? null)}
+                            style={{ display: 'none' }}
+                            id="bonnetje-upload"
+                          />
+                          <label
+                            htmlFor="bonnetje-upload"
+                            style={{
+                              display: 'flex', alignItems: 'center', gap: 8,
+                              padding: '8px 12px', borderRadius: 8, border: '1px dashed var(--border-dark)',
+                              cursor: 'pointer', fontSize: 13, color: 'var(--text-muted)',
+                              background: bonnetjeBestand ? 'var(--primary-xlight)' : 'var(--bg)',
+                              transition: 'all 0.12s',
+                            }}
+                          >
+                            <Paperclip size={14} />
+                            {bonnetjeBestand ? bonnetjeBestand.name : 'Bonnetje toevoegen (foto of PDF)'}
+                          </label>
+                          {bonnetjeBestand && (
+                            <button
+                              type="button"
+                              onClick={() => setBonnetjeBestand(null)}
+                              style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex' }}
+                            ><X size={14} /></button>
+                          )}
+                        </div>
+                      </div>
+
                       <button type="submit" className="btn btn-primary" disabled={opslaan || !bedrag} style={{ justifyContent: 'center' }}>
                         <Plus size={15} />
                         {opslaan ? 'Opslaan...' : 'Boeking toevoegen'}
@@ -475,15 +541,31 @@ export default function KasboekPage() {
                             <span>{new Date(entry.aangemaakt_op).toLocaleString('nl-NL', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
                           </div>
                         </div>
-                        <button
-                          onClick={() => verwijder(entry.id)}
-                          style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '4px 6px', borderRadius: 6, display: 'flex', alignItems: 'center', opacity: 0.4, transition: 'opacity 0.1s' }}
-                          onMouseEnter={e => (e.currentTarget.style.opacity = '1')}
-                          onMouseLeave={e => (e.currentTarget.style.opacity = '0.4')}
-                          title="Verwijderen"
-                        >
-                          <Trash2 size={14} />
-                        </button>
+                        <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                          {entry.bonnetje_pad && (isSuperadmin || profiel?.rol === 'directie') && (
+                            <button
+                              onClick={() => openBonnetje(entry)}
+                              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--primary)', padding: '4px 6px', borderRadius: 6, display: 'flex', alignItems: 'center' }}
+                              title="Bonnetje bekijken"
+                            >
+                              <Paperclip size={14} />
+                            </button>
+                          )}
+                          {entry.bonnetje_pad && !isSuperadmin && profiel?.rol !== 'directie' && (
+                            <span title="Bonnetje aanwezig" style={{ color: 'var(--primary)', display: 'flex', alignItems: 'center', padding: '4px 6px' }}>
+                              <Paperclip size={12} />
+                            </span>
+                          )}
+                          <button
+                            onClick={() => verwijder(entry.id)}
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '4px 6px', borderRadius: 6, display: 'flex', alignItems: 'center', opacity: 0.4, transition: 'opacity 0.1s' }}
+                            onMouseEnter={e => (e.currentTarget.style.opacity = '1')}
+                            onMouseLeave={e => (e.currentTarget.style.opacity = '0.4')}
+                            title="Verwijderen"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -636,6 +718,62 @@ export default function KasboekPage() {
               <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
                 <button className="btn btn-primary" onClick={() => setLocatieBeheerOpen(false)}>Klaar</button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── Bonnetje modal ─────────────────────────────────────────────────────── */}
+      {bonnetjeModal && (
+        <div className="modal-backdrop" onClick={() => { setBonnetjeModal(null); setBonnetjeUrl(null) }}>
+          <div className="modal-box" style={{ maxWidth: 640 }} onClick={e => e.stopPropagation()}>
+            <div className="card-header">
+              <span className="card-title">
+                Bonnetje — {bonnetjeModal.omschrijving || bonnetjeModal.categorie || 'Boeking'}
+              </span>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                {bonnetjeUrl && (
+                  <a
+                    href={bonnetjeUrl}
+                    download
+                    target="_blank"
+                    rel="noreferrer"
+                    className="btn btn-sm"
+                  >
+                    <Download size={13} /> Downloaden
+                  </a>
+                )}
+                <button onClick={() => { setBonnetjeModal(null); setBonnetjeUrl(null) }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex' }}>
+                  <X size={18} />
+                </button>
+              </div>
+            </div>
+            <div className="card-body">
+              {/* Info rij */}
+              <div style={{ display: 'flex', gap: 16, marginBottom: 16, fontSize: 13, color: 'var(--text-muted)' }}>
+                <span>{bonnetjeModal.type === 'inkomst' ? '↑' : '↓'} {fmt(bonnetjeModal.bedrag)}</span>
+                {bonnetjeModal.categorie && <span>🏷 {bonnetjeModal.categorie}</span>}
+                <span>📅 {new Date(bonnetjeModal.aangemaakt_op).toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
+              </div>
+
+              {/* Bonnetje preview */}
+              {bonnetjeLaden ? (
+                <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>Laden...</div>
+              ) : bonnetjeUrl ? (
+                bonnetjeModal.bonnetje_pad?.endsWith('.pdf') ? (
+                  <iframe src={bonnetjeUrl} style={{ width: '100%', height: 500, border: 'none', borderRadius: 8 }} />
+                ) : (
+                  <img
+                    src={bonnetjeUrl}
+                    alt="Bonnetje"
+                    style={{ width: '100%', maxHeight: 500, objectFit: 'contain', borderRadius: 8, background: 'var(--bg)' }}
+                  />
+                )
+              ) : (
+                <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>
+                  Bonnetje kon niet geladen worden.
+                </div>
+              )}
             </div>
           </div>
         </div>

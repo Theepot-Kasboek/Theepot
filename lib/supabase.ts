@@ -54,5 +54,7 @@ export interface KasboekEntry {
   type: 'inkomst' | 'uitgave'
   aangemaakt_door: string | null
   aangemaakt_op: string
+  locatie: string
+  bonnetje_pad: string | null
   medewerker_naam?: string
 }
