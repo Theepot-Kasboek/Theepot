@@ -1,15 +1,284 @@
 'use client'
 import { useState, useEffect, useCallback, Suspense, useMemo } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { Plus, Search, BookOpen, Clock, Copy, Download, Filter } from 'lucide-react'
+import { Plus, Search, BookOpen, Clock, Copy, Download, Upload, X, CheckCircle, AlertCircle } from 'lucide-react'
 import { getSupabase, type Activiteit } from '@/lib/supabase'
 import { getCategorieKleur, getCategorieEmoji } from '@/lib/categorieen'
-import { getThemaKleur, getThemaEmoji } from '@/lib/themas'
+import { getThemaEmoji } from '@/lib/themas'
 import { exportActiviteitAlsPDF } from '@/lib/pdf-export'
 import ActiviteitModal from '@/components/ActiviteitModal'
 import ActiviteitFormModal from '@/components/ActiviteitFormModal'
 import Toast from '@/components/Toast'
 import Topbar from '@/components/Topbar'
+
+// ─── Standaard AI prompt ───────────────────────────────────────────────────────
+
+const AI_PROMPT = `Bedenk 10 activiteiten voor de BSO waar ik werk. Geef ALLEEN een JSON-array terug, geen uitleg:
+[
+  {
+    "naam": "Naam van de activiteit",
+    "thema": "Kies voor elke activiteit een origineel en specifiek thema. Zorg voor veel variatie en denk verder dan de standaard thema's — voorbeelden: Ruimtevaart, Middeleeuwen, Circus, Superhelden, Oceaan, Jungle, Detectives, Sprookjes, Robots, Olympische Spelen, Boerderij, Piraten, Dinosaurussen, Weersomstandigheden, enz.",
+    "leeftijd": "bijv. 4-12 jaar",
+    "tijdsduur": 45,
+    "groepsgrootte": "bijv. 2-15 kinderen",
+    "beschrijving": "Uitgebreide beschrijving van 8 tot 12 zinnen. Beschrijf wat de kinderen doen, hoe de activiteit verloopt, wat het doel is en waarom het leuk of leerzaam is.",
+    "materialen": ["materiaal 1", "materiaal 2"],
+    "stappen": ["Stap 1", "Stap 2", "Stap 3"]
+  }
+]`
+
+// ─── JSON Import Modal ─────────────────────────────────────────────────────────
+
+interface ImportResultaat {
+  succes: number
+  mislukt: number
+  fouten: string[]
+}
+
+function JsonImportModal({
+  onClose,
+  onSuccess,
+}: {
+  onClose: () => void
+  onSuccess: (aantal: number) => void
+}) {
+  const [stap, setStap] = useState<'prompt' | 'json' | 'bezig' | 'klaar'>('prompt')
+  const [jsonTekst, setJsonTekst] = useState('')
+  const [geparsed, setGeparsed] = useState<Omit<Activiteit, 'id' | 'created_at'>[]>([])
+  const [parseError, setParseError] = useState('')
+  const [resultaat, setResultaat] = useState<ImportResultaat | null>(null)
+  const [promptGekopieerd, setPromptGekopieerd] = useState(false)
+
+  function kopieerPrompt() {
+    navigator.clipboard.writeText(AI_PROMPT)
+    setPromptGekopieerd(true)
+    setTimeout(() => setPromptGekopieerd(false), 2000)
+  }
+
+  function parseerJson() {
+    setParseError('')
+    try {
+      const raw = JSON.parse(jsonTekst)
+      const arr = Array.isArray(raw) ? raw : [raw]
+
+      const gevalideerd = arr.map((item: Record<string, unknown>, i: number) => {
+        if (!item.naam) throw new Error(`Item ${i + 1}: "naam" ontbreekt`)
+        return {
+          naam: String(item.naam),
+          beschrijving: String(item.beschrijving || ''),
+          categorie: String(item.categorie || 'Creatief'),
+          thema: String(item.thema || ''),
+          leeftijd: String(item.leeftijd || '4-12 jaar'),
+          tijdsduur: Number(item.tijdsduur) || 45,
+          groepsgrootte: String(item.groepsgrootte || '2-15 kinderen'),
+          materialen: Array.isArray(item.materialen) ? item.materialen.map(String) : [],
+          stappen: Array.isArray(item.stappen) ? item.stappen.map(String) : [],
+          materiaal_aanwezig: Boolean(item.materiaal_aanwezig ?? false),
+          ai_gegenereerd: true,
+        }
+      })
+
+      setGeparsed(gevalideerd)
+      setStap('json')
+    } catch (e) {
+      setParseError(e instanceof Error ? e.message : 'Ongeldige JSON')
+    }
+  }
+
+  async function importeer() {
+    setStap('bezig')
+    const supabase = getSupabase()
+    let succes = 0
+    const fouten: string[] = []
+
+    for (const activiteit of geparsed) {
+      const { error } = await supabase.from('activiteiten').insert([activiteit])
+      if (error) fouten.push(`${activiteit.naam}: ${error.message}`)
+      else succes++
+    }
+
+    setResultaat({ succes, mislukt: fouten.length, fouten })
+    setStap('klaar')
+    if (succes > 0) onSuccess(succes)
+  }
+
+  return (
+    <div className="modal-backdrop" onClick={e => { if (e.target === e.currentTarget) onClose() }}>
+      <div className="modal-box" style={{ maxWidth: 600 }} onClick={e => e.stopPropagation()}>
+
+        {/* Header */}
+        <div className="card-header">
+          <span className="card-title">
+            {stap === 'prompt' && 'Activiteiten importeren via AI'}
+            {stap === 'json' && `${geparsed.length} activiteiten gevonden`}
+            {stap === 'bezig' && 'Importeren...'}
+            {stap === 'klaar' && 'Import voltooid'}
+          </span>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex' }}>
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+          {/* Stap 1: Prompt */}
+          {stap === 'prompt' && (
+            <>
+              <div>
+                <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 12, lineHeight: 1.6 }}>
+                  Kopieer de prompt hieronder, plak hem in <strong>Claude.ai</strong> of een andere AI-assistent,
+                  en plak daarna de gegenereerde JSON terug in het veld eronder.
+                </p>
+
+                {/* Prompt box */}
+                <div style={{
+                  background: 'var(--bg)',
+                  border: '1px solid var(--border-dark)',
+                  borderRadius: 10,
+                  padding: 14,
+                  fontFamily: 'monospace',
+                  fontSize: 11.5,
+                  lineHeight: 1.6,
+                  color: 'var(--text)',
+                  whiteSpace: 'pre-wrap',
+                  maxHeight: 200,
+                  overflowY: 'auto',
+                  marginBottom: 8,
+                }}>
+                  {AI_PROMPT}
+                </div>
+                <button
+                  className="btn btn-primary btn-sm"
+                  onClick={kopieerPrompt}
+                  style={{ width: '100%', justifyContent: 'center' }}
+                >
+                  {promptGekopieerd ? <><CheckCircle size={14} /> Gekopieerd!</> : <><Copy size={14} /> Prompt kopiëren</>}
+                </button>
+              </div>
+
+              <div className="divider" style={{ margin: 0 }} />
+
+              {/* JSON plakken */}
+              <div>
+                <label className="form-label">Plak hier de JSON van de AI</label>
+                <textarea
+                  className="form-textarea"
+                  style={{ minHeight: 140, fontFamily: 'monospace', fontSize: 12 }}
+                  placeholder={'[\n  {\n    "naam": "Watergevecht",\n    ...\n  }\n]'}
+                  value={jsonTekst}
+                  onChange={e => { setJsonTekst(e.target.value); setParseError('') }}
+                />
+                {parseError && (
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 6, color: '#DC2626', fontSize: 12 }}>
+                    <AlertCircle size={14} />
+                    {parseError}
+                  </div>
+                )}
+              </div>
+
+              <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                <button className="btn" onClick={onClose}>Annuleren</button>
+                <button
+                  className="btn btn-primary"
+                  onClick={parseerJson}
+                  disabled={!jsonTekst.trim()}
+                >
+                  Controleren →
+                </button>
+              </div>
+            </>
+          )}
+
+          {/* Stap 2: Bevestigen */}
+          {stap === 'json' && (
+            <>
+              <p style={{ fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.6 }}>
+                De volgende <strong>{geparsed.length} activiteiten</strong> worden toegevoegd aan de bibliotheek:
+              </p>
+
+              <div style={{ maxHeight: 280, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {geparsed.map((a, i) => (
+                  <div key={i} style={{
+                    display: 'flex', alignItems: 'center', gap: 10,
+                    padding: '10px 12px', borderRadius: 9,
+                    background: 'var(--bg)', border: '1px solid var(--border)',
+                  }}>
+                    <div style={{
+                      width: 26, height: 26, borderRadius: 7, flexShrink: 0,
+                      background: 'var(--primary-light)', color: 'var(--primary-text)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontSize: 11, fontWeight: 700,
+                    }}>{i + 1}</div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {a.naam}
+                      </div>
+                      <div style={{ fontSize: 11, color: 'var(--text-muted)', display: 'flex', gap: 8, marginTop: 2 }}>
+                        {a.thema && <span>{getThemaEmoji(a.thema)} {a.thema}</span>}
+                        <span>⏱ {a.tijdsduur} min</span>
+                        <span>{a.stappen.length} stappen</span>
+                        <span>{a.materialen.length} materialen</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                <button className="btn" onClick={() => setStap('prompt')}>← Terug</button>
+                <button className="btn btn-primary" onClick={importeer}>
+                  <Upload size={14} /> {geparsed.length} activiteiten importeren
+                </button>
+              </div>
+            </>
+          )}
+
+          {/* Stap 3: Bezig */}
+          {stap === 'bezig' && (
+            <div style={{ textAlign: 'center', padding: '24px 0' }}>
+              <p style={{ fontSize: 14, color: 'var(--text-muted)' }}>
+                Activiteiten worden opgeslagen...
+              </p>
+            </div>
+          )}
+
+          {/* Stap 4: Klaar */}
+          {stap === 'klaar' && resultaat && (
+            <>
+              <div style={{ textAlign: 'center', padding: '8px 0 16px' }}>
+                <div style={{ fontSize: 40, marginBottom: 12 }}>
+                  {resultaat.mislukt === 0 ? '✅' : '⚠️'}
+                </div>
+                <div style={{ fontFamily: 'Sora, sans-serif', fontSize: 18, fontWeight: 700, marginBottom: 6 }}>
+                  {resultaat.succes} van {geparsed.length} geïmporteerd
+                </div>
+                {resultaat.mislukt > 0 && (
+                  <p style={{ fontSize: 13, color: '#DC2626' }}>
+                    {resultaat.mislukt} activiteit{resultaat.mislukt !== 1 ? 'en' : ''} mislukt
+                  </p>
+                )}
+              </div>
+
+              {resultaat.fouten.length > 0 && (
+                <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 8, padding: '10px 14px' }}>
+                  {resultaat.fouten.map((f, i) => (
+                    <div key={i} style={{ fontSize: 12, color: '#991B1B', marginBottom: 4 }}>• {f}</div>
+                  ))}
+                </div>
+              )}
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                <button className="btn btn-primary" onClick={onClose}>Sluiten</button>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Hoofd pagina ──────────────────────────────────────────────────────────────
 
 function ActiviteitenPage() {
   const searchParams = useSearchParams()
@@ -25,6 +294,7 @@ function ActiviteitenPage() {
   const [geselecteerd, setGeselecteerd] = useState<Activiteit | null>(null)
   const [bewerkActiviteit, setBewerkActiviteit] = useState<Activiteit | null>(null)
   const [toevoegen, setToevoegen] = useState(false)
+  const [importOpen, setImportOpen] = useState(false)
   const [toast, setToast] = useState<{ bericht: string; type: 'success' | 'error' } | null>(null)
 
   const laadActiviteiten = useCallback(async () => {
@@ -99,7 +369,6 @@ function ActiviteitenPage() {
     catch { setToast({ bericht: 'PDF export mislukt', type: 'error' }) }
   }
 
-  // Toast helper voor modals die string sturen
   function handleToast(msg: string) {
     setToast({ bericht: msg, type: msg.includes('mislukt') || msg.includes('Fout') ? 'error' : 'success' })
   }
@@ -111,8 +380,8 @@ function ActiviteitenPage() {
         subtitel={`${activiteiten.length} activiteiten`}
         acties={
           <>
-            <button className="btn" onClick={() => window.location.href = '/upload'}>
-              <Filter size={13} /> PDF Importeren
+            <button className="btn" onClick={() => setImportOpen(true)}>
+              <Upload size={14} /> AI Import
             </button>
             <button className="btn btn-primary" onClick={() => setToevoegen(true)}>
               <Plus size={14} /> Toevoegen
@@ -154,66 +423,36 @@ function ActiviteitenPage() {
             <span style={{ fontSize: 13, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{gefilterd.length} resultaten</span>
           </div>
 
-          {/* Algemene filters */}
           <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap', marginBottom: 10 }}>
             {[
               { key: 'all', label: 'Alle' },
               { key: 'beschikbaar', label: '✅ Beschikbaar' },
               { key: 'kort', label: '⏱ Kort (≤30 min)' },
             ].map(f => (
-              <button
-                key={f.key}
-                onClick={() => setActieveFilter(f.key)}
-                style={{
-                  padding: '5px 12px', borderRadius: 20, fontSize: 12, fontWeight: 500,
-                  cursor: 'pointer', border: '1.5px solid',
-                  borderColor: actieveFilter === f.key ? 'var(--primary)' : 'var(--border-dark)',
-                  background: actieveFilter === f.key ? 'var(--primary)' : 'var(--bg-card)',
-                  color: actieveFilter === f.key ? '#fff' : 'var(--text-muted)',
-                  transition: 'all 0.12s',
-                }}
-              >{f.label}</button>
+              <button key={f.key} onClick={() => setActieveFilter(f.key)} style={{ padding: '5px 12px', borderRadius: 20, fontSize: 12, fontWeight: 500, cursor: 'pointer', border: '1.5px solid', borderColor: actieveFilter === f.key ? 'var(--primary)' : 'var(--border-dark)', background: actieveFilter === f.key ? 'var(--primary)' : 'var(--bg-card)', color: actieveFilter === f.key ? '#fff' : 'var(--text-muted)', transition: 'all 0.12s' }}>
+                {f.label}
+              </button>
             ))}
           </div>
 
-          {/* Categorieën */}
           {categorieen.length > 0 && (
             <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap', alignItems: 'center', marginBottom: 8 }}>
               <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', whiteSpace: 'nowrap' }}>Categorie</span>
               {categorieen.map(c => (
-                <button
-                  key={c}
-                  onClick={() => setActieveFilter(`cat:${c}`)}
-                  style={{
-                    padding: '5px 12px', borderRadius: 20, fontSize: 12, fontWeight: 500,
-                    cursor: 'pointer', border: '1.5px solid',
-                    borderColor: actieveFilter === `cat:${c}` ? getCategorieKleur(c) : 'var(--border-dark)',
-                    background: actieveFilter === `cat:${c}` ? getCategorieKleur(c) : 'var(--bg-card)',
-                    color: actieveFilter === `cat:${c}` ? '#fff' : 'var(--text-muted)',
-                    transition: 'all 0.12s',
-                  }}
-                >{getCategorieEmoji(c)} {c}</button>
+                <button key={c} onClick={() => setActieveFilter(`cat:${c}`)} style={{ padding: '5px 12px', borderRadius: 20, fontSize: 12, fontWeight: 500, cursor: 'pointer', border: '1.5px solid', borderColor: actieveFilter === `cat:${c}` ? getCategorieKleur(c) : 'var(--border-dark)', background: actieveFilter === `cat:${c}` ? getCategorieKleur(c) : 'var(--bg-card)', color: actieveFilter === `cat:${c}` ? '#fff' : 'var(--text-muted)', transition: 'all 0.12s' }}>
+                  {getCategorieEmoji(c)} {c}
+                </button>
               ))}
             </div>
           )}
 
-          {/* Thema's */}
           {themas.length > 0 && (
             <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap', alignItems: 'center' }}>
               <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', whiteSpace: 'nowrap' }}>Thema</span>
               {themas.map(t => (
-                <button
-                  key={t}
-                  onClick={() => setActieveFilter(`thema:${t}`)}
-                  style={{
-                    padding: '5px 12px', borderRadius: 20, fontSize: 12, fontWeight: 500,
-                    cursor: 'pointer', border: '1.5px solid',
-                    borderColor: actieveFilter === `thema:${t}` ? '#D97706' : 'var(--border-dark)',
-                    background: actieveFilter === `thema:${t}` ? '#D97706' : 'var(--bg-card)',
-                    color: actieveFilter === `thema:${t}` ? '#fff' : 'var(--text-muted)',
-                    transition: 'all 0.12s',
-                  }}
-                >{getThemaEmoji(t)} {t}</button>
+                <button key={t} onClick={() => setActieveFilter(`thema:${t}`)} style={{ padding: '5px 12px', borderRadius: 20, fontSize: 12, fontWeight: 500, cursor: 'pointer', border: '1.5px solid', borderColor: actieveFilter === `thema:${t}` ? '#D97706' : 'var(--border-dark)', background: actieveFilter === `thema:${t}` ? '#D97706' : 'var(--bg-card)', color: actieveFilter === `thema:${t}` ? '#fff' : 'var(--text-muted)', transition: 'all 0.12s' }}>
+                  {getThemaEmoji(t)} {t}
+                </button>
               ))}
             </div>
           )}
@@ -226,7 +465,10 @@ function ActiviteitenPage() {
           <div className="empty-state">
             <BookOpen size={40} />
             <h3>Geen activiteiten gevonden</h3>
-            <p>{zoekterm ? 'Pas je zoekopdracht aan.' : 'Voeg een eerste activiteit toe.'}</p>
+            <p>{zoekterm ? 'Pas je zoekopdracht aan.' : 'Voeg een eerste activiteit toe of importeer via AI.'}</p>
+            <button className="btn btn-primary" onClick={() => setImportOpen(true)}>
+              <Upload size={14} /> Importeren via AI
+            </button>
           </div>
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 14 }}>
@@ -273,21 +515,21 @@ function ActiviteitenPage() {
         )}
       </div>
 
-      {geselecteerd && !bewerkActiviteit && (
-        <ActiviteitModal
-          activiteit={geselecteerd}
-          onClose={() => setGeselecteerd(null)}
-          onEdit={() => setBewerkActiviteit(geselecteerd)}
-          onDelete={verwijderActiviteit}
-          onToast={handleToast}
+      {importOpen && (
+        <JsonImportModal
+          onClose={() => setImportOpen(false)}
+          onSuccess={async (aantal) => {
+            setToast({ bericht: `${aantal} activiteiten geïmporteerd!`, type: 'success' })
+            await laadActiviteiten()
+          }}
         />
       )}
+
+      {geselecteerd && !bewerkActiviteit && (
+        <ActiviteitModal activiteit={geselecteerd} onClose={() => setGeselecteerd(null)} onEdit={() => setBewerkActiviteit(geselecteerd)} onDelete={verwijderActiviteit} onToast={handleToast} />
+      )}
       {(toevoegen || bewerkActiviteit) && (
-        <ActiviteitFormModal
-          activiteit={bewerkActiviteit || undefined}
-          onSave={bewerkActiviteit ? slaBewerking : slaOp}
-          onClose={() => { setToevoegen(false); setBewerkActiviteit(null) }}
-        />
+        <ActiviteitFormModal activiteit={bewerkActiviteit || undefined} onSave={bewerkActiviteit ? slaBewerking : slaOp} onClose={() => { setToevoegen(false); setBewerkActiviteit(null) }} />
       )}
       {toast && <Toast bericht={toast.bericht} type={toast.type} onClose={() => setToast(null)} />}
     </>
