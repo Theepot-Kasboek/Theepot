@@ -20,6 +20,9 @@ interface Recht {
   pagina_agenda: Toegang
   pagina_chat: Toegang
   pagina_medewerkers: Toegang
+  pagina_maaltijdlijst: Toegang
+  pagina_weekplanningen: Toegang
+  pagina_gesprekken: Toegang
 
   chat_starten: boolean
   kasboek_export: boolean
@@ -29,6 +32,8 @@ interface Recht {
   agenda_algemeen_bewerken: boolean
   agenda_personeel_inzien: boolean
   vakantie_exporteren: boolean
+  weekplanning_exporteren: boolean
+  gesprekken_exporteren: boolean
 }
 
 type Toegang = 'geen' | 'lezen' | 'bewerken'
@@ -36,14 +41,14 @@ type Toegang = 'geen' | 'lezen' | 'bewerken'
 // ─── Pagina definities ────────────────────────────────────────────────────────
 
 interface PaginaDef {
-  key: keyof Pick<Recht, 'pagina_kasboek' | 'pagina_vakantieplanningen' | 'pagina_activiteiten' | 'pagina_agenda' | 'pagina_chat' | 'pagina_medewerkers'>
+  key: string
   label: string
   icon: string
   functies: FunctieDef[]
 }
 
 interface FunctieDef {
-  key: keyof Pick<Recht, 'kasboek_export' | 'kasboek_bonnetjes_inzien' | 'activiteiten_importeren' | 'activiteiten_verwijderen' | 'agenda_algemeen_bewerken' | 'agenda_personeel_inzien' | 'vakantie_exporteren' | 'chat_starten'>
+  key: string
   label: string
   beschrijving: string
   vereist: Toegang
@@ -94,6 +99,28 @@ const PAGINAS: PaginaDef[] = [
     ],
   },
   {
+    key: 'pagina_maaltijdlijst',
+    label: 'Maaltijdlijst',
+    icon: '🍽️',
+    functies: [],
+  },
+  {
+    key: 'pagina_weekplanningen',
+    label: 'Weekplanningen',
+    icon: '✂️',
+    functies: [
+      { key: 'weekplanning_exporteren', label: 'Exporteren', beschrijving: 'Weekplanning exporteren als PDF', vereist: 'lezen' },
+    ],
+  },
+  {
+    key: 'pagina_gesprekken',
+    label: '10-minutengesprekken',
+    icon: '💬',
+    functies: [
+      { key: 'gesprekken_exporteren', label: 'Exporteren', beschrijving: '10-minutengesprekken exporteren als PDF', vereist: 'lezen' },
+    ],
+  },
+  {
     key: 'pagina_medewerkers',
     label: 'Medewerkers',
     icon: '👥',
@@ -119,6 +146,9 @@ function leegRecht(): Omit<Recht, 'id' | 'rol' | 'profiel_id'> {
     pagina_agenda: 'geen',
     pagina_chat: 'geen',
     pagina_medewerkers: 'geen',
+    pagina_maaltijdlijst: 'geen',
+    pagina_weekplanningen: 'geen',
+    pagina_gesprekken: 'geen',
     kasboek_export: false,
     kasboek_bonnetjes_inzien: false,
     activiteiten_importeren: false,
@@ -127,6 +157,8 @@ function leegRecht(): Omit<Recht, 'id' | 'rol' | 'profiel_id'> {
     agenda_personeel_inzien: false,
     vakantie_exporteren: false,
     chat_starten: false,
+    weekplanning_exporteren: false,
+    gesprekken_exporteren: false,
   }
 }
 
@@ -333,13 +365,13 @@ function RechtKaart({ titel, subtitel, avatar, recht, open, onToggle, onSave, op
 
   useEffect(() => { setLokaal(recht); setGewijzigd(false) }, [recht])
 
-  function update(key: keyof Recht, waarde: Toegang | boolean) {
-    setLokaal(prev => ({ ...prev, [key]: waarde }))
+  function update(key: string, waarde: Toegang | boolean) {
+    setLokaal(prev => ({ ...prev, [key]: waarde } as Recht))
     setGewijzigd(true)
   }
 
-  function toegangVoor(key: keyof Pick<Recht, 'pagina_kasboek' | 'pagina_vakantieplanningen' | 'pagina_activiteiten' | 'pagina_agenda' | 'pagina_chat' | 'pagina_medewerkers'>): Toegang {
-    return lokaal[key] as Toegang
+  function toegangVoor(key: string): Toegang {
+    return (lokaal as unknown as Record<string, Toegang>)[key] ?? 'geen'
   }
 
   // Snelle samenvatting voor gesloten kaart
@@ -425,7 +457,7 @@ function RechtKaart({ titel, subtitel, avatar, recht, open, onToggle, onSave, op
                   <div style={{ marginLeft: 40, display: 'flex', flexDirection: 'column', gap: 6 }}>
                     {pagina.functies.map(functie => {
                       const beschikbaar = beschikbareFuncties.includes(functie)
-                      const aan = lokaal[functie.key] as boolean
+                      const aan = (lokaal as unknown as Record<string, boolean>)[functie.key] ?? false
 
                       return (
                         <div
