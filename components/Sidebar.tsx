@@ -123,6 +123,7 @@ export default function Sidebar() {
       items: [
         { href: '/agenda', label: 'Agenda', icon: <Calendar size={16} /> },
         { href: '/chat', label: 'Chat', icon: <MessageSquare size={16} />, notificatie: ongelezen },
+        { href: '/maaltijdlijst', label: 'Maaltijdlijst', icon: <UtensilsCrossed size={16} /> },
       ],
     },
     {
