@@ -39,6 +39,7 @@ interface VakantieActiviteit {
   categorie: string
   naam: string
   beschrijving: string | null
+  benodigdheden: string[]
   activiteit_id: string | null
 }
 
@@ -48,6 +49,7 @@ interface BibliotheekActiviteit {
   categorie: string
   thema: string
   tijdsduur: number
+  materialen: string[]
 }
 
 type Dag = 'maandag' | 'dinsdag' | 'woensdag' | 'donderdag' | 'vrijdag'
@@ -105,7 +107,7 @@ export default function VakantieplanningenPage() {
   }, [weken])
 
   const haalBibliotheekOp = useCallback(async () => {
-    const { data } = await getSupabase().from('activiteiten').select('id, naam, categorie, thema, tijdsduur').order('naam')
+    const { data } = await getSupabase().from('activiteiten').select('id, naam, categorie, thema, tijdsduur, materialen').order('naam')
     setBibliotheek((data ?? []) as BibliotheekActiviteit[])
   }, [])
 
@@ -145,7 +147,8 @@ export default function VakantieplanningenPage() {
   }
 
   async function voegActiviteitToe(data: Omit<VakantieActiviteit, 'id'>) {
-    const { error } = await getSupabase().from('vakantie_activiteiten').insert(data)
+    const insertData = { ...data, benodigdheden: data.benodigdheden ?? [] }
+    const { error } = await getSupabase().from('vakantie_activiteiten').insert(insertData)
     if (error) { setToast({ bericht: 'Mislukt: ' + error.message, type: 'error' }); return }
     setActiviteitModal(null)
     setToast({ bericht: 'Activiteit toegevoegd!', type: 'success' })
@@ -598,7 +601,15 @@ function DocumentWeergave({ planning, weken, activiteiten, dagDatumStr }: {
                             <span style={{ fontFamily: 'Sora, sans-serif', fontWeight: 600, fontSize: 14 }}>{act.naam}</span>
                           </div>
                           {act.beschrijving && (
-                            <p style={{ fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.6, margin: 0 }}>{act.beschrijving}</p>
+                            <p style={{ fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.6, margin: 0, marginBottom: act.benodigdheden?.length > 0 ? 6 : 0 }}>{act.beschrijving}</p>
+                          )}
+                          {act.benodigdheden?.length > 0 && (
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 4 }}>
+                              <span style={{ fontSize: 11, color: 'var(--text-muted)', marginRight: 2 }}>📦</span>
+                              {act.benodigdheden.map((b, i) => (
+                                <span key={i} style={{ padding: '1px 8px', borderRadius: 20, background: 'var(--primary-light)', color: 'var(--primary-text)', fontSize: 11, fontWeight: 500 }}>{b}</span>
+                              ))}
+                            </div>
                           )}
                         </div>
                       ))}
@@ -708,14 +719,30 @@ function ActiviteitToevoegenModal({ weekId, dag, activiteit, bibliotheek, volgor
   const [naam, setNaam] = useState(activiteit?.naam ?? '')
   const [categorie, setCategorie] = useState(activiteit?.categorie ?? STANDAARD_CATEGORIEEN[0])
   const [beschrijving, setBeschrijving] = useState(activiteit?.beschrijving ?? '')
+  const [benodigdhedenRaw, setBenodigdhedenRaw] = useState((activiteit?.benodigdheden ?? []).join(', '))
+  const [nieuweCategorie, setNieuweCategorie] = useState('')
+  const [toonNieuweCategorie, setToonNieuweCategorie] = useState(false)
   const [zoek, setZoek] = useState('')
   const [categorieen, setCategorieen] = useState<string[]>(STANDAARD_CATEGORIEEN)
 
   useEffect(() => {
-    getSupabase().from('kasboek_categorieen').select('naam').then(({ data }) => {
-      if (data && data.length > 0) setCategorieen(data.map((r: { naam: string }) => r.naam))
+    getSupabase().from('vakantie_categorieen').select('naam').order('naam').then(({ data }) => {
+      if (data && data.length > 0) {
+        setCategorieen(data.map((r: { naam: string }) => r.naam))
+      }
     })
   }, [])
+
+  async function voegCategorieToe() {
+    if (!nieuweCategorie.trim()) return
+    const naam = nieuweCategorie.trim()
+    await getSupabase().from('vakantie_categorieen').insert({ naam }).then(() => {
+      setCategorieen(prev => [...prev, naam].sort())
+      setCategorie(naam)
+      setNieuweCategorie('')
+      setToonNieuweCategorie(false)
+    })
+  }
 
   const gefilterd = bibliotheek.filter(a =>
     !zoek || a.naam.toLowerCase().includes(zoek.toLowerCase()) || a.categorie.toLowerCase().includes(zoek.toLowerCase())
@@ -723,7 +750,8 @@ function ActiviteitToevoegenModal({ weekId, dag, activiteit, bibliotheek, volgor
 
   function handleSave() {
     if (!naam.trim()) return
-    const data = { week_id: weekId, dag, volgorde, categorie, naam: naam.trim(), beschrijving: beschrijving.trim() || null, activiteit_id: null }
+    const benodigdheden = benodigdhedenRaw.split(',').map(s => s.trim()).filter(Boolean)
+    const data = { week_id: weekId, dag, volgorde, categorie, naam: naam.trim(), beschrijving: beschrijving.trim() || null, benodigdheden, activiteit_id: null }
     if (activiteit) onBewerk(activiteit.id, data)
     else onSave(data)
   }
@@ -731,6 +759,7 @@ function ActiviteitToevoegenModal({ weekId, dag, activiteit, bibliotheek, volgor
   function kiesUitBibliotheek(a: BibliotheekActiviteit) {
     setNaam(a.naam)
     setCategorie(a.categorie)
+    if (a.materialen?.length > 0) setBenodigdhedenRaw(a.materialen.join(', '))
     setTab('handmatig')
   }
 
@@ -754,22 +783,44 @@ function ActiviteitToevoegenModal({ weekId, dag, activiteit, bibliotheek, volgor
         <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           {tab === 'handmatig' ? (
             <>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                <div>
-                  <label className="form-label">Naam activiteit *</label>
-                  <input className="form-input" value={naam} onChange={e => setNaam(e.target.value)} placeholder="Naam van de activiteit" autoFocus />
-                </div>
-                <div>
-                  <label className="form-label">Categorie</label>
-                  <input className="form-input" value={categorie} onChange={e => setCategorie(e.target.value)} list="cat-lijst" placeholder="Bijv. Knutsel, Groepsspel..." />
-                  <datalist id="cat-lijst">
-                    {STANDAARD_CATEGORIEEN.map(c => <option key={c} value={c} />)}
-                  </datalist>
-                </div>
+              <div>
+                <label className="form-label">Naam activiteit *</label>
+                <input className="form-input" value={naam} onChange={e => setNaam(e.target.value)} placeholder="Naam van de activiteit" autoFocus />
+              </div>
+              <div>
+                <label className="form-label" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span>Categorie</span>
+                  <button type="button" onClick={() => setToonNieuweCategorie(!toonNieuweCategorie)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, color: 'var(--primary)', fontWeight: 500 }}>
+                    + Nieuwe categorie
+                  </button>
+                </label>
+                {toonNieuweCategorie ? (
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <input className="form-input" value={nieuweCategorie} onChange={e => setNieuweCategorie(e.target.value)} placeholder="Naam nieuwe categorie" onKeyDown={e => e.key === 'Enter' && voegCategorieToe()} autoFocus />
+                    <button className="btn btn-primary" onClick={voegCategorieToe} disabled={!nieuweCategorie.trim()} style={{ whiteSpace: 'nowrap' }}>Toevoegen</button>
+                    <button className="btn" onClick={() => setToonNieuweCategorie(false)}>✕</button>
+                  </div>
+                ) : (
+                  <select className="form-select" value={categorie} onChange={e => setCategorie(e.target.value)}>
+                    {categorieen.map(c => <option key={c} value={c}>{c}</option>)}
+                    {!categorieen.includes(categorie) && categorie && <option value={categorie}>{categorie}</option>}
+                  </select>
+                )}
+              </div>
+              <div>
+                <label className="form-label">Benodigdheden (kommagescheiden)</label>
+                <input className="form-input" value={benodigdhedenRaw} onChange={e => setBenodigdhedenRaw(e.target.value)} placeholder="Bijv. Schaar, lijm, gekleurd papier, verf" />
+                {benodigdhedenRaw && (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginTop: 6 }}>
+                    {benodigdhedenRaw.split(',').map(s => s.trim()).filter(Boolean).map((b, i) => (
+                      <span key={i} style={{ padding: '2px 9px', borderRadius: 20, background: 'var(--primary-light)', color: 'var(--primary-text)', fontSize: 11, fontWeight: 500 }}>{b}</span>
+                    ))}
+                  </div>
+                )}
               </div>
               <div>
                 <label className="form-label">Beschrijving (optioneel)</label>
-                <textarea className="form-textarea" value={beschrijving} onChange={e => setBeschrijving(e.target.value)} placeholder="Korte omschrijving van de activiteit..." style={{ minHeight: 80 }} />
+                <textarea className="form-textarea" value={beschrijving} onChange={e => setBeschrijving(e.target.value)} placeholder="Korte omschrijving van de activiteit..." style={{ minHeight: 70 }} />
               </div>
               <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
                 <button className="btn" onClick={onClose}>Annuleren</button>
