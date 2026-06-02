@@ -189,7 +189,8 @@ async function exporteerPDF(locatieNaam: string, weekStart: string, registraties
 // ─── Hoofd pagina ─────────────────────────────────────────────────────────────
 
 export default function MaaltijdlijstPage() {
-  const { profiel, isSuperadmin } = useAuth()
+  const { profiel, isSuperadmin, maaltijdToegang } = useAuth()
+  const [toegestaneLocaties, setToegestaneLocaties] = useState<{naam: string; toegang: string}[]>([])
 
   const [locaties, setLocaties] = useState<Locatie[]>([])
   const [actieveLocatie, setActieveLocatie] = useState<Locatie | null>(null)
@@ -208,12 +209,34 @@ export default function MaaltijdlijstPage() {
 
   // ── Locaties ────────────────────────────────────────────────────────────────
   const haalLocatiesOp = useCallback(async () => {
-    const { data } = await getSupabase().from('maaltijd_locaties').select('*').eq('actief', true).order('naam')
-    setLocaties((data ?? []) as Locatie[])
-    if (data && data.length > 0 && !actieveLocatie) setActieveLocatie(data[0] as Locatie)
-  }, [actieveLocatie])
+    if (!profiel) return
+    const supabase = getSupabase()
+    const { data: alleLocaties } = await supabase.from('maaltijd_locaties').select('*').eq('actief', true).order('naam')
+    if (!alleLocaties) return
 
-  useEffect(() => { haalLocatiesOp() }, [])
+    let zichtbaar: Locatie[] = []
+
+    if (isSuperadmin) {
+      zichtbaar = alleLocaties as Locatie[]
+    } else {
+      const { data: toegangData } = await supabase
+        .from('locatie_toegang')
+        .select('locatie_naam, toegang')
+        .eq('profiel_id', profiel.id)
+        .eq('locatie_type', 'maaltijdlijst')
+        .neq('toegang', 'geen')
+
+      const toegangMap = Object.fromEntries((toegangData ?? []).map((t: {locatie_naam: string; toegang: string}) => [t.locatie_naam, t.toegang]))
+      setToegestaneLocaties((toegangData ?? []).map((t: {locatie_naam: string; toegang: string}) => ({ naam: t.locatie_naam, toegang: t.toegang })))
+      zichtbaar = (alleLocaties as Locatie[]).filter(l => toegangMap[l.naam])
+    }
+
+    setLocaties(zichtbaar)
+    if (zichtbaar.length > 0 && !actieveLocatie) setActieveLocatie(zichtbaar[0])
+    else if (actieveLocatie && !zichtbaar.find(l => l.id === actieveLocatie.id)) setActieveLocatie(zichtbaar[0] ?? null)
+  }, [profiel, isSuperadmin, actieveLocatie])
+
+  useEffect(() => { haalLocatiesOp() }, [profiel])
 
   // ── Standaard kinderen ──────────────────────────────────────────────────────
   const haalStandaardOp = useCallback(async () => {
@@ -353,6 +376,7 @@ export default function MaaltijdlijstPage() {
   }
 
   const isHuidigeWeek = huidigWeekStart === toDateStr(maandaagVanWeek(new Date()))
+  const magBewerken = isSuperadmin || (actieveLocatie ? maaltijdToegang(actieveLocatie.naam) === 'bewerken' : false)
 
   // ─── RENDER ──────────────────────────────────────────────────────────────────
 
@@ -373,10 +397,25 @@ export default function MaaltijdlijstPage() {
                 <Settings size={14} /> Standaard kinderen
               </button>
             )}
+            {!isSuperadmin && actieveLocatie && maaltijdToegang(actieveLocatie.naam) === 'lezen' && (
+              <span style={{ fontSize: 12, color: 'var(--text-muted)', padding: '6px 10px', borderRadius: 7, background: 'var(--bg)', border: '1px solid var(--border)' }}>
+                👁 Alleen lezen
+              </span>
+            )}
             {isSuperadmin && (
               <button className="btn" onClick={() => setLocatieModal(true)}>
                 <MapPin size={14} /> Locaties
               </button>
+            )}
+            {!isSuperadmin && actieveLocatie && maaltijdToegang(actieveLocatie.naam) === 'lezen' && (
+              <span style={{ fontSize: 12, color: 'var(--text-muted)', padding: '6px 12px', borderRadius: 8, background: 'var(--bg)', border: '1px solid var(--border)' }}>
+                👁 Alleen lezen
+              </span>
+            )}
+            {!magBewerken && actieveLocatie && (
+              <span style={{ fontSize: 12, color: 'var(--text-muted)', fontStyle: 'italic', padding: '4px 10px' }}>
+                👁️ Alleen lezen
+              </span>
             )}
           </div>
         }
@@ -453,7 +492,7 @@ export default function MaaltijdlijstPage() {
                             </td>
                             <td colSpan={4} style={{ padding: '10px 14px', border: '1px solid var(--border)', color: 'var(--text-muted)', fontSize: 12, fontStyle: 'italic' }}>Geen kinderen</td>
                             <td style={{ border: '1px solid var(--border)', textAlign: 'center', padding: 6 }}>
-                              <button onClick={() => setExtraModal(dag)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--primary)', display: 'flex', alignItems: 'center', margin: '0 auto' }} title="Extra kind toevoegen"><UserPlus size={14} /></button>
+                              {magBewerken && <button onClick={() => setExtraModal(dag)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--primary)', display: 'flex', alignItems: 'center', margin: '0 auto' }} title="Extra kind toevoegen"><UserPlus size={14} /></button>}
                             </td>
                           </tr>
                         ] : dagRegs.map((reg, i) => (
@@ -475,24 +514,27 @@ export default function MaaltijdlijstPage() {
                             <td style={{ padding: '8px 14px', border: '1px solid var(--border)', fontSize: 12, color: 'var(--text-muted)' }}>
                               {reg.bijzonderheden ?? '—'}
                             </td>
-                            {/* Aanwezig toggle */}
+                            {/* Meegegeten toggle */}
                             <td style={{ padding: '8px 14px', border: '1px solid var(--border)', textAlign: 'center' }}>
                               <button
-                                onClick={() => toggleAanwezig(reg)}
+                                onClick={() => magBewerken ? toggleAanwezig(reg) : undefined}
+                                disabled={!magBewerken}
                                 style={{
-                                  width: 32, height: 32, borderRadius: 8, border: 'none', cursor: 'pointer',
+                                  width: 32, height: 32, borderRadius: 8, border: 'none',
+                                  cursor: magBewerken ? 'pointer' : 'default',
                                   background: reg.aanwezig ? 'var(--primary)' : '#FEF2F2',
                                   color: reg.aanwezig ? '#fff' : '#DC2626',
                                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                                   margin: '0 auto', fontSize: 16, transition: 'all 0.15s',
+                                  opacity: magBewerken ? 1 : 0.7,
                                 }}
-                                title={reg.aanwezig ? 'Klik om af te vinken' : 'Klik om aan te vinken'}
+                                title={magBewerken ? (reg.aanwezig ? 'Klik om af te vinken' : 'Klik om aan te vinken') : 'Alleen lezen'}
                               >
                                 {reg.aanwezig ? '✓' : '✗'}
                               </button>
                             </td>
                             {/* Wat gegeten */}
-                            <td style={{ padding: '8px 14px', border: '1px solid var(--border)', cursor: 'pointer' }} onClick={() => setWatGegetenModal(reg)}>
+                            <td style={{ padding: '8px 14px', border: '1px solid var(--border)', cursor: magBewerken ? 'pointer' : 'default' }} onClick={() => magBewerken && setWatGegetenModal(reg)}>
                               <span style={{ fontSize: 12, color: reg.wat_gegeten ? 'var(--text)' : 'var(--text-muted)', fontStyle: reg.wat_gegeten ? 'normal' : 'italic' }}>
                                 {reg.wat_gegeten ?? 'Klik om in te vullen...'}
                               </span>
@@ -500,10 +542,10 @@ export default function MaaltijdlijstPage() {
                             {/* Acties */}
                             <td style={{ padding: '6px', border: '1px solid var(--border)', textAlign: 'center' }}>
                               <div style={{ display: 'flex', gap: 4, justifyContent: 'center' }}>
-                                {i === dagRegs.length - 1 && (
+                                {magBewerken && i === dagRegs.length - 1 && (
                                   <button onClick={() => setExtraModal(dag)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--primary)', display: 'flex' }} title="Extra toevoegen"><UserPlus size={13} /></button>
                                 )}
-                                {reg.is_extra && (
+                                {magBewerken && reg.is_extra && (
                                   <button onClick={() => verwijderRegistratie(reg.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#DC2626', display: 'flex', opacity: 0.6 }} title="Verwijderen"><X size={13} /></button>
                                 )}
                               </div>

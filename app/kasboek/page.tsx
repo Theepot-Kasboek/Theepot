@@ -46,7 +46,8 @@ const STANDAARD_CATEGORIEEN = ['Omzet', 'Inkopen', 'Personeelskosten', 'Overige 
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function KasboekPage() {
-  const { profiel, isSuperadmin } = useAuth()
+  const { profiel, isSuperadmin, kasboekToegang } = useAuth()
+  const [toegestaneLocaties, setToegestaneLocaties] = useState<{naam: string; toegang: string}[]>([])
 
   // Navigatie
   const [huidigeDatum, setHuidigeDatum] = useState(new Date())
@@ -84,23 +85,45 @@ export default function KasboekPage() {
   const [bonnetjeUrl, setBonnetjeUrl] = useState<string | null>(null)
   const [bonnetjeLaden, setBonnetjeLaden] = useState(false)
 
-  // ── Locaties ophalen ────────────────────────────────────────────────────────
+  // ── Locaties ophalen + toegang filteren ────────────────────────────────────
   const haalLocatiesOp = useCallback(async () => {
-    const { data } = await getSupabase()
-      .from('kasboek_locaties')
-      .select('*')
-      .eq('actief', true)
-      .order('naam')
-    if (data) {
-      setLocaties(data as Locatie[])
-      // Zet eerste locatie actief als nog niet geselecteerd
-      if (data.length > 0 && !actieveLocatie) {
-        setActieveLocatie(data[0] as Locatie)
-      }
-    }
-  }, [actieveLocatie])
+    if (!profiel) return
+    const supabase = getSupabase()
+    const { data: alleLocaties } = await supabase
+      .from('kasboek_locaties').select('*').eq('actief', true).order('naam')
+    if (!alleLocaties) return
 
-  useEffect(() => { haalLocatiesOp() }, [])
+    let zichtbaar: Locatie[] = []
+
+    if (isSuperadmin) {
+      // Superadmin ziet alles
+      zichtbaar = alleLocaties as Locatie[]
+    } else {
+      // Haal locatietoegang op voor dit account
+      const { data: toegangData } = await supabase
+        .from('locatie_toegang')
+        .select('locatie_naam, toegang')
+        .eq('profiel_id', profiel.id)
+        .eq('locatie_type', 'kasboek')
+        .neq('toegang', 'geen')
+
+      const toegangMap = Object.fromEntries((toegangData ?? []).map((t: {locatie_naam: string; toegang: string}) => [t.locatie_naam, t.toegang]))
+      setToegestaneLocaties((toegangData ?? []).map((t: {locatie_naam: string; toegang: string}) => ({ naam: t.locatie_naam, toegang: t.toegang })))
+      zichtbaar = (alleLocaties as Locatie[]).filter(l => toegangMap[l.naam])
+    }
+
+    setLocaties(zichtbaar)
+    if (zichtbaar.length > 0 && !actieveLocatie) {
+      setActieveLocatie(zichtbaar[0])
+    } else if (actieveLocatie && !zichtbaar.find(l => l.id === actieveLocatie.id)) {
+      setActieveLocatie(zichtbaar[0] ?? null)
+    }
+  }, [profiel, isSuperadmin, actieveLocatie])
+
+  useEffect(() => { haalLocatiesOp() }, [profiel])
+
+  // Mag de actieve locatie bewerken?
+  const magBewerkenKasboek = isSuperadmin || toegestaneLocaties.find(t => t.naam === actieveLocatie?.naam)?.toegang === 'bewerken'
 
   // ── Categorieën ophalen ─────────────────────────────────────────────────────
   const haalCategorieenOp = useCallback(async () => {
@@ -306,6 +329,12 @@ export default function KasboekPage() {
                 </button>
               </>
             )}
+            {/* Lees-indicator voor read-only gebruikers */}
+            {!isSuperadmin && actieveLocatie && kasboekToegang(actieveLocatie.naam) === 'lezen' && (
+              <span style={{ fontSize: 12, color: 'var(--text-muted)', padding: '6px 12px', borderRadius: 8, background: 'var(--bg)', border: '1px solid var(--border)' }}>
+                👁 Alleen lezen
+              </span>
+            )}
           </div>
         }
       />
@@ -378,16 +407,21 @@ export default function KasboekPage() {
               ))}
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 16 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: magBewerkenKasboek ? '1fr 2fr' : '1fr', gap: 16 }}>
               {/* Links: formulier + per categorie */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                <div className="card">
+                {!magBewerkenKasboek && (
+                  <div style={{ padding: '10px 14px', background: 'var(--primary-xlight)', border: '1px solid var(--border-dark)', borderRadius: 9, fontSize: 13, color: 'var(--primary-text)' }}>
+                    👁️ Je hebt alleen leestoegang voor deze locatie.
+                  </div>
+                )}
+                {magBewerkenKasboek && <div className="card">
                   <div className="card-header">
                     <span className="card-title">Nieuwe boeking</span>
                     <span className="tag tag-green" style={{ fontSize: 11 }}>{actieveLocatie.naam}</span>
                   </div>
                   <div className="card-body">
-                    <form onSubmit={handleToevoegen} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                    <form onSubmit={handleToevoegen} style={{ display: 'flex', flexDirection: 'column', gap: 14 }} aria-disabled={!isSuperadmin && actieveLocatie ? kasboekToegang(actieveLocatie.naam) !== 'bewerken' : false}>
                       {/* Type toggle */}
                       <div style={{ display: 'flex', gap: 4, background: 'var(--bg)', borderRadius: 9, padding: 4 }}>
                         {(['inkomst', 'uitgave'] as const).map(t => (
@@ -466,13 +500,19 @@ export default function KasboekPage() {
                         </div>
                       </div>
 
-                      <button type="submit" className="btn btn-primary" disabled={opslaan || !bedrag} style={{ justifyContent: 'center' }}>
-                        <Plus size={15} />
-                        {opslaan ? 'Opslaan...' : 'Boeking toevoegen'}
-                      </button>
+                      {(!isSuperadmin && actieveLocatie && kasboekToegang(actieveLocatie.naam) !== 'bewerken') ? (
+                        <div style={{ padding: '8px 12px', borderRadius: 8, background: 'var(--bg)', border: '1px solid var(--border)', fontSize: 12, color: 'var(--text-muted)', textAlign: 'center' }}>
+                          Alleen lezen — je kunt geen boekingen toevoegen voor deze locatie
+                        </div>
+                      ) : (
+                        <button type="submit" className="btn btn-primary" disabled={opslaan || !bedrag} style={{ justifyContent: 'center' }}>
+                          <Plus size={15} />
+                          {opslaan ? 'Opslaan...' : 'Boeking toevoegen'}
+                        </button>
+                      )}
                     </form>
                   </div>
-                </div>
+                </div>}
 
                 {/* Per categorie */}
                 {Object.keys(perCategorie).length > 0 && (
