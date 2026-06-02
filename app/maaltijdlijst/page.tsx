@@ -96,7 +96,7 @@ async function exporteerPDF(locatieNaam: string, weekStart: string, registraties
   // Tabel opzet
   const kolomX = [10, 52, 115, 175, 215, 260]
   const kolomBreedtes = [40, 62, 58, 38, 43, 35]
-  const KOLOMTITELS = ['Dag + datum', 'Naam kind', 'Bijzonderheden / allergie', 'Aanwezig', 'Wat gegeten?', 'Extra']
+  const KOLOMTITELS = ['Dag + datum', 'Naam kind', 'Bijzonderheden / allergie', 'Meegegeten', 'Wat gegeten?', 'Extra']
   let y = 42
 
   // Tabelheader
@@ -432,7 +432,7 @@ export default function MaaltijdlijstPage() {
                       <th style={{ width: 120, padding: '10px 14px', background: 'var(--primary)', color: '#fff', fontFamily: 'Sora, sans-serif', fontSize: 12, textAlign: 'left', border: '1px solid var(--primary-dark)' }}>Dag + datum</th>
                       <th style={{ padding: '10px 14px', background: 'var(--primary)', color: '#fff', fontFamily: 'Sora, sans-serif', fontSize: 12, textAlign: 'left', border: '1px solid var(--primary-dark)', minWidth: 180 }}>Naam kind</th>
                       <th style={{ padding: '10px 14px', background: 'var(--primary)', color: '#fff', fontFamily: 'Sora, sans-serif', fontSize: 12, textAlign: 'left', border: '1px solid var(--primary-dark)', minWidth: 160 }}>Bijzonderheden / allergie</th>
-                      <th style={{ width: 90, padding: '10px 14px', background: 'var(--primary)', color: '#fff', fontFamily: 'Sora, sans-serif', fontSize: 12, textAlign: 'center', border: '1px solid var(--primary-dark)' }}>Aanwezig</th>
+                      <th style={{ width: 90, padding: '10px 14px', background: 'var(--primary)', color: '#fff', fontFamily: 'Sora, sans-serif', fontSize: 12, textAlign: 'center', border: '1px solid var(--primary-dark)' }}>Meegegeten</th>
                       <th style={{ padding: '10px 14px', background: 'var(--primary)', color: '#fff', fontFamily: 'Sora, sans-serif', fontSize: 12, textAlign: 'left', border: '1px solid var(--primary-dark)', minWidth: 140 }}>Wat gegeten?</th>
                       <th style={{ width: 60, padding: '10px 14px', background: 'var(--primary)', color: '#fff', border: '1px solid var(--primary-dark)' }}></th>
                     </tr>
@@ -486,7 +486,7 @@ export default function MaaltijdlijstPage() {
                                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                                   margin: '0 auto', fontSize: 16, transition: 'all 0.15s',
                                 }}
-                                title={reg.aanwezig ? 'Klik om af te melden' : 'Klik om aan te melden'}
+                                title={reg.aanwezig ? 'Klik om af te vinken' : 'Klik om aan te vinken'}
                               >
                                 {reg.aanwezig ? '✓' : '✗'}
                               </button>

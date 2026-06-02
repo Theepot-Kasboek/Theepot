@@ -135,7 +135,10 @@ function leegRecht(): Omit<Recht, 'id' | 'rol' | 'profiel_id'> {
 export default function RechtenPage() {
   const { isSuperadmin } = useAuth()
 
-  const [tab, setTab] = useState<'rollen' | 'accounts'>('rollen')
+  const [tab, setTab] = useState<'rollen' | 'accounts' | 'locaties'>('rollen')
+  const [kasboekLocaties, setKasboekLocaties] = useState<string[]>([])
+  const [maaltijdLocaties, setMaaltijdLocaties] = useState<string[]>([])
+  const [locatieToegang, setLocatieToegang] = useState<{id:string;profiel_id:string;locatie_type:string;locatie_naam:string;toegang:string}[]>([])
   const [rechten, setRechten] = useState<Recht[]>([])
   const [profielen, setProfielen] = useState<Profiel[]>([])
   const [laden, setLaden] = useState(true)
@@ -146,12 +149,18 @@ export default function RechtenPage() {
   const haalOp = useCallback(async () => {
     setLaden(true)
     const supabase = getSupabase()
-    const [{ data: r }, { data: p }] = await Promise.all([
+    const [{ data: r }, { data: p }, { data: kl }, { data: ml }, { data: lt }] = await Promise.all([
       supabase.from('rechten').select('*'),
       supabase.from('profielen').select('*').neq('rol', 'superadmin').order('naam'),
+      supabase.from('kasboek_locaties').select('naam').eq('actief', true).order('naam'),
+      supabase.from('maaltijd_locaties').select('naam').eq('actief', true).order('naam'),
+      supabase.from('locatie_toegang').select('*'),
     ])
     setRechten((r ?? []) as Recht[])
     setProfielen((p ?? []) as Profiel[])
+    setKasboekLocaties((kl ?? []).map((l: {naam: string}) => l.naam))
+    setMaaltijdLocaties((ml ?? []).map((l: {naam: string}) => l.naam))
+    setLocatieToegang(lt ?? [])
     setLaden(false)
   }, [])
 
@@ -229,7 +238,7 @@ export default function RechtenPage() {
 
         {/* Tabs */}
         <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', marginBottom: 20 }}>
-          {([['rollen', '🎭 Per rol', Users], ['accounts', '👤 Per account', User]] as const).map(([key, label, Icon]) => (
+          {([['rollen', '🎭 Per rol'], ['accounts', '👤 Per account'], ['locaties', '📍 Locatietoegang']] as const).map(([key, label]) => (
             <button
               key={key}
               onClick={() => setTab(key)}
@@ -285,6 +294,18 @@ export default function RechtenPage() {
                 <h3>Geen medewerkers</h3>
                 <p>Voeg eerst medewerkers toe via de Medewerkers pagina.</p>
               </div>
+            )}
+
+            {/* Locatietoegang tab */}
+            {tab === 'locaties' && (
+              <LocatieToegang
+                profielen={profielen}
+                kasboekLocaties={kasboekLocaties}
+                maaltijdLocaties={maaltijdLocaties}
+                locatieToegang={locatieToegang}
+                onRefresh={haalOp}
+                onToast={setToast}
+              />
             )}
           </div>
         )}
@@ -462,6 +483,164 @@ function RechtKaart({ titel, subtitel, avatar, recht, open, onToggle, onSave, op
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+// ─── Locatie Toegang component ────────────────────────────────────────────────
+
+type LocatieToegangsRij = { id: string; profiel_id: string; locatie_type: string; locatie_naam: string; toegang: string }
+
+function LocatieToegang({ profielen, kasboekLocaties, maaltijdLocaties, locatieToegang, onRefresh, onToast }: {
+  profielen: Profiel[]
+  kasboekLocaties: string[]
+  maaltijdLocaties: string[]
+  locatieToegang: LocatieToegangsRij[]
+  onRefresh: () => void
+  onToast: (t: { bericht: string; type: 'success' | 'error' }) => void
+}) {
+  const [actieveProfiel, setActieveProfiel] = useState<string>(profielen[0]?.id ?? '')
+  const [opslaan, setOpslaan] = useState(false)
+
+  const profiel = profielen.find(p => p.id === actieveProfiel)
+
+  function huidigeToegang(locatieType: string, locatieNaam: string): string {
+    return locatieToegang.find(t => t.profiel_id === actieveProfiel && t.locatie_type === locatieType && t.locatie_naam === locatieNaam)?.toegang ?? 'geen'
+  }
+
+  async function setToegang(locatieType: string, locatieNaam: string, toegang: string) {
+    const supabase = getSupabase()
+    const bestaand = locatieToegang.find(t => t.profiel_id === actieveProfiel && t.locatie_type === locatieType && t.locatie_naam === locatieNaam)
+
+    if (bestaand) {
+      await supabase.from('locatie_toegang').update({ toegang }).eq('id', bestaand.id)
+    } else {
+      await supabase.from('locatie_toegang').insert({ profiel_id: actieveProfiel, locatie_type: locatieType, locatie_naam: locatieNaam, toegang })
+    }
+    onRefresh()
+  }
+
+  if (profielen.length === 0) return (
+    <div className="empty-state" style={{ padding: 40 }}>
+      <User size={32} />
+      <h3>Geen medewerkers</h3>
+      <p>Voeg eerst medewerkers toe via de Medewerkers pagina.</p>
+    </div>
+  )
+
+  return (
+    <div style={{ display: 'flex', gap: 16 }}>
+      {/* Profielen lijst links */}
+      <div style={{ width: 220, flexShrink: 0 }}>
+        <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 10 }}>Medewerker</div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          {profielen.map(p => (
+            <button
+              key={p.id}
+              onClick={() => setActieveProfiel(p.id)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 9, padding: '9px 12px', borderRadius: 9,
+                border: `1.5px solid ${actieveProfiel === p.id ? 'var(--primary)' : 'var(--border)'}`,
+                background: actieveProfiel === p.id ? 'var(--primary-xlight)' : 'var(--bg-card)',
+                cursor: 'pointer', textAlign: 'left', transition: 'all 0.12s',
+              }}
+            >
+              <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'var(--primary)', color: '#fff', fontSize: 11, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                {p.naam.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase()}
+              </div>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 13, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.naam}</div>
+                <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>{ROL_LABELS[p.rol]}</div>
+              </div>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Rechter kant: locatietoegang */}
+      <div style={{ flex: 1 }}>
+        {profiel && (
+          <>
+            <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 10 }}>
+              Locatietoegang voor {profiel.naam}
+            </div>
+
+            {/* Kasboek locaties */}
+            {kasboekLocaties.length > 0 && (
+              <div className="card" style={{ marginBottom: 14 }}>
+                <div className="card-header">
+                  <span className="card-title">💰 Kasboek — locaties</span>
+                </div>
+                <div>
+                  {kasboekLocaties.map(loc => {
+                    const toegang = huidigeToegang('kasboek', loc)
+                    return (
+                      <div key={loc} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 18px', borderBottom: '1px solid var(--border)' }}>
+                        <div style={{ flex: 1, fontSize: 13, fontWeight: 500 }}>📍 {loc}</div>
+                        <div style={{ display: 'flex', gap: 4, background: 'var(--bg)', borderRadius: 8, padding: 3, border: '1px solid var(--border)' }}>
+                          {TOEGANG_OPTIES.map(opt => (
+                            <button
+                              key={opt.waarde}
+                              onClick={() => setToegang('kasboek', loc, opt.waarde)}
+                              style={{
+                                padding: '5px 12px', borderRadius: 6, border: 'none', fontSize: 12, fontWeight: 500, cursor: 'pointer', transition: 'all 0.12s',
+                                background: toegang === opt.waarde ? opt.bg : 'transparent',
+                                color: toegang === opt.waarde ? opt.kleur : 'var(--text-muted)',
+                                outline: toegang === opt.waarde ? `1.5px solid ${opt.kleur}40` : 'none',
+                              }}
+                            >{opt.label}</button>
+                          ))}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Maaltijdlijst locaties */}
+            {maaltijdLocaties.length > 0 && (
+              <div className="card">
+                <div className="card-header">
+                  <span className="card-title">🍽️ Maaltijdlijst — locaties</span>
+                </div>
+                <div>
+                  {maaltijdLocaties.map(loc => {
+                    const toegang = huidigeToegang('maaltijdlijst', loc)
+                    return (
+                      <div key={loc} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 18px', borderBottom: '1px solid var(--border)' }}>
+                        <div style={{ flex: 1, fontSize: 13, fontWeight: 500 }}>📍 {loc}</div>
+                        <div style={{ display: 'flex', gap: 4, background: 'var(--bg)', borderRadius: 8, padding: 3, border: '1px solid var(--border)' }}>
+                          {TOEGANG_OPTIES.map(opt => (
+                            <button
+                              key={opt.waarde}
+                              onClick={() => setToegang('maaltijdlijst', loc, opt.waarde)}
+                              style={{
+                                padding: '5px 12px', borderRadius: 6, border: 'none', fontSize: 12, fontWeight: 500, cursor: 'pointer', transition: 'all 0.12s',
+                                background: toegang === opt.waarde ? opt.bg : 'transparent',
+                                color: toegang === opt.waarde ? opt.kleur : 'var(--text-muted)',
+                                outline: toegang === opt.waarde ? `1.5px solid ${opt.kleur}40` : 'none',
+                              }}
+                            >{opt.label}</button>
+                          ))}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+
+            {kasboekLocaties.length === 0 && maaltijdLocaties.length === 0 && (
+              <div className="empty-state" style={{ padding: 40 }}>
+                <span style={{ fontSize: 36, opacity: 0.3 }}>📍</span>
+                <h3>Geen locaties</h3>
+                <p>Voeg eerst locaties toe via het Kasboek of de Maaltijdlijst.</p>
+              </div>
+            )}
+          </>
+        )}
+      </div>
     </div>
   )
 }
