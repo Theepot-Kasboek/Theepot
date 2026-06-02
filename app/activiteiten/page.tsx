@@ -331,6 +331,15 @@ function ActiviteitenPage() {
     let matchFilter = true
     if (actieveFilter === 'beschikbaar') matchFilter = a.materiaal_aanwezig
     else if (actieveFilter === 'kort') matchFilter = a.tijdsduur <= 30
+    else if (actieveFilter === 'leeftijd_jong') {
+      const l = a.leeftijd?.toLowerCase() ?? ''
+      matchFilter = l.includes('4') || l.includes('5') || l.includes('6') || l.includes('7') || l.includes('jong') || l.includes('klein')
+    }
+    else if (actieveFilter === 'leeftijd_oud') {
+      const l = a.leeftijd?.toLowerCase() ?? ''
+      const getallen = l.match(/\d+/g)?.map(Number) ?? []
+      matchFilter = getallen.some(n => n >= 8) || l.includes('8') || l.includes('oud') || l.includes('groot')
+    }
     else if (actieveFilter.startsWith('cat:')) matchFilter = a.categorie === actieveFilter.slice(4)
     else if (actieveFilter.startsWith('thema:')) matchFilter = a.thema === actieveFilter.slice(6)
     return matchZoek && matchFilter
@@ -352,6 +361,23 @@ function ActiviteitenPage() {
     if (!geselecteerd) return
     const { error } = await getSupabase().from('activiteiten').delete().eq('id', geselecteerd.id)
     if (!error) { await laadActiviteiten(); setGeselecteerd(null); setToast({ bericht: 'Verwijderd!', type: 'success' }) }
+  }
+
+  async function kopieerAlsJSON(a: Activiteit, e: React.MouseEvent) {
+    e.stopPropagation()
+    const json = JSON.stringify([{
+      naam: a.naam,
+      thema: a.thema,
+      leeftijd: a.leeftijd,
+      tijdsduur: a.tijdsduur,
+      groepsgrootte: a.groepsgrootte,
+      beschrijving: a.beschrijving,
+      materialen: a.materialen,
+      stappen: a.stappen,
+      categorie: a.categorie,
+    }], null, 2)
+    await navigator.clipboard.writeText(json)
+    setToast({ bericht: 'JSON gekopieerd!', type: 'success' })
   }
 
   async function kopieerKaart(a: Activiteit, e: React.MouseEvent) {
@@ -427,6 +453,8 @@ function ActiviteitenPage() {
           <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap', marginBottom: 10 }}>
             {[
               { key: 'all', label: 'Alle' },
+              { key: 'leeftijd_jong', label: '👶 4–7 jaar' },
+              { key: 'leeftijd_oud', label: '🧒 8+ jaar' },
               { key: 'beschikbaar', label: '✅ Beschikbaar' },
               { key: 'kort', label: '⏱ Kort (≤30 min)' },
             ].map(f => (
@@ -491,8 +519,9 @@ function ActiviteitenPage() {
                     <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 8 }}>
                       <h3 style={{ fontFamily: 'Sora, sans-serif', fontSize: 14, fontWeight: 600, lineHeight: 1.35, flex: 1, paddingRight: 8 }}>{a.naam}</h3>
                       <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
-                        <button onClick={e => kopieerKaart(a, e)} className="btn btn-sm" style={{ padding: '4px 8px' }}><Copy size={11} /></button>
-                        <button onClick={e => exportKaart(a, e)} className="btn btn-sm" style={{ padding: '4px 8px' }} title="PDF exporteren (staand)"><Download size={11} /></button>
+                        <button onClick={e => kopieerKaart(a, e)} className="btn btn-sm" style={{ padding: '4px 8px' }} title="Kopieer als tekst"><Copy size={11} /></button>
+                        <button onClick={e => exportKaart(a, e)} className="btn btn-sm" style={{ padding: '4px 8px' }} title="PDF exporteren"><Download size={11} /></button>
+                        <button onClick={e => kopieerAlsJSON(a, e)} className="btn btn-sm" style={{ padding: '4px 8px' }} title="Kopieer als JSON"><span style={{ fontSize: 9, fontWeight: 700, fontFamily: 'monospace' }}>JSON</span></button>
                       </div>
                     </div>
                     <p style={{ fontSize: 12.5, color: 'var(--text-muted)', lineHeight: 1.55, marginBottom: 12, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>

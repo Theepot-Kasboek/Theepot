@@ -99,7 +99,7 @@ function localToISO(local: string) {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function AgendaPage() {
-  const { profiel, isSuperadmin } = useAuth()
+  const { profiel, isSuperadmin, rechten } = useAuth()
 
   const [weergave, setWeergave] = useState<Weergave>('maand')
   const [huidigeDatum, setHuidigeDatum] = useState(new Date())
@@ -130,6 +130,10 @@ export default function AgendaPage() {
     if (!profiel) return
     const supabase = getSupabase()
 
+    // Rollen die alle kalenders mogen inzien
+    const magAllesZien = isSuperadmin || profiel.rol === 'directie' || profiel.rol === 'leidinggevende'
+    const magAllesBewerken = isSuperadmin
+
     // Eigen persoonlijke kalender
     const { data: persoonlijk } = await supabase
       .from('agenda_kalenders')
@@ -137,9 +141,19 @@ export default function AgendaPage() {
       .eq('type', 'persoonlijk')
       .eq('eigenaar_id', profiel.id)
 
-    // Algemene kalenders (superadmin ziet alle, anderen alleen gedeelde)
+    // Alle persoonlijke kalenders voor bevoorrechte rollen
+    let allePersoonlijk: Kalender[] = persoonlijk ?? []
+    if (magAllesZien) {
+      const { data } = await supabase
+        .from('agenda_kalenders')
+        .select('*')
+        .eq('type', 'persoonlijk')
+      allePersoonlijk = data ?? []
+    }
+
+    // Algemene kalenders
     let algemeen: Kalender[] = []
-    if (isSuperadmin) {
+    if (magAllesZien) {
       const { data } = await supabase
         .from('agenda_kalenders')
         .select('*')
@@ -158,16 +172,6 @@ export default function AgendaPage() {
           .in('id', ids)
         algemeen = data ?? []
       }
-    }
-
-    // Als superadmin: alle persoonlijke kalenders ook zichtbaar
-    let allePersoonlijk: Kalender[] = persoonlijk ?? []
-    if (isSuperadmin) {
-      const { data } = await supabase
-        .from('agenda_kalenders')
-        .select('*')
-        .eq('type', 'persoonlijk')
-      allePersoonlijk = data ?? []
     }
 
     const alles = [...allePersoonlijk, ...algemeen]
@@ -266,7 +270,11 @@ export default function AgendaPage() {
     })
   }
 
+  // Bewerk rechten: superadmin en leidinggevende mogen alles, directie alleen lezen
+  const magBewerken = isSuperadmin || profiel?.rol === 'leidinggevende' || rechten.agenda_algemeen_bewerken
+
   function openNieuw(dag?: Date) {
+    if (!magBewerken) return
     setKlikDatum(dag ?? null)
     setBewerkAfspraak(null)
     setNieuwModal(true)
@@ -303,7 +311,7 @@ export default function AgendaPage() {
             return (
               <div
                 key={i}
-                onClick={() => openNieuw(dag)}
+                onClick={() => magBewerken && openNieuw(dag)}
                 style={{ borderRight: '1px solid var(--border)', borderBottom: '1px solid var(--border)', padding: '6px', cursor: 'pointer', minHeight: 90, background: vandaag ? 'var(--primary-xlight)' : 'var(--bg-card)', transition: 'background 0.1s' }}
                 onMouseEnter={e => !vandaag && (e.currentTarget.style.background = 'var(--bg)')}
                 onMouseLeave={e => !vandaag && (e.currentTarget.style.background = 'var(--bg-card)')}
@@ -537,7 +545,7 @@ export default function AgendaPage() {
             {/* Kalenders + Nieuw */}
             <button className="btn" onClick={() => setKalenderPanelOpen(true)}><Calendar size={14} /> Kalenders</button>
             <button className="btn" onClick={() => setIcsModal(true)}><Upload size={14} /> ICS</button>
-            <button className="btn btn-primary" onClick={() => openNieuw()}><Plus size={14} /> Afspraak</button>
+            {magBewerken && <button className="btn btn-primary" onClick={() => openNieuw()}><Plus size={14} /> Afspraak</button>}
           </div>
         }
       />
