@@ -43,6 +43,188 @@ function navigeerMaand(datum: Date, richting: number): Date {
 
 const STANDAARD_CATEGORIEEN = ['Omzet', 'Inkopen', 'Personeelskosten', 'Overige kosten', 'Materialen', 'Huisvestingskosten']
 
+// ─── PDF Export ───────────────────────────────────────────────────────────────
+
+async function exportKasboekPDF(
+  locatieNaam: string,
+  maandLabel: string,
+  entries: KasboekEntry[],
+  inkomsten: number,
+  uitgaven: number,
+  saldo: number,
+  perCategorie: Record<string, { inkomst: number; uitgave: number }>
+) {
+  const { jsPDF } = await import('jspdf')
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
+
+  const groen: [number, number, number] = [140, 198, 63]
+  const donkerGroen: [number, number, number] = [61, 107, 26]
+  const wit: [number, number, number] = [255, 255, 255]
+  const zwart: [number, number, number] = [15, 26, 8]
+  const grijs: [number, number, number] = [150, 150, 150]
+  const lichtGroen: [number, number, number] = [235, 245, 214]
+  const lichtRood: [number, number, number] = [254, 242, 242]
+
+  const fmt = (n: number) => `€ ${Math.abs(n).toFixed(2).replace('.', ',')}`
+  const marge = 15
+  const breedte = 210 - marge * 2
+  let y = 0
+
+  // Header
+  doc.setFillColor(...groen)
+  doc.rect(0, 0, 210, 20, 'F')
+  doc.setTextColor(...wit)
+  doc.setFontSize(9)
+  doc.setFont('helvetica', 'bold')
+  doc.text('De Theepot — Kasboek', marge, 12)
+  doc.setFont('helvetica', 'normal')
+  doc.text(new Date().toLocaleDateString('nl-NL'), 210 - marge, 12, { align: 'right' })
+
+  // Titel
+  y = 32
+  doc.setTextColor(...zwart)
+  doc.setFontSize(20)
+  doc.setFont('helvetica', 'bold')
+  doc.text('Kasboek', marge, y)
+  y += 8
+  doc.setFontSize(11)
+  doc.setFont('helvetica', 'normal')
+  doc.setTextColor(...donkerGroen)
+  doc.text(`${locatieNaam} — ${maandLabel}`, marge, y)
+  y += 14
+
+  // Samenvatting blokken
+  const blokB = (breedte - 8) / 3
+  const blokken = [
+    { label: 'Inkomsten', bedrag: inkomsten, kleur: [22, 163, 74] as [number,number,number], bg: [240, 253, 244] as [number,number,number] },
+    { label: 'Uitgaven',  bedrag: uitgaven,  kleur: [220, 38, 38]  as [number,number,number], bg: [254, 242, 242] as [number,number,number] },
+    { label: 'Saldo',     bedrag: saldo,     kleur: saldo >= 0 ? donkerGroen : [220, 38, 38] as [number,number,number], bg: saldo >= 0 ? lichtGroen : lichtRood },
+  ]
+
+  blokken.forEach((b, i) => {
+    const x = marge + i * (blokB + 4)
+    doc.setFillColor(...b.bg)
+    doc.roundedRect(x, y, blokB, 22, 3, 3, 'F')
+    doc.setDrawColor(...b.kleur)
+    doc.setLineWidth(0.5)
+    doc.roundedRect(x, y, blokB, 22, 3, 3, 'S')
+    doc.setFontSize(8)
+    doc.setFont('helvetica', 'bold')
+    doc.setTextColor(...b.kleur)
+    doc.text(b.label.toUpperCase(), x + 4, y + 7)
+    doc.setFontSize(14)
+    doc.text(fmt(b.bedrag), x + 4, y + 17)
+  })
+  y += 30
+
+  // Per categorie
+  if (Object.keys(perCategorie).length > 0) {
+    doc.setFontSize(11)
+    doc.setFont('helvetica', 'bold')
+    doc.setTextColor(...zwart)
+    doc.text('Overzicht per categorie', marge, y)
+    y += 7
+
+    doc.setFillColor(...groen)
+    doc.rect(marge, y, breedte, 7, 'F')
+    doc.setTextColor(...wit)
+    doc.setFontSize(8)
+    doc.setFont('helvetica', 'bold')
+    doc.text('Categorie', marge + 3, y + 4.8)
+    doc.text('Inkomsten', marge + 90, y + 4.8)
+    doc.text('Uitgaven', marge + 125, y + 4.8)
+    doc.text('Saldo', marge + 158, y + 4.8)
+    y += 7
+
+    Object.entries(perCategorie).forEach(([cat, bedragen], i) => {
+      const catSaldo = bedragen.inkomst - bedragen.uitgave
+      doc.setFillColor(i % 2 === 0 ? 255 : 248, i % 2 === 0 ? 255 : 250, i % 2 === 0 ? 255 : 248)
+      doc.rect(marge, y, breedte, 7, 'F')
+      doc.setDrawColor(...grijs)
+      doc.setLineWidth(0.2)
+      doc.rect(marge, y, breedte, 7)
+      doc.setTextColor(...zwart)
+      doc.setFont('helvetica', 'normal')
+      doc.setFontSize(8.5)
+      doc.text(cat, marge + 3, y + 4.8)
+      doc.setTextColor(22, 163, 74)
+      doc.text(bedragen.inkomst > 0 ? `+${fmt(bedragen.inkomst)}` : '—', marge + 90, y + 4.8)
+      doc.setTextColor(220, 38, 38)
+      doc.text(bedragen.uitgave > 0 ? `−${fmt(bedragen.uitgave)}` : '—', marge + 125, y + 4.8)
+      doc.setTextColor(catSaldo >= 0 ? 61 : 220, catSaldo >= 0 ? 107 : 38, catSaldo >= 0 ? 26 : 38)
+      doc.text(fmt(catSaldo), marge + 158, y + 4.8)
+      y += 7
+    })
+    y += 8
+  }
+
+  // Boekingen tabel
+  doc.setFontSize(11)
+  doc.setFont('helvetica', 'bold')
+  doc.setTextColor(...zwart)
+  doc.text('Alle boekingen', marge, y)
+  y += 7
+
+  doc.setFillColor(...groen)
+  doc.rect(marge, y, breedte, 7, 'F')
+  doc.setTextColor(...wit)
+  doc.setFontSize(8)
+  doc.setFont('helvetica', 'bold')
+  doc.text('Datum & tijd', marge + 3, y + 4.8)
+  doc.text('Type', marge + 42, y + 4.8)
+  doc.text('Categorie', marge + 62, y + 4.8)
+  doc.text('Omschrijving', marge + 105, y + 4.8)
+  doc.text('Bedrag', marge + 155, y + 4.8)
+  y += 7
+
+  entries.forEach((entry, i) => {
+    if (y > 265) { doc.addPage(); y = 20 }
+    const isInkomst = entry.type === 'inkomst'
+    doc.setFillColor(i % 2 === 0 ? 255 : 248, i % 2 === 0 ? 255 : 250, i % 2 === 0 ? 255 : 248)
+    doc.rect(marge, y, breedte, 7, 'F')
+    doc.setDrawColor(...grijs)
+    doc.setLineWidth(0.2)
+    doc.rect(marge, y, breedte, 7)
+    doc.setTextColor(...zwart)
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(8)
+    const datum = new Date(entry.aangemaakt_op)
+    doc.text(datum.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' }) + ' ' + datum.toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' }), marge + 3, y + 4.8)
+    doc.setTextColor(isInkomst ? 22 : 220, isInkomst ? 163 : 38, isInkomst ? 74 : 38)
+    doc.text(isInkomst ? '↑ Inkomst' : '↓ Uitgave', marge + 42, y + 4.8)
+    doc.setTextColor(...zwart)
+    doc.text((entry.categorie ?? '—').substring(0, 18), marge + 62, y + 4.8)
+    doc.text((entry.omschrijving ?? '—').substring(0, 26), marge + 105, y + 4.8)
+    doc.setTextColor(isInkomst ? 22 : 220, isInkomst ? 163 : 38, isInkomst ? 74 : 38)
+    doc.setFont('helvetica', 'bold')
+    doc.text((isInkomst ? '+' : '−') + fmt(entry.bedrag), marge + 155, y + 4.8)
+    y += 7
+  })
+
+  if (entries.length === 0) {
+    doc.setTextColor(...grijs)
+    doc.setFont('helvetica', 'italic')
+    doc.setFontSize(9)
+    doc.text('Geen boekingen in deze periode.', marge + 3, y + 5)
+    y += 10
+  }
+
+  // Footer
+  const aantalPaginas = doc.getNumberOfPages()
+  for (let p = 1; p <= aantalPaginas; p++) {
+    doc.setPage(p)
+    doc.setFillColor(245, 247, 245)
+    doc.rect(0, 284, 210, 13, 'F')
+    doc.setFontSize(7)
+    doc.setFont('helvetica', 'normal')
+    doc.setTextColor(...grijs)
+    doc.text(`De Theepot — Kasboek ${locatieNaam} — ${maandLabel}`, marge, 291)
+    doc.text(`${p} / ${aantalPaginas}`, 210 - marge, 291, { align: 'right' })
+  }
+
+  doc.save(`Kasboek_${locatieNaam}_${maandLabel.replace(' ', '_')}.pdf`)
+}
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function KasboekPage() {
@@ -318,6 +500,23 @@ export default function KasboekPage() {
             <button className="btn" style={{ padding: '6px 8px' }} onClick={() => setHuidigeDatum(d => navigeerMaand(d, 1))}>
               <ChevronRight size={16} />
             </button>
+            {/* Export knop */}
+            {actieveLocatie && (isSuperadmin || (actieveLocatie && kasboekToegang(actieveLocatie.naam) !== 'geen')) && (
+              <button
+                className="btn"
+                onClick={() => exportKasboekPDF(
+                  actieveLocatie.naam,
+                  periodeLabel(huidigeDatum),
+                  entries,
+                  inkomsten,
+                  uitgaven,
+                  saldo,
+                  perCategorie
+                )}
+              >
+                <Download size={14} /> PDF
+              </button>
+            )}
             {/* Beheer knoppen (alleen superadmin) */}
             {isSuperadmin && (
               <>
