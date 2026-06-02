@@ -267,9 +267,18 @@ export default function ChatPage() {
               <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 8 }}>Support</div>
               <div
                 onClick={() => {
-                  const bestaand = gesprekken.find(g => g.type === 'direct' && deelnemers.some(d => d.gesprek_id === g.id && d.profiel_id === supportProfiel.id))
-                  if (bestaand) { setActiefGesprek(bestaand) }
-                  else if (magStarten) maakGesprek(`${profiel?.naam} & ${supportProfiel.naam}`, 'direct', [supportProfiel.id])
+                  // Zoek bestaand gesprek met support (check via alle deelnemers van elk gesprek)
+                  const bestaand = gesprekken.find(g => {
+                    if (g.type !== 'direct') return false
+                    // We checken dit via de gespreksnaam als fallback
+                    return g.naam.includes(supportProfiel.naam) && g.naam.includes(profiel?.naam ?? '')
+                  })
+                  if (bestaand) {
+                    setActiefGesprek(bestaand)
+                  } else {
+                    // Iedereen mag altijd een gesprek starten met support
+                    maakGesprek(`${profiel?.naam} & ${supportProfiel.naam}`, 'direct', [supportProfiel.id])
+                  }
                 }}
                 style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', borderRadius: 10, cursor: 'pointer', background: 'var(--primary-xlight)', border: '1px solid var(--border-dark)', transition: 'background 0.12s' }}
                 onMouseEnter={e => (e.currentTarget.style.background = 'var(--primary-light)')}
