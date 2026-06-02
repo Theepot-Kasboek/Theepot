@@ -60,128 +60,212 @@ function maandLabel(weekStart: string): string {
 
 // ─── PDF Export ───────────────────────────────────────────────────────────────
 
-async function exporteerPDF(locatieNaam: string, weekStart: string, registraties: Registratie[]) {
+async function exporteerPDF(
+  locatieNaam: string,
+  weekStart: string,
+  registraties: Registratie[],
+  orientatie: 'portrait' | 'landscape' = 'portrait'
+) {
   const { jsPDF } = await import('jspdf')
-  const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' })
+  const doc = new jsPDF({ orientation: orientatie, unit: 'mm', format: 'a4' })
+
   const groen: [number, number, number] = [140, 198, 63]
   const donkerGroen: [number, number, number] = [61, 107, 26]
   const wit: [number, number, number] = [255, 255, 255]
-  const zwart: [number, number, number] = [15, 26, 8]
+  const zwart: [number, number, number] = [30, 30, 30]
   const grijs: [number, number, number] = [180, 180, 180]
   const lichtGroen: [number, number, number] = [235, 245, 214]
 
+  const isLandscape = orientatie === 'landscape'
+  const paginaBreedte = isLandscape ? 297 : 210
+  const paginaHoogte = isLandscape ? 210 : 297
+  const marge = 14
+  const breedte = paginaBreedte - marge * 2
+  let y = 0
+
   const ma = new Date(weekStart)
   const vr = new Date(ma); vr.setDate(ma.getDate() + 4)
+  const weekLabel = `${ma.toLocaleDateString('nl-NL', { day: 'numeric', month: 'long' })} – ${vr.toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric' })}`
+
+  // Kolom breedtes afhankelijk van orientatie
+  const kol = {
+    dag:    isLandscape ? 32 : 28,
+    naam:   isLandscape ? 54 : 46,
+    bijz:   isLandscape ? 54 : 46,
+    meeg:   isLandscape ? 22 : 18,
+    wat:    isLandscape ? 46 : 38,
+    extra:  isLandscape ? 20 : 16,
+  }
 
   // Header
   doc.setFillColor(...groen)
-  doc.rect(0, 0, 297, 18, 'F')
+  doc.rect(0, 0, paginaBreedte, 16, 'F')
   doc.setTextColor(...wit)
-  doc.setFontSize(9)
+  doc.setFontSize(8.5)
   doc.setFont('helvetica', 'bold')
-  doc.text('De Theepot — Maaltijdlijst', 10, 11)
+  doc.text('De Theepot — Maaltijdlijst', marge, 10)
   doc.setFont('helvetica', 'normal')
-  doc.text(`${locatieNaam} · Maand: ${maandLabel(weekStart)}`, 297 - 10, 11, { align: 'right' })
+  doc.text(new Date().toLocaleDateString('nl-NL'), paginaBreedte - marge, 10, { align: 'right' })
 
   // Titel
+  y = 26
   doc.setTextColor(...zwart)
-  doc.setFontSize(14)
+  doc.setFontSize(16)
   doc.setFont('helvetica', 'bold')
-  doc.text(`Eetlijst SLS — ${locatieNaam}`, 10, 28)
-  doc.setFontSize(10)
+  doc.text(`Eetlijst — ${locatieNaam}`, marge, y)
+  y += 7
+  doc.setFontSize(9)
   doc.setFont('helvetica', 'normal')
   doc.setTextColor(...donkerGroen)
-  doc.text(`Week: ${ma.toLocaleDateString('nl-NL', { day: 'numeric', month: 'long' })} – ${vr.toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric' })}`, 10, 34)
-
-  // Tabel opzet
-  const kolomX = [10, 52, 115, 175, 215, 260]
-  const kolomBreedtes = [40, 62, 58, 38, 43, 35]
-  const KOLOMTITELS = ['Dag + datum', 'Naam kind', 'Bijzonderheden / allergie', 'Meegegeten', 'Wat gegeten?', 'Extra']
-  let y = 42
+  doc.text(`Maand: ${maandLabel(weekStart)} · Week: ${weekLabel}`, marge, y)
+  y += 10
 
   // Tabelheader
-  doc.setFillColor(...groen)
-  doc.rect(10, y, 284, 8, 'F')
-  doc.setTextColor(...wit)
-  doc.setFontSize(8)
-  doc.setFont('helvetica', 'bold')
-  KOLOMTITELS.forEach((t, i) => doc.text(t, kolomX[i] + 2, y + 5.5))
-  y += 8
+  const kolomX = [
+    marge,
+    marge + kol.dag,
+    marge + kol.dag + kol.naam,
+    marge + kol.dag + kol.naam + kol.bijz,
+    marge + kol.dag + kol.naam + kol.bijz + kol.meeg,
+    marge + kol.dag + kol.naam + kol.bijz + kol.meeg + kol.wat,
+  ]
 
-  // Rijen per dag
-  DAGEN.forEach((dag, dagIdx) => {
+  const rijH = 8.5
+
+  function tekenHeader() {
+    doc.setFillColor(...groen)
+    doc.rect(marge, y, breedte, rijH, 'F')
+    doc.setTextColor(...wit)
+    doc.setFontSize(7.5)
+    doc.setFont('helvetica', 'bold')
+    const headers = ['Dag + datum', 'Naam kind', 'Bijzonderheden', 'Meegegeten', 'Wat gegeten?', 'Extra']
+    headers.forEach((h, i) => doc.text(h, kolomX[i] + 2, y + 5.5))
+    y += rijH
+  }
+
+  tekenHeader()
+
+  DAGEN.forEach((dag) => {
     const dagRegs = registraties.filter(r => r.dag === dag).sort((a, b) => a.volgorde - b.volgorde)
     const datum = dagDatum(weekStart, dag)
     const aantalRijen = Math.max(dagRegs.length, 1)
+    const blokHoogte = aantalRijen * rijH
 
-    // Dag cel (gegroepeerd)
-    if (y > 175) { doc.addPage(); y = 20 }
+    // Nieuwe pagina nodig?
+    if (y + blokHoogte > paginaHoogte - 20) {
+      doc.addPage()
+      y = 20
+      tekenHeader()
+    }
 
-    const dagH = aantalRijen * 8
-    doc.setFillColor(...lichtGroen)
-    doc.rect(10, y, 40, dagH, 'F')
-    doc.setDrawColor(...grijs)
-    doc.setLineWidth(0.3)
-    doc.rect(10, y, 40, dagH)
-    doc.setTextColor(...donkerGroen)
-    doc.setFont('helvetica', 'bold')
-    doc.setFontSize(8.5)
-    doc.text(DAG_LABEL[dag], 12, y + 5)
-    doc.setFont('helvetica', 'normal')
-    doc.setFontSize(7.5)
-    doc.setTextColor(100, 120, 80)
-    doc.text(datum, 12, y + 9.5)
+    const dagY = y
 
     if (dagRegs.length === 0) {
       // Lege rij
-      doc.setFillColor(248, 250, 246)
-      doc.rect(52, y, 245, 8, 'F')
-      doc.rect(52, y, 245, 8)
-      y += 8
+      doc.setFillColor(...lichtGroen)
+      doc.rect(marge, y, kol.dag, rijH, 'F')
+      doc.setFillColor(252, 252, 252)
+      doc.rect(marge + kol.dag, y, breedte - kol.dag, rijH, 'F')
+      doc.setDrawColor(...grijs)
+      doc.setLineWidth(0.25)
+      doc.rect(marge, y, breedte, rijH)
+
+      doc.setTextColor(...donkerGroen)
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(7.5)
+      doc.text(DAG_LABEL[dag], marge + 2, y + 5.5)
+
+      doc.setTextColor(...grijs)
+      doc.setFont('helvetica', 'italic')
+      doc.setFontSize(7.5)
+      doc.text(datum, marge + 2, y + 5.5 + 3.5)
+
+      y += rijH
     } else {
       dagRegs.forEach((reg, i) => {
-        const rijY = y + i * 8
-        doc.setFillColor(i % 2 === 0 ? 255 : 248, i % 2 === 0 ? 255 : 250, i % 2 === 0 ? 255 : 246)
-        doc.rect(52, rijY, 245, 8, 'F')
-        ;[52, 115, 175, 215, 260].forEach(x => {
+        const rijY = dagY + i * rijH
+        const isOneven = i % 2 === 1
+
+        // Dag cel (alleen eerste rij)
+        if (i === 0) {
+          doc.setFillColor(...lichtGroen)
+          doc.rect(marge, dagY, kol.dag, blokHoogte, 'F')
           doc.setDrawColor(...grijs)
-          doc.rect(x, rijY, kolomBreedtes[[52,115,175,215,260].indexOf(x)+1] || 35, 8)
-        })
-
-        doc.setTextColor(...zwart)
-        doc.setFont('helvetica', reg.is_extra ? 'italic' : 'normal')
-        doc.setFontSize(8)
-        const naamTekst = reg.naam + (reg.is_extra ? ' (extra)' : '')
-        doc.text(naamTekst.substring(0, 30), 54, rijY + 5.2)
-
-        if (reg.bijzonderheden) {
-          doc.setFontSize(7)
-          doc.setTextColor(100, 100, 100)
-          doc.text(reg.bijzonderheden.substring(0, 28), 117, rijY + 5.2)
+          doc.setLineWidth(0.25)
+          doc.rect(marge, dagY, kol.dag, blokHoogte)
+          doc.setTextColor(...donkerGroen)
+          doc.setFont('helvetica', 'bold')
+          doc.setFontSize(7.5)
+          doc.text(DAG_LABEL[dag], marge + 2, dagY + 5.5)
+          doc.setFont('helvetica', 'normal')
+          doc.setFontSize(6.5)
+          doc.text(datum, marge + 2, dagY + 10)
         }
 
-        // Aanwezig indicator
-        doc.setFontSize(10)
-        doc.setTextColor(reg.aanwezig ? 61 : 160, reg.aanwezig ? 107 : 30, reg.aanwezig ? 26 : 30)
-        doc.text(reg.aanwezig ? '✓' : '✗', 193, rijY + 5.5)
+        // Inhoud kolommen
+        doc.setFillColor(isOneven ? 248 : 255, isOneven ? 250 : 255, isOneven ? 248 : 255)
+        doc.rect(marge + kol.dag, rijY, breedte - kol.dag, rijH, 'F')
+        doc.setDrawColor(...grijs)
+        doc.setLineWidth(0.25)
+        // Horizontale lijn
+        if (i > 0) doc.line(marge + kol.dag, rijY, marge + breedte, rijY)
+        // Verticale lijnen
+        ;[kol.dag, kol.dag + kol.naam, kol.dag + kol.naam + kol.bijz, kol.dag + kol.naam + kol.bijz + kol.meeg, kol.dag + kol.naam + kol.bijz + kol.meeg + kol.wat].forEach(x => {
+          doc.line(marge + x, rijY, marge + x, rijY + rijH)
+        })
+        doc.rect(marge, dagY, breedte, blokHoogte)
 
+        // Naam
+        doc.setTextColor(reg.aanwezig ? 30 : 150, 30, 30)
+        doc.setFont('helvetica', reg.is_extra ? 'italic' : 'normal')
+        doc.setFontSize(7.5)
+        const naamTekst = (reg.naam + (reg.is_extra ? ' (extra)' : '')).substring(0, 22)
+        doc.text(naamTekst, kolomX[1] + 2, rijY + 5.5)
+
+        // Bijzonderheden
+        if (reg.bijzonderheden) {
+          doc.setTextColor(100, 100, 100)
+          doc.setFont('helvetica', 'normal')
+          doc.setFontSize(7)
+          doc.text(reg.bijzonderheden.substring(0, 22), kolomX[2] + 2, rijY + 5.5)
+        }
+
+        // Meegegeten
+        doc.setFontSize(10)
+        doc.setFont('helvetica', 'bold')
+        doc.setTextColor(reg.aanwezig ? 61 : 200, reg.aanwezig ? 107 : 50, reg.aanwezig ? 26 : 50)
+        doc.text(reg.aanwezig ? '✓' : '✗', kolomX[3] + kol.meeg / 2 - 2, rijY + 5.8)
+
+        // Wat gegeten
         if (reg.wat_gegeten) {
           doc.setFontSize(7.5)
-          doc.setTextColor(...zwart)
-          doc.text(reg.wat_gegeten.substring(0, 22), 217, rijY + 5.2)
+          doc.setFont('helvetica', 'normal')
+          doc.setTextColor(30, 30, 30)
+          doc.text(reg.wat_gegeten.substring(0, 20), kolomX[4] + 2, rijY + 5.5)
         }
       })
-      y += aantalRijen * 8
+
+      y = dagY + blokHoogte
     }
+
+    // Dikke scheidingslijn tussen dagen
+    doc.setFillColor(...groen)
+    doc.rect(marge, y, breedte, 2.5, 'F')
+    y += 2.5
   })
 
-  // Footer
-  doc.setFillColor(245, 247, 245)
-  doc.rect(0, 195, 297, 10, 'F')
-  doc.setFontSize(7)
-  doc.setTextColor(130, 130, 130)
-  doc.text('De Theepot — Maaltijdlijst', 10, 200)
-  doc.text(new Date().toLocaleDateString('nl-NL'), 287, 200, { align: 'right' })
+  // Footer op alle pagina's
+  const aantalPaginas = doc.getNumberOfPages()
+  for (let p = 1; p <= aantalPaginas; p++) {
+    doc.setPage(p)
+    doc.setFillColor(245, 247, 245)
+    doc.rect(0, paginaHoogte - 12, paginaBreedte, 12, 'F')
+    doc.setFontSize(7)
+    doc.setFont('helvetica', 'normal')
+    doc.setTextColor(...grijs)
+    doc.text(`De Theepot — Maaltijdlijst ${locatieNaam} — ${weekLabel}`, marge, paginaHoogte - 5)
+    doc.text(`${p} / ${aantalPaginas}`, paginaBreedte - marge, paginaHoogte - 5, { align: 'right' })
+  }
 
   doc.save(`Maaltijdlijst_${locatieNaam}_${weekStart}.pdf`)
 }
@@ -205,6 +289,8 @@ export default function MaaltijdlijstPage() {
   const [watGegetenModal, setWatGegetenModal] = useState<Registratie | null>(null)
 
   const [laden, setLaden] = useState(false)
+  const [exportOrientatie, setExportOrientatie] = useState<'portrait' | 'landscape'>('portrait')
+  const [toonOrientatieKeuze, setToonOrientatieKeuze] = useState(false)
   const [toast, setToast] = useState<{ bericht: string; type: 'success' | 'error' } | null>(null)
 
   // ── Locaties ────────────────────────────────────────────────────────────────
@@ -388,9 +474,21 @@ export default function MaaltijdlijstPage() {
         acties={
           <div style={{ display: 'flex', gap: 8 }}>
             {actieveLocatie && week && (
-              <button className="btn" onClick={() => exporteerPDF(actieveLocatie.naam, huidigWeekStart, registraties)}>
-                <Download size={14} /> Export PDF
-              </button>
+              <div style={{ position: 'relative' }}>
+                <button className="btn" onClick={() => setToonOrientatieKeuze(o => !o)}>
+                  <Download size={14} /> Export PDF
+                </button>
+                {toonOrientatieKeuze && (
+                  <div style={{ position: 'absolute', top: '100%', right: 0, marginTop: 4, background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 10, boxShadow: '0 4px 20px rgba(0,0,0,0.1)', padding: 4, zIndex: 30, minWidth: 170 }}>
+                    {(['portrait', 'landscape'] as const).map(o => (
+                      <button key={o} onClick={() => { setToonOrientatieKeuze(false); exporteerPDF(actieveLocatie.naam, huidigWeekStart, registraties, o) }} style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '8px 12px', background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, color: 'var(--text)', borderRadius: 7, textAlign: 'left' }} onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg)')} onMouseLeave={e => (e.currentTarget.style.background = 'none')}>
+                        <span style={{ fontSize: 16 }}>{o === 'portrait' ? '📄' : '📰'}</span>
+                        {o === 'portrait' ? 'Staand (A4)' : 'Liggend (A4)'}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
             )}
             {isSuperadmin && actieveLocatie && (
               <button className="btn" onClick={() => setStandaardModal(true)}>
@@ -565,6 +663,8 @@ export default function MaaltijdlijstPage() {
           </>
         )}
       </div>
+
+      {toonOrientatieKeuze && <div style={{ position: 'fixed', inset: 0, zIndex: 20 }} onClick={() => setToonOrientatieKeuze(false)} />}
 
       {/* ─── Modals ──────────────────────────────────────────────────────────── */}
 

@@ -7,7 +7,7 @@ import Topbar from '@/components/Topbar'
 import Toast from '@/components/Toast'
 import {
   ChevronLeft, ChevronRight, Plus, X, Calendar,
-  Clock, AlignLeft, Users, Pencil, Trash2, Share2, Eye
+  Clock, AlignLeft, Users, Pencil, Trash2, Share2, Eye, Upload
 } from 'lucide-react'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -119,6 +119,7 @@ export default function AgendaPage() {
   const [detailAfspraak, setDetailAfspraak] = useState<Afspraak | null>(null)
   const [nieuweKalenderModal, setNieuweKalenderModal] = useState(false)
   const [deelModal, setDeelModal] = useState<Kalender | null>(null)
+  const [icsModal, setIcsModal] = useState(false)
   const [klikDatum, setKlikDatum] = useState<Date | null>(null)
 
   // Toast
@@ -535,6 +536,7 @@ export default function AgendaPage() {
             <button className="btn" style={{ padding: '6px 8px' }} onClick={() => setHuidigeDatum(d => navigeer(weergave, d, 1))}><ChevronRight size={16} /></button>
             {/* Kalenders + Nieuw */}
             <button className="btn" onClick={() => setKalenderPanelOpen(true)}><Calendar size={14} /> Kalenders</button>
+            <button className="btn" onClick={() => setIcsModal(true)}><Upload size={14} /> ICS</button>
             <button className="btn btn-primary" onClick={() => openNieuw()}><Plus size={14} /> Afspraak</button>
           </div>
         }
@@ -677,6 +679,26 @@ export default function AgendaPage() {
           kalender={deelModal}
           onClose={() => setDeelModal(null)}
           onToast={setToast}
+        />
+      )}
+
+      {/* ICS Import modal */}
+      {icsModal && (
+        <IcsImportModal
+          kalenders={alleKalenders.filter(k => k.type === 'algemeen' || k.eigenaar_id === profiel?.id)}
+          defaultKalenderId={alleKalenders.find(k => k.type === 'persoonlijk' && k.eigenaar_id === profiel?.id)?.id}
+          onImport={async (afspraken) => {
+            const supabase = getSupabase()
+            let succes = 0
+            for (const a of afspraken) {
+              const { error } = await supabase.from('agenda_afspraken').insert({ ...a, aangemaakt_door: profiel?.id })
+              if (!error) succes++
+            }
+            setIcsModal(false)
+            setToast({ bericht: `${succes} afspraken geïmporteerd!`, type: 'success' })
+            await haalAfsprakenOp()
+          }}
+          onClose={() => setIcsModal(false)}
         />
       )}
 
@@ -880,3 +902,220 @@ const KALENDER_KLEUREN = [
   '#8CC63F', '#185FA5', '#D97706', '#DC2626',
   '#7C3AED', '#0891B2', '#DB2777', '#059669',
 ]
+
+// ─── ICS Import Modal ─────────────────────────────────────────────────────────
+
+interface IcsAfspraak {
+  kalender_id: string
+  titel: string
+  beschrijving: string | null
+  start_tijd: string
+  eind_tijd: string
+  hele_dag: boolean
+}
+
+function IcsImportModal({ kalenders, defaultKalenderId, onImport, onClose }: {
+  kalenders: Kalender[]
+  defaultKalenderId?: string
+  onImport: (afspraken: IcsAfspraak[]) => void
+  onClose: () => void
+}) {
+  const [geselecteerdKalenderId, setGeselecteerdKalenderId] = useState(defaultKalenderId ?? kalenders[0]?.id ?? '')
+  const [geparsed, setGeparsed] = useState<IcsAfspraak[]>([])
+  const [parseError, setParseError] = useState('')
+  const [bestand, setBestand] = useState<File | null>(null)
+  const [laden, setLaden] = useState(false)
+
+  async function verwerkBestand(file: File) {
+    setBestand(file)
+    setParseError('')
+    setGeparsed([])
+    const tekst = await file.text()
+    const afspraken = parseICS(tekst, geselecteerdKalenderId)
+    if (afspraken.length === 0) {
+      setParseError('Geen afspraken gevonden in dit ICS bestand.')
+    } else {
+      setGeparsed(afspraken)
+    }
+  }
+
+  // Update kalender_id in geparsed als kalender wijzigt
+  function wijzigKalender(id: string) {
+    setGeselecteerdKalenderId(id)
+    setGeparsed(prev => prev.map(a => ({ ...a, kalender_id: id })))
+  }
+
+  return (
+    <div className="modal-backdrop" onClick={e => { if (e.target === e.currentTarget) onClose() }}>
+      <div className="modal-box" style={{ maxWidth: 520 }} onClick={e => e.stopPropagation()}>
+        <div className="card-header">
+          <span className="card-title">ICS bestand importeren</span>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex' }}><X size={18} /></button>
+        </div>
+        <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+          {/* Kalender kiezen */}
+          <div>
+            <label className="form-label">Importeren naar kalender</label>
+            <select className="form-select" value={geselecteerdKalenderId} onChange={e => wijzigKalender(e.target.value)}>
+              {kalenders.map(k => <option key={k.id} value={k.id}>{k.naam}</option>)}
+            </select>
+          </div>
+
+          {/* Bestand upload */}
+          <div>
+            <label className="form-label">ICS bestand</label>
+            <label style={{
+              display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px',
+              borderRadius: 9, border: '2px dashed var(--border-dark)', cursor: 'pointer',
+              background: bestand ? 'var(--primary-xlight)' : 'var(--bg)', transition: 'all 0.12s',
+            }}>
+              <Upload size={18} color={bestand ? 'var(--primary)' : 'var(--text-muted)'} />
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 500, color: bestand ? 'var(--primary-text)' : 'var(--text)' }}>
+                  {bestand ? bestand.name : 'Klik om een .ics bestand te kiezen'}
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                  {bestand ? `${geparsed.length} afspraken gevonden` : 'Google Calendar, Apple Calendar, Outlook, etc.'}
+                </div>
+              </div>
+              <input type="file" accept=".ics,text/calendar" style={{ display: 'none' }} onChange={e => e.target.files?.[0] && verwerkBestand(e.target.files[0])} />
+            </label>
+          </div>
+
+          {/* Fout */}
+          {parseError && (
+            <div style={{ padding: '10px 14px', borderRadius: 8, background: '#FEF2F2', border: '1px solid #FECACA', fontSize: 13, color: '#DC2626' }}>
+              {parseError}
+            </div>
+          )}
+
+          {/* Preview */}
+          {geparsed.length > 0 && (
+            <div>
+              <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>
+                Preview — {geparsed.length} afspraken
+              </div>
+              <div style={{ maxHeight: 240, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 5 }}>
+                {geparsed.slice(0, 20).map((a, i) => (
+                  <div key={i} style={{ display: 'flex', gap: 10, padding: '8px 12px', borderRadius: 8, background: 'var(--bg)', border: '1px solid var(--border)' }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.titel}</div>
+                      <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                        {a.hele_dag
+                          ? new Date(a.start_tijd).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric' }) + ' — Hele dag'
+                          : new Date(a.start_tijd).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' }) + ' · ' + new Date(a.start_tijd).toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' }) + ' – ' + new Date(a.eind_tijd).toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' })
+                        }
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                {geparsed.length > 20 && (
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)', textAlign: 'center', padding: 8 }}>
+                    + {geparsed.length - 20} meer afspraken
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+            <button className="btn" onClick={onClose}>Annuleren</button>
+            <button
+              className="btn btn-primary"
+              onClick={() => onImport(geparsed)}
+              disabled={geparsed.length === 0 || laden}
+            >
+              <Upload size={14} />
+              {laden ? 'Importeren...' : `${geparsed.length} afspraken importeren`}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── ICS Parser ───────────────────────────────────────────────────────────────
+
+function parseICS(tekst: string, kalenderId: string): IcsAfspraak[] {
+  const afspraken: IcsAfspraak[] = []
+  const regels = tekst.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n')
+
+  // Vouw gevouwen regels samen
+  const samengevoegd: string[] = []
+  for (const regel of regels) {
+    if (regel.startsWith(' ') || regel.startsWith('\t')) {
+      if (samengevoegd.length > 0) samengevoegd[samengevoegd.length - 1] += regel.substring(1)
+    } else {
+      samengevoegd.push(regel)
+    }
+  }
+
+  let inEvent = false
+  let huidig: Partial<{ titel: string; beschrijving: string; start: string; eind: string; heleDag: boolean }> = {}
+
+  for (const regel of samengevoegd) {
+    const dubbelpunt = regel.indexOf(':')
+    if (dubbelpunt === -1) continue
+    const sleutel = regel.substring(0, dubbelpunt).toUpperCase()
+    const waarde = regel.substring(dubbelpunt + 1).trim()
+
+    if (sleutel === 'BEGIN' && waarde === 'VEVENT') {
+      inEvent = true
+      huidig = {}
+    } else if (sleutel === 'END' && waarde === 'VEVENT') {
+      inEvent = false
+      if (huidig.titel && huidig.start) {
+        try {
+          const start = parseICSdatum(huidig.start)
+          const eind = huidig.eind ? parseICSdatum(huidig.eind) : new Date(start.getTime() + 3600000)
+          afspraken.push({
+            kalender_id: kalenderId,
+            titel: huidig.titel,
+            beschrijving: huidig.beschrijving ?? null,
+            start_tijd: start.toISOString(),
+            eind_tijd: eind.toISOString(),
+            hele_dag: huidig.heleDag ?? false,
+          })
+        } catch {}
+      }
+    } else if (inEvent) {
+      if (sleutel === 'SUMMARY') {
+        huidig.titel = waarde.replace(/\\n/g, ' ').replace(/\\,/g, ',').replace(/\\;/g, ';')
+      } else if (sleutel === 'DESCRIPTION') {
+        huidig.beschrijving = waarde.replace(/\\n/g, '\n').replace(/\\,/g, ',')
+      } else if (sleutel.startsWith('DTSTART')) {
+        huidig.start = waarde
+        huidig.heleDag = sleutel.includes('DATE') && !sleutel.includes('DATE-TIME') && !waarde.includes('T')
+      } else if (sleutel.startsWith('DTEND')) {
+        huidig.eind = waarde
+      }
+    }
+  }
+
+  return afspraken
+}
+
+function parseICSdatum(waarde: string): Date {
+  // Hele dag: 20240315
+  if (waarde.length === 8 && !waarde.includes('T')) {
+    return new Date(
+      parseInt(waarde.substring(0, 4)),
+      parseInt(waarde.substring(4, 6)) - 1,
+      parseInt(waarde.substring(6, 8))
+    )
+  }
+  // Met tijd: 20240315T140000Z of 20240315T140000
+  const jaar = parseInt(waarde.substring(0, 4))
+  const maand = parseInt(waarde.substring(4, 6)) - 1
+  const dag = parseInt(waarde.substring(6, 8))
+  const uur = parseInt(waarde.substring(9, 11))
+  const min = parseInt(waarde.substring(11, 13))
+  const sec = parseInt(waarde.substring(13, 15)) || 0
+
+  if (waarde.endsWith('Z')) {
+    return new Date(Date.UTC(jaar, maand, dag, uur, min, sec))
+  }
+  return new Date(jaar, maand, dag, uur, min, sec)
+}

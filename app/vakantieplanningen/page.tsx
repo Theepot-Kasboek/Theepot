@@ -255,9 +255,11 @@ export default function VakantieplanningenPage() {
           subtitel={`${zichtbarePlanningen.length} planning${zichtbarePlanningen.length !== 1 ? 'en' : ''}`}
           acties={
             magBewerken ? (
-              <button className="btn btn-primary" onClick={() => setNieuwePlanningModal(true)}>
-                <Plus size={14} /> Nieuwe planning
-              </button>
+              <div style={{ display: 'flex', alignItems: 'center' }}>
+                <button className="btn btn-primary" onClick={() => setNieuwePlanningModal(true)}>
+                  <Plus size={14} /> Nieuwe planning
+                </button>
+              </div>
             ) : undefined
           }
         />

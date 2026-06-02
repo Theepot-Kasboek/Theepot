@@ -295,6 +295,7 @@ function ActiviteitenPage() {
   const [bewerkActiviteit, setBewerkActiviteit] = useState<Activiteit | null>(null)
   const [toevoegen, setToevoegen] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
+  const [pdfOrientatie, setPdfOrientatie] = useState<'portrait' | 'landscape'>('portrait')
   const [toast, setToast] = useState<{ bericht: string; type: 'success' | 'error' } | null>(null)
 
   const laadActiviteiten = useCallback(async () => {
@@ -491,7 +492,7 @@ function ActiviteitenPage() {
                       <h3 style={{ fontFamily: 'Sora, sans-serif', fontSize: 14, fontWeight: 600, lineHeight: 1.35, flex: 1, paddingRight: 8 }}>{a.naam}</h3>
                       <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
                         <button onClick={e => kopieerKaart(a, e)} className="btn btn-sm" style={{ padding: '4px 8px' }}><Copy size={11} /></button>
-                        <button onClick={e => exportKaart(a, e)} className="btn btn-sm" style={{ padding: '4px 8px' }}><Download size={11} /></button>
+                        <button onClick={e => exportKaart(a, e)} className="btn btn-sm" style={{ padding: '4px 8px' }} title="PDF exporteren (staand)"><Download size={11} /></button>
                       </div>
                     </div>
                     <p style={{ fontSize: 12.5, color: 'var(--text-muted)', lineHeight: 1.55, marginBottom: 12, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
