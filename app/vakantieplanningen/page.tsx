@@ -8,7 +8,7 @@ import Toast from '@/components/Toast'
 import {
   Plus, X, ChevronDown, ChevronRight, Trash2,
   Calendar, Download, Eye, Upload, Pencil, GripVertical,
-  BookOpen, ArrowLeft
+  BookOpen, ArrowLeft, Send
 } from 'lucide-react'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -20,6 +20,7 @@ interface Planning {
   thema: string
   start_datum: string
   eind_datum: string
+  gepubliceerd: boolean
   aangemaakt_door: string | null
   aangemaakt_op: string
 }
@@ -67,7 +68,9 @@ function fmtDatum(d: string) {
 // ─── Hoofd component ──────────────────────────────────────────────────────────
 
 export default function VakantieplanningenPage() {
-  const { profiel } = useAuth()
+  const { profiel, rechten, isSuperadmin } = useAuth()
+  const magBewerken = isSuperadmin || rechten.pagina_vakantieplanningen === 'bewerken'
+  const magZien = isSuperadmin || rechten.pagina_vakantieplanningen !== 'geen'
 
   const [planningen, setPlanningen] = useState<Planning[]>([])
   const [actievePlanning, setActievePlanning] = useState<Planning | null>(null)
@@ -134,6 +137,15 @@ export default function VakantieplanningenPage() {
     setActiviteiten([])
     await haalPlanningenOp()
     setToast({ bericht: 'Planning verwijderd.', type: 'success' })
+  }
+
+  async function togglePubliceer(planning: Planning) {
+    await getSupabase().from('vakantie_planningen').update({ gepubliceerd: !planning.gepubliceerd }).eq('id', planning.id)
+    setToast({ bericht: planning.gepubliceerd ? 'Planning verborgen.' : 'Planning gepubliceerd!', type: 'success' })
+    await haalPlanningenOp()
+    if (actievePlanning?.id === planning.id) {
+      setActievePlanning({ ...actievePlanning, gepubliceerd: !planning.gepubliceerd })
+    }
   }
 
   async function maakWeek(naam: string) {
@@ -216,55 +228,99 @@ export default function VakantieplanningenPage() {
 
   // ─── OVERZICHT tabblad ────────────────────────────────────────────────────────
 
+  // Geen toegang
+  if (!magZien) {
+    return (
+      <>
+        <Topbar titel="Vakantieplanningen" subtitel="Geen toegang" />
+        <div className="page-content">
+          <div className="empty-state">
+            <Calendar size={36} />
+            <h3>Geen toegang</h3>
+            <p>Je hebt geen toegang tot de vakantieplanningen.</p>
+          </div>
+        </div>
+      </>
+    )
+  }
+
+  // Planningenlijst (niet-bewerkende gebruikers zien alleen gepubliceerde)
+  const zichtbarePlanningen = magBewerken ? planningen : planningen.filter(p => p.gepubliceerd)
+
   if (!actievePlanning) {
     return (
       <>
         <Topbar
           titel="Vakantieplanningen"
-          subtitel={`${planningen.length} planningen`}
+          subtitel={`${zichtbarePlanningen.length} planning${zichtbarePlanningen.length !== 1 ? 'en' : ''}`}
           acties={
-            <button className="btn btn-primary" onClick={() => setNieuwePlanningModal(true)}>
-              <Plus size={14} /> Nieuwe planning
-            </button>
-          }
-        />
-        <div className="page-content">
-          {planningen.length === 0 ? (
-            <div className="empty-state">
-              <Calendar size={36} />
-              <h3>Geen planningen</h3>
-              <p>Maak een eerste vakantieplanning aan.</p>
+            magBewerken ? (
               <button className="btn btn-primary" onClick={() => setNieuwePlanningModal(true)}>
                 <Plus size={14} /> Nieuwe planning
               </button>
+            ) : undefined
+          }
+        />
+        <div className="page-content">
+          {zichtbarePlanningen.length === 0 ? (
+            <div className="empty-state">
+              <Calendar size={36} />
+              <h3>{magBewerken ? 'Geen planningen' : 'Geen gepubliceerde planningen'}</h3>
+              <p>{magBewerken ? 'Maak een eerste vakantieplanning aan.' : 'Er zijn nog geen planningen beschikbaar gesteld.'}</p>
+              {magBewerken && (
+                <button className="btn btn-primary" onClick={() => setNieuwePlanningModal(true)}>
+                  <Plus size={14} /> Nieuwe planning
+                </button>
+              )}
             </div>
           ) : (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 14 }}>
-              {planningen.map(p => (
+              {zichtbarePlanningen.map(p => (
                 <div
                   key={p.id}
                   className="card"
-                  style={{ cursor: 'pointer', transition: 'border-color 0.15s' }}
+                  style={{ cursor: 'pointer', transition: 'border-color 0.15s', opacity: !p.gepubliceerd && magBewerken ? 0.75 : 1 }}
                   onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--primary)')}
                   onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--border)')}
                 >
-                  <div style={{ height: 4, background: 'var(--primary)', borderRadius: '12px 12px 0 0' }} />
+                  <div style={{ height: 4, background: p.gepubliceerd ? 'var(--primary)' : 'var(--border-dark)', borderRadius: '12px 12px 0 0' }} />
                   <div style={{ padding: '16px 18px' }}>
                     <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 10 }}>
-                      <div>
-                        <div style={{ fontFamily: 'Sora, sans-serif', fontSize: 15, fontWeight: 700, marginBottom: 3 }}>{p.naam}</div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3 }}>
+                          <div style={{ fontFamily: 'Sora, sans-serif', fontSize: 15, fontWeight: 700 }}>{p.naam}</div>
+                          {magBewerken && (
+                            <span style={{ padding: '2px 8px', borderRadius: 20, fontSize: 10, fontWeight: 600, background: p.gepubliceerd ? 'var(--primary-light)' : 'var(--bg)', color: p.gepubliceerd ? 'var(--primary-text)' : 'var(--text-muted)', border: '1px solid var(--border)' }}>
+                              {p.gepubliceerd ? '● Gepubliceerd' : '○ Concept'}
+                            </span>
+                          )}
+                        </div>
                         <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{p.vakantie} — {p.thema}</div>
                       </div>
-                      <button onClick={e => { e.stopPropagation(); verwijderPlanning(p.id) }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', opacity: 0.5, padding: 4, display: 'flex' }}>
-                        <Trash2 size={14} />
-                      </button>
+                      {magBewerken && (
+                        <button onClick={e => { e.stopPropagation(); verwijderPlanning(p.id) }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', opacity: 0.5, padding: 4, display: 'flex', flexShrink: 0 }}>
+                          <Trash2 size={14} />
+                        </button>
+                      )}
                     </div>
                     <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 14 }}>
                       📅 {fmtDatum(p.start_datum)} — {fmtDatum(p.eind_datum)}
                     </div>
-                    <button className="btn btn-primary" style={{ width: '100%', justifyContent: 'center' }} onClick={() => setActievePlanning(p)}>
-                      Openen <ChevronRight size={14} />
-                    </button>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button className="btn btn-primary" style={{ flex: 1, justifyContent: 'center' }} onClick={() => setActievePlanning(p)}>
+                        {magBewerken ? 'Openen' : 'Bekijken'} <ChevronRight size={14} />
+                      </button>
+                      {magBewerken && (
+                        <button
+                          className="btn"
+                          style={{ padding: '7px 10px' }}
+                          onClick={e => { e.stopPropagation(); togglePubliceer(p) }}
+                          title={p.gepubliceerd ? 'Verbergen' : 'Publiceren'}
+                        >
+                          {p.gepubliceerd ? <Eye size={14} style={{ opacity: 0.5 }} /> : <Send size={14} color="var(--primary)" />}
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
               ))}
@@ -284,21 +340,40 @@ export default function VakantieplanningenPage() {
 
   const actieveWeekObj = weken.find(w => w.id === actieveWeek)
 
+  // Niet-bewerkende gebruikers zien alleen de documentweergave
+  if (!magBewerken && weergave !== 'document') {
+    setWeergave('document')
+  }
+
   return (
     <>
       <Topbar
         titel={actievePlanning.naam}
         subtitel={`${actievePlanning.vakantie} · ${actievePlanning.thema} · ${fmtDatum(actievePlanning.start_datum)} – ${fmtDatum(actievePlanning.eind_datum)}`}
         acties={
-          <div style={{ display: 'flex', gap: 8 }}>
-            {/* Weergave toggle */}
-            <div style={{ display: 'flex', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
-              {(['overzicht', 'document'] as const).map(w => (
-                <button key={w} onClick={() => setWeergave(w)} style={{ padding: '6px 12px', border: 'none', fontSize: 12, fontWeight: 500, cursor: 'pointer', background: weergave === w ? 'var(--primary)' : 'transparent', color: weergave === w ? '#fff' : 'var(--text-muted)', transition: 'all 0.12s', textTransform: 'capitalize' }}>
-                  {w === 'overzicht' ? '📅 Overzicht' : '📄 Document'}
-                </button>
-              ))}
-            </div>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            {/* Gepubliceerd badge */}
+            {magBewerken && (
+              <span style={{ padding: '4px 12px', borderRadius: 20, fontSize: 11, fontWeight: 600, background: actievePlanning.gepubliceerd ? 'var(--primary-light)' : 'var(--bg)', color: actievePlanning.gepubliceerd ? 'var(--primary-text)' : 'var(--text-muted)', border: '1px solid var(--border)' }}>
+                {actievePlanning.gepubliceerd ? '● Gepubliceerd' : '○ Concept'}
+              </span>
+            )}
+            {/* Publiceer knop */}
+            {magBewerken && (
+              <button className="btn" onClick={() => togglePubliceer(actievePlanning)}>
+                {actievePlanning.gepubliceerd ? <><Eye size={14} style={{ opacity: 0.5 }} /> Verbergen</> : <><Send size={14} color="var(--primary)" /> Publiceren</>}
+              </button>
+            )}
+            {/* Weergave toggle — alleen voor bewerkende gebruikers */}
+            {magBewerken && (
+              <div style={{ display: 'flex', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
+                {(['overzicht', 'document'] as const).map(w => (
+                  <button key={w} onClick={() => setWeergave(w)} style={{ padding: '6px 12px', border: 'none', fontSize: 12, fontWeight: 500, cursor: 'pointer', background: weergave === w ? 'var(--primary)' : 'transparent', color: weergave === w ? '#fff' : 'var(--text-muted)', transition: 'all 0.12s', textTransform: 'capitalize' }}>
+                    {w === 'overzicht' ? '📅 Overzicht' : '📄 Document'}
+                  </button>
+                ))}
+              </div>
+            )}
             <button className="btn" onClick={() => { setActievePlanning(null); setWeken([]); setActiviteiten([]) }}>
               <ArrowLeft size={14} /> Terug
             </button>
@@ -319,13 +394,15 @@ export default function VakantieplanningenPage() {
               Week {w.week_nummer} — {w.naam}
             </button>
           ))}
-          <button className="btn btn-sm" onClick={() => setNieuweWeekModal(true)}>
-            <Plus size={13} /> Week toevoegen
-          </button>
+          {magBewerken && (
+            <button className="btn btn-sm" onClick={() => setNieuweWeekModal(true)}>
+              <Plus size={13} /> Week toevoegen
+            </button>
+          )}
         </div>
 
         {/* Weergave */}
-        {weergave === 'overzicht' && actieveWeekObj && (
+        {weergave === 'overzicht' && magBewerken && actieveWeekObj && (
           <WeekOverzicht
             week={actieveWeekObj}
             activiteiten={activiteiten}
@@ -339,7 +416,7 @@ export default function VakantieplanningenPage() {
           />
         )}
 
-        {weergave === 'document' && (
+        {(weergave === 'document' || !magBewerken) && (
           <DocumentWeergave
             planning={actievePlanning}
             weken={weken}
@@ -671,7 +748,7 @@ function NieuwePlanningModal({ onSave, onClose }: {
           </div>
           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
             <button className="btn" onClick={onClose}>Annuleren</button>
-            <button className="btn btn-primary" onClick={() => naam && thema && startDatum && eindDatum && onSave({ naam, vakantie, thema, start_datum: startDatum, eind_datum: eindDatum })} disabled={!naam || !thema || !startDatum || !eindDatum}>
+            <button className="btn btn-primary" onClick={() => naam && thema && startDatum && eindDatum && onSave({ naam, vakantie, thema, start_datum: startDatum, eind_datum: eindDatum, gepubliceerd: false })} disabled={!naam || !thema || !startDatum || !eindDatum}>
               Aanmaken
             </button>
           </div>
