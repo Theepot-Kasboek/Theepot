@@ -106,9 +106,10 @@ export default function Sidebar() {
       ],
     },
     {
-      label: 'Financieel',
+      label: 'Administratie',
       items: [
         { href: '/kasboek', label: 'Kasboek', icon: <Wallet size={16} /> },
+        { href: '/maaltijdlijst', label: 'Maaltijdlijst', icon: <UtensilsCrossed size={16} /> },
       ],
     },
     {
@@ -123,7 +124,6 @@ export default function Sidebar() {
       items: [
         { href: '/agenda', label: 'Agenda', icon: <Calendar size={16} /> },
         { href: '/chat', label: 'Chat', icon: <MessageSquare size={16} />, notificatie: ongelezen },
-        { href: '/maaltijdlijst', label: 'Maaltijdlijst', icon: <UtensilsCrossed size={16} /> },
       ],
     },
     {
