@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard,
@@ -76,7 +77,13 @@ export default function Sidebar() {
     <aside className="sidebar">
       {/* Logo */}
       <Link href="/" className="sidebar-logo">
-        <div className="logo-icon">DT</div>
+        <Image
+          src="/logo.jpg"
+          alt="De Theepot"
+          width={40}
+          height={40}
+          style={{ borderRadius: 8, objectFit: 'contain', flexShrink: 0 }}
+        />
         <div>
           <div className="logo-name">De Theepot</div>
           <div className="logo-sub">Dashboard</div>
