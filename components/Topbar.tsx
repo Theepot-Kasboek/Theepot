@@ -19,50 +19,41 @@ export default function Topbar({ titel, subtitel, acties, zoeken }: TopbarProps)
 
   return (
     <div style={{ background: 'var(--bg-card)', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
-      {/* Eerste rij: hamburger + titel */}
+
+      {/* Hoofdrij — altijd zichtbaar */}
       <div className="topbar">
-        <button
-          className="topbar-hamburger"
-          onClick={toggleSidebar}
-          aria-label="Menu openen"
-        >
+        {/* Hamburger op mobiel */}
+        <button className="topbar-hamburger" onClick={toggleSidebar} aria-label="Menu openen">
           <Menu size={22} />
         </button>
 
+        {/* Titel */}
         <div style={{ flex: 1, minWidth: 0 }}>
           <div className="topbar-title">{titel}</div>
           {subtitel && <div className="topbar-sub">{subtitel}</div>}
         </div>
 
-        {/* Zoekbalk alleen op desktop */}
-        {zoeken && (
-          <div className="search-bar topbar-zoek-desktop">
-            <Search size={14} color="var(--text-muted)" />
-            <input
-              placeholder={zoeken.placeholder ?? 'Zoeken...'}
-              value={zoeken.waarde}
-              onChange={(e) => zoeken.onChange(e.target.value)}
-            />
-          </div>
-        )}
+        {/* Acties + zoekbalk — op desktop in deze rij, gecentreerd */}
+        <div className="topbar-acties-desktop" style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+          {zoeken && (
+            <div className="search-bar">
+              <Search size={14} color="var(--text-muted)" />
+              <input
+                placeholder={zoeken.placeholder ?? 'Zoeken...'}
+                value={zoeken.waarde}
+                onChange={(e) => zoeken.onChange(e.target.value)}
+              />
+            </div>
+          )}
+          {acties}
+        </div>
       </div>
 
-      {/* Tweede rij: acties (scrollbaar op mobiel) */}
+      {/* Mobiele tweede rij — alleen op kleine schermen */}
       {(acties || zoeken) && (
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 8,
-          padding: '0 12px 10px',
-          overflowX: 'auto',
-          WebkitOverflowScrolling: 'touch',
-          scrollbarWidth: 'none',
-        }}
-          className="topbar-acties-rij"
-        >
-          {/* Zoekbalk op mobiel in tweede rij */}
+        <div className="topbar-acties-mobiel">
           {zoeken && (
-            <div className="search-bar topbar-zoek-mobiel" style={{ flexShrink: 0, minWidth: 160 }}>
+            <div className="search-bar" style={{ flexShrink: 0, minWidth: 160 }}>
               <Search size={14} color="var(--text-muted)" />
               <input
                 placeholder={zoeken.placeholder ?? 'Zoeken...'}

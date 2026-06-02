@@ -669,45 +669,34 @@ h1, h2, h3, h4, h5, h6,
   }
 }
 
-/* ─── TOPBAR TWEE RIJEN ──────────────────────────────── */
+/* ─── TOPBAR ACTIES ──────────────────────────────────── */
 
-/* Desktop: acties rij verborgen (alles in één rij) */
-.topbar-acties-rij {
+/* Desktop: acties in hoofdrij, mobiele rij verborgen */
+.topbar-acties-mobiel {
   display: none;
 }
 
-.topbar-zoek-mobiel {
-  display: none;
-}
-
-.topbar-zoek-desktop {
+.topbar-acties-desktop {
   display: flex;
 }
 
 @media (max-width: 768px) {
-  /* Toon tweede rij op mobiel */
-  .topbar-acties-rij {
-    display: flex;
-  }
-
-  /* Verberg zoek op desktop locatie */
-  .topbar-zoek-desktop {
+  /* Verberg desktop acties, toon mobiele rij */
+  .topbar-acties-desktop {
     display: none !important;
   }
 
-  /* Toon zoek in tweede rij */
-  .topbar-zoek-mobiel {
+  .topbar-acties-mobiel {
     display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 12px 10px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
   }
 
-  /* Verberg lege acties rij */
-  .topbar-acties-rij:empty {
+  .topbar-acties-mobiel::-webkit-scrollbar {
     display: none;
-  }
-
-  /* Topbar hoogte aanpassen */
-  .topbar {
-    height: var(--topbar-h);
-    min-height: var(--topbar-h);
   }
 }
