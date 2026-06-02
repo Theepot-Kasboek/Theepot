@@ -113,6 +113,12 @@ export default function Sidebar({ isOpen, onClose }: { isOpen?: boolean; onClose
       ],
     },
     {
+      label: 'Kind administratie',
+      items: [
+        { href: '/gesprekken', label: '10-minutengesprekken', icon: <MessageCircle size={16} /> },
+      ],
+    },
+    {
       label: 'Activiteiten',
       items: [
         { href: '/vakantieplanningen', label: 'Vakantieplanningen', icon: <Map size={16} /> },
@@ -125,12 +131,6 @@ export default function Sidebar({ isOpen, onClose }: { isOpen?: boolean; onClose
       items: [
         { href: '/agenda', label: 'Agenda', icon: <Calendar size={16} /> },
         { href: '/chat', label: 'Chat', icon: <MessageSquare size={16} />, notificatie: ongelezen },
-      ],
-    },
-    {
-      label: 'Kind administratie',
-      items: [
-        { href: '/gesprekken', label: '10-minutengesprekken', icon: <MessageCircle size={16} /> },
       ],
     },
     {
