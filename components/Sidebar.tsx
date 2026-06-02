@@ -22,7 +22,7 @@ interface NavItem {
   notificatie?: number
 }
 
-export default function Sidebar() {
+export default function Sidebar({ isOpen, onClose }: { isOpen?: boolean; onClose?: () => void }) {
   const pathname = usePathname()
   const { profiel, isSuperadmin, loading, signOut } = useAuth()
   const { theme, toggleTheme } = useTheme()
@@ -136,7 +136,7 @@ export default function Sidebar() {
   ]
 
   return (
-    <aside className="sidebar">
+    <aside className={`sidebar${isOpen ? ' open' : ''}`}>
       {/* Logo */}
       <Link href="/" className="sidebar-logo">
         <Image

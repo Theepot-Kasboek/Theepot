@@ -1,6 +1,7 @@
 'use client'
 
-import { Search } from 'lucide-react'
+import { Search, Menu } from 'lucide-react'
+import { useMobiel } from './LayoutShell'
 
 interface TopbarProps {
   titel: string
@@ -14,14 +15,25 @@ interface TopbarProps {
 }
 
 export default function Topbar({ titel, subtitel, acties, zoeken }: TopbarProps) {
+  const { toggleSidebar } = useMobiel()
+
   return (
     <div className="topbar">
-      <div style={{ flex: 1 }}>
+      {/* Hamburger op mobiel */}
+      <button
+        className="topbar-hamburger"
+        onClick={toggleSidebar}
+        aria-label="Menu openen"
+      >
+        <Menu size={22} />
+      </button>
+
+      <div style={{ flex: 1, minWidth: 0 }}>
         <div className="topbar-title">{titel}</div>
         {subtitel && <div className="topbar-sub">{subtitel}</div>}
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
         {zoeken && (
           <div className="search-bar">
             <Search size={14} color="var(--text-muted)" />
