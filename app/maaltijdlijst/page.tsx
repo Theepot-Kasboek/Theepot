@@ -262,8 +262,57 @@ export default function MaaltijdlijstPage() {
     setLaden(false)
   }, [actieveLocatie, huidigWeekStart, standaardKinderen])
 
-  useEffect(() => { haalStandaardOp() }, [haalStandaardOp])
-  useEffect(() => { haalWeekOp() }, [haalWeekOp])
+  // Laad standaard kinderen EERST, daarna pas de week
+  useEffect(() => {
+    if (!actieveLocatie) return
+    async function laadAlles() {
+      // 1. Standaard kinderen ophalen
+      const { data: stdData } = await getSupabase()
+        .from('maaltijd_standaard_kinderen')
+        .select('*')
+        .eq('locatie_id', actieveLocatie!.id)
+        .order('dag').order('volgorde')
+      const std = (stdData ?? []) as StandaardKind[]
+      setStandaardKinderen(std)
+
+      // 2. Week ophalen of aanmaken (nu met standaard kinderen beschikbaar)
+      setLaden(true)
+      const supabase = getSupabase()
+      let { data: weekData } = await supabase
+        .from('maaltijd_weken').select('*')
+        .eq('locatie_id', actieveLocatie!.id)
+        .eq('week_start', huidigWeekStart).single()
+
+      if (!weekData) {
+        const { data: nieuw } = await supabase.from('maaltijd_weken').insert({
+          locatie_id: actieveLocatie!.id,
+          maand: maandLabel(huidigWeekStart),
+          week_start: huidigWeekStart,
+        }).select().single()
+
+        if (nieuw) {
+          weekData = nieuw
+          if (std.length > 0) {
+            const invoegen = std.map((k: StandaardKind) => ({
+              week_id: nieuw.id, dag: k.dag, naam: k.naam,
+              bijzonderheden: k.bijzonderheden, aanwezig: true, is_extra: false, volgorde: k.volgorde,
+            }))
+            await supabase.from('maaltijd_registraties').insert(invoegen)
+          }
+        }
+      }
+
+      setWeek(weekData as Week)
+      if (weekData) {
+        const { data: regData } = await supabase
+          .from('maaltijd_registraties').select('*')
+          .eq('week_id', weekData.id).order('volgorde')
+        setRegistraties((regData ?? []) as Registratie[])
+      }
+      setLaden(false)
+    }
+    laadAlles()
+  }, [actieveLocatie, huidigWeekStart])
 
   // ── Toggle aanwezig ─────────────────────────────────────────────────────────
   async function toggleAanwezig(reg: Registratie) {
