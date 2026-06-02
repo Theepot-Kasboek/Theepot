@@ -78,7 +78,25 @@ export default function Sidebar() {
       .subscribe()
 
     return () => { supabase.removeChannel(channel) }
-  }, [profiel])
+  }, [profiel, pathname])
+
+  // Extra: herlaad na 1 seconde als je op de chatpagina bent (geeft chat pagina tijd om te markeren)
+  useEffect(() => {
+    if (!profiel || !pathname.startsWith('/chat')) return
+    const timer = setTimeout(async () => {
+      const supabase = getSupabase()
+      const { data: deelnemerData } = await supabase
+        .from('chat_deelnemers').select('gesprek_id').eq('profiel_id', profiel.id)
+      if (!deelnemerData || deelnemerData.length === 0) { setOngelezen(0); return }
+      const ids = deelnemerData.map((d: { gesprek_id: string }) => d.gesprek_id)
+      const { data: berichtData } = await supabase
+        .from('chat_berichten').select('id, gelezen_door, afzender_id')
+        .in('gesprek_id', ids).neq('afzender_id', profiel.id)
+      if (!berichtData) { setOngelezen(0); return }
+      setOngelezen(berichtData.filter((b: { gelezen_door: string[] | null }) => !b.gelezen_door?.includes(profiel.id)).length)
+    }, 1500)
+    return () => clearTimeout(timer)
+  }, [profiel, pathname])
 
   const navGroepen: { label: string; items: NavItem[] }[] = [
     {
