@@ -21,6 +21,7 @@ interface Recht {
   pagina_chat: Toegang
   pagina_medewerkers: Toegang
 
+  chat_starten: boolean
   kasboek_export: boolean
   kasboek_bonnetjes_inzien: boolean
   activiteiten_importeren: boolean
@@ -42,7 +43,7 @@ interface PaginaDef {
 }
 
 interface FunctieDef {
-  key: keyof Pick<Recht, 'kasboek_export' | 'kasboek_bonnetjes_inzien' | 'activiteiten_importeren' | 'activiteiten_verwijderen' | 'agenda_algemeen_bewerken' | 'agenda_personeel_inzien' | 'vakantie_exporteren'>
+  key: keyof Pick<Recht, 'kasboek_export' | 'kasboek_bonnetjes_inzien' | 'activiteiten_importeren' | 'activiteiten_verwijderen' | 'agenda_algemeen_bewerken' | 'agenda_personeel_inzien' | 'vakantie_exporteren' | 'chat_starten'>
   label: string
   beschrijving: string
   vereist: Toegang
@@ -88,7 +89,9 @@ const PAGINAS: PaginaDef[] = [
     key: 'pagina_chat',
     label: 'Chat',
     icon: '💬',
-    functies: [],
+    functies: [
+      { key: 'chat_starten', label: 'Gesprekken starten', beschrijving: 'Nieuwe directe of groepsgesprekken aanmaken', vereist: 'lezen' },
+    ],
   },
   {
     key: 'pagina_medewerkers',
@@ -123,6 +126,7 @@ function leegRecht(): Omit<Recht, 'id' | 'rol' | 'profiel_id'> {
     agenda_algemeen_bewerken: false,
     agenda_personeel_inzien: false,
     vakantie_exporteren: false,
+    chat_starten: false,
   }
 }
 

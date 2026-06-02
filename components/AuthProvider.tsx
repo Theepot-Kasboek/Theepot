@@ -20,6 +20,7 @@ interface Rechten {
   agenda_algemeen_bewerken: boolean
   agenda_personeel_inzien: boolean
   vakantie_exporteren: boolean
+  chat_starten: boolean
 }
 
 const SUPERADMIN_RECHTEN: Rechten = {
@@ -36,6 +37,7 @@ const SUPERADMIN_RECHTEN: Rechten = {
   agenda_algemeen_bewerken: true,
   agenda_personeel_inzien: true,
   vakantie_exporteren: true,
+  chat_starten: true,
 }
 
 const GEEN_RECHTEN: Rechten = {
@@ -52,6 +54,7 @@ const GEEN_RECHTEN: Rechten = {
   agenda_algemeen_bewerken: false,
   agenda_personeel_inzien: false,
   vakantie_exporteren: false,
+  chat_starten: false,
 }
 
 interface AuthContextType {
