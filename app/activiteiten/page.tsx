@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect, useCallback, Suspense, useMemo } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { Plus, Search, BookOpen, Clock, Copy, Download, Upload, X, CheckCircle, AlertCircle } from 'lucide-react'
+import { Plus, Search, BookOpen, Clock, Copy, Download, Upload, X, CheckCircle, AlertCircle, Image as ImageIcon } from 'lucide-react'
 import { getSupabase, type Activiteit } from '@/lib/supabase'
 import { getCategorieKleur, getCategorieEmoji } from '@/lib/categorieen'
 import { getThemaEmoji } from '@/lib/themas'
@@ -364,6 +364,18 @@ function ActiviteitenPage() {
     if (!error) { await laadActiviteiten(); setGeselecteerd(null); setToast({ bericht: 'Verwijderd!', type: 'success' }) }
   }
 
+  async function uploadAfbeeldingVanKaart(a: Activiteit, bestand: File, e: React.MouseEvent) {
+    e.stopPropagation()
+    const supabase = getSupabase()
+    const ext = bestand.name.split('.').pop()
+    const pad = `${a.id}.${ext}`
+    const { error } = await supabase.storage.from('activiteit-afbeeldingen').upload(pad, bestand, { upsert: true })
+    if (error) { setToast({ bericht: 'Upload mislukt: ' + error.message, type: 'error' }); return }
+    await supabase.from('activiteiten').update({ afbeelding_pad: pad }).eq('id', a.id)
+    setToast({ bericht: 'Afbeelding toegevoegd!', type: 'success' })
+    await laadActiviteiten()
+  }
+
   async function kopieerAlsJSON(a: Activiteit, e: React.MouseEvent) {
     e.stopPropagation()
     const json = JSON.stringify([{
@@ -533,6 +545,12 @@ function ActiviteitenPage() {
                         <button onClick={e => kopieerKaart(a, e)} className="btn btn-sm" style={{ padding: '4px 8px' }} title="Kopieer als tekst"><Copy size={11} /></button>
                         <button onClick={e => exportKaart(a, e)} className="btn btn-sm" style={{ padding: '4px 8px' }} title="PDF exporteren"><Download size={11} /></button>
                         <button onClick={e => kopieerAlsJSON(a, e)} className="btn btn-sm" style={{ padding: '4px 8px' }} title="Kopieer als JSON"><span style={{ fontSize: 9, fontWeight: 700, fontFamily: 'monospace' }}>JSON</span></button>
+                        <label onClick={e => e.stopPropagation()} title="Afbeelding toevoegen" style={{ cursor: 'pointer' }}>
+                          <div className="btn btn-sm" style={{ padding: '4px 8px', color: a.afbeelding_pad ? 'var(--primary)' : 'var(--text-muted)' }}>
+                            <ImageIcon size={11} />
+                          </div>
+                          <input type="file" accept="image/*" style={{ display: 'none' }} onChange={e => e.target.files?.[0] && uploadAfbeeldingVanKaart(a, e.target.files[0], e as unknown as React.MouseEvent)} />
+                        </label>
                       </div>
                     </div>
                     <p style={{ fontSize: 12.5, color: 'var(--text-muted)', lineHeight: 1.55, marginBottom: 12, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
@@ -567,7 +585,7 @@ function ActiviteitenPage() {
       )}
 
       {geselecteerd && !bewerkActiviteit && (
-        <ActiviteitModal activiteit={geselecteerd} onClose={() => setGeselecteerd(null)} onEdit={() => setBewerkActiviteit(geselecteerd)} onDelete={verwijderActiviteit} onToast={handleToast} />
+        <ActiviteitModal activiteit={geselecteerd} onClose={() => setGeselecteerd(null)} onEdit={() => setBewerkActiviteit(geselecteerd)} onDelete={verwijderActiviteit} onToast={handleToast} onAfbeeldingGewijzigd={laadActiviteiten} />
       )}
       {(toevoegen || bewerkActiviteit) && (
         <ActiviteitFormModal activiteit={bewerkActiviteit || undefined} onSave={bewerkActiviteit ? slaBewerking : slaOp} onClose={() => { setToevoegen(false); setBewerkActiviteit(null) }} />

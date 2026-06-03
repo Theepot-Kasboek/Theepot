@@ -13,6 +13,7 @@ interface Props {
   onEdit: () => void
   onDelete: () => void
   onToast: (msg: string) => void
+  onAfbeeldingGewijzigd?: () => void
 }
 
 function maakKopieerTekst(a: Activiteit): string {
@@ -23,7 +24,7 @@ function maakKopieerTekst(a: Activiteit): string {
   return regels.join('\n')
 }
 
-export default function ActiviteitModal({ activiteit, onClose, onEdit, onDelete, onToast }: Props) {
+export default function ActiviteitModal({ activiteit, onClose, onEdit, onDelete, onToast, onAfbeeldingGewijzigd }: Props) {
   const [pdfLoading, setPdfLoading] = useState(false)
   const [bevestigVerwijder, setBevestigVerwijder] = useState(false)
   const [afbeeldingUrl, setAfbeeldingUrl] = useState<string | null>(null)
@@ -74,6 +75,7 @@ export default function ActiviteitModal({ activiteit, onClose, onEdit, onDelete,
     activiteit.afbeelding_pad = pad
     onToast('✅ Afbeelding opgeslagen!')
     setUploadLaden(false)
+    onAfbeeldingGewijzigd?.()
   }
 
   async function verwijderAfbeelding() {
@@ -85,6 +87,7 @@ export default function ActiviteitModal({ activiteit, onClose, onEdit, onDelete,
     setAfbeeldingUrl(null)
     activiteit.afbeelding_pad = null
     onToast('✅ Afbeelding verwijderd')
+    onAfbeeldingGewijzigd?.()
   }
 
   const catKleur = getCategorieKleur(activiteit.categorie)
