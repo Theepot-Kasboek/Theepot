@@ -530,8 +530,15 @@ export default function AgendaPage() {
   return (
     <>
       <Topbar
-        titel="Agenda"
-        subtitel={periodeLabel(weergave, huidigeDatum)}
+        titel={
+          <span style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+            Agenda
+            <span style={{ fontWeight: 400, fontSize: '0.7em', color: 'var(--text-muted)' }}>—</span>
+            <span style={{ fontFamily: 'Sora, sans-serif', fontWeight: 700, fontSize: '1.1em', color: 'var(--primary)' }}>
+              {periodeLabel(weergave, huidigeDatum)}
+            </span>
+          </span>
+        }
         acties={
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             {/* Weergave switcher */}

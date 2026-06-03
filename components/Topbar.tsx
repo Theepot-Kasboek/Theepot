@@ -1,10 +1,11 @@
 'use client'
 
+import React from 'react'
 import { Search, Menu } from 'lucide-react'
 import { useMobiel } from './LayoutShell'
 
 interface TopbarProps {
-  titel: string
+  titel: string | React.ReactNode
   subtitel?: string
   acties?: React.ReactNode
   zoeken?: {
