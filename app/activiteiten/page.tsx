@@ -328,11 +328,11 @@ function ActiviteitenPage() {
   const gefilterd = activiteiten.filter(a => {
     const zoek = zoekterm.toLowerCase()
     const matchZoek = !zoekterm ||
-      a.naam.toLowerCase().includes(zoek) ||
-      a.beschrijving.toLowerCase().includes(zoek) ||
+      (a.naam ?? '').toLowerCase().includes(zoek) ||
+      (a.beschrijving ?? '').toLowerCase().includes(zoek) ||
       (Array.isArray(a.thema) ? a.thema.join(' ') : (a.thema ?? '')).toLowerCase().includes(zoek) ||
-      a.categorie?.toLowerCase().includes(zoek) ||
-      a.materialen.some(m => m.toLowerCase().includes(zoek))
+      (a.categorie ?? '').toLowerCase().includes(zoek) ||
+      (a.materialen ?? []).some(m => m.toLowerCase().includes(zoek))
     let matchFilter = true
     if (actieveFilter === 'kort') matchFilter = a.tijdsduur <= 30
     else if (actieveFilter === 'leeftijd_jong') {
