@@ -1,6 +1,6 @@
 'use client'
-import { useState, useEffect } from 'react'
-import { X } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
+import { X, Image as ImageIcon, Upload } from 'lucide-react'
 import { getSupabase, Activiteit } from '@/lib/supabase'
 import { ALLE_CATEGORIEEN } from '@/lib/categorieen'
 
@@ -22,10 +22,20 @@ export default function ActiviteitFormModal({ activiteit, onSave, onClose }: Pro
   const [materialenRaw, setMaterialenRaw] = useState((activiteit?.materialen || []).join(', '))
   const [stappenRaw, setStappenRaw] = useState((activiteit?.stappen || []).join('\n'))
   const [materiaalAanwezig, setMateriaalAanwezig] = useState(activiteit?.materiaal_aanwezig || false)
+  const [afbeeldingPad, setAfbeeldingPad] = useState<string | null>(activiteit?.afbeelding_pad ?? null)
+  const [afbeeldingPreview, setAfbeeldingPreview] = useState<string | null>(null)
+  const [afbeeldingBestand, setAfbeeldingBestand] = useState<File | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
   useEffect(() => {
+    // Laad bestaande afbeelding preview
+    if (activiteit?.afbeelding_pad) {
+      const supabase = getSupabase()
+      const { data } = supabase.storage.from('activiteit-afbeeldingen').getPublicUrl(activiteit.afbeelding_pad)
+      setAfbeeldingPreview(data.publicUrl)
+    }
+
     getSupabase().from('activiteiten').select('thema').then(({ data }) => {
       if (data) {
         const uniek = Array.from(new Set(data.map((r: any) => r.thema).filter(Boolean))).sort() as string[]
@@ -34,11 +44,40 @@ export default function ActiviteitFormModal({ activiteit, onSave, onClose }: Pro
     })
   }, [])
 
+  function kiesAfbeelding(bestand: File) {
+    setAfbeeldingBestand(bestand)
+    const reader = new FileReader()
+    reader.onload = e => setAfbeeldingPreview(e.target?.result as string)
+    reader.readAsDataURL(bestand)
+  }
+
+  function verwijderAfbeelding() {
+    setAfbeeldingBestand(null)
+    setAfbeeldingPreview(null)
+    setAfbeeldingPad(null)
+  }
+
   async function handleSave() {
     if (!naam.trim() || !beschrijving.trim()) { setError('Vul naam en beschrijving in.'); return }
     if (!categorie.trim()) { setError('Vul een categorie in.'); return }
     setLoading(true); setError('')
+
     try {
+      let definitiefPad = afbeeldingPad
+
+      // Upload nieuwe afbeelding als die gekozen is
+      if (afbeeldingBestand) {
+        const supabase = getSupabase()
+        // We hebben nog geen id bij nieuw aanmaken, gebruik tijdelijke naam
+        const tijdelijkId = activiteit?.id ?? `nieuw-${Date.now()}`
+        const ext = afbeeldingBestand.name.split('.').pop()
+        const pad = `${tijdelijkId}.${ext}`
+        const { error: uploadError } = await supabase.storage
+          .from('activiteit-afbeeldingen')
+          .upload(pad, afbeeldingBestand, { upsert: true })
+        if (!uploadError) definitiefPad = pad
+      }
+
       await onSave({
         naam: naam.trim(), beschrijving: beschrijving.trim(),
         categorie: categorie.trim(),
@@ -46,7 +85,9 @@ export default function ActiviteitFormModal({ activiteit, onSave, onClose }: Pro
         leeftijd, tijdsduur: parseInt(tijdsduur) || 30, groepsgrootte,
         materialen: materialenRaw.split(',').map(s => s.trim()).filter(Boolean),
         stappen: stappenRaw.split('\n').map(s => s.trim()).filter(Boolean),
-        materiaal_aanwezig: materiaalAanwezig, ai_gegenereerd: false, afbeelding_pad: activiteit?.afbeelding_pad ?? null,
+        materiaal_aanwezig: materiaalAanwezig,
+        ai_gegenereerd: false,
+        afbeelding_pad: definitiefPad,
       })
     } catch { setError('Er is iets misgegaan.') }
     setLoading(false)
@@ -108,6 +149,41 @@ export default function ActiviteitFormModal({ activiteit, onSave, onClose }: Pro
           <div>
             <label className="form-label">Stappen (één per regel)</label>
             <textarea className="form-textarea" style={{ minHeight: 100 }} value={stappenRaw} onChange={e => setStappenRaw(e.target.value)} placeholder={'Stap 1\nStap 2\nStap 3'} />
+          </div>
+
+          {/* Afbeelding */}
+          <div>
+            <label className="form-label">Voorbeeldafbeelding (optioneel)</label>
+            {afbeeldingPreview ? (
+              <div style={{ position: 'relative', borderRadius: 10, overflow: 'hidden', border: '1px solid var(--border)' }}>
+                <img src={afbeeldingPreview} alt="Preview" style={{ width: '100%', maxHeight: 180, objectFit: 'cover', display: 'block' }} />
+                <div style={{ position: 'absolute', top: 8, right: 8, display: 'flex', gap: 6 }}>
+                  <label style={{ cursor: 'pointer' }}>
+                    <div className="btn btn-sm" style={{ background: 'rgba(0,0,0,0.6)', color: '#fff', border: 'none', backdropFilter: 'blur(4px)' }}>
+                      <ImageIcon size={12} /> Wijzigen
+                    </div>
+                    <input type="file" accept="image/*" style={{ display: 'none' }} onChange={e => e.target.files?.[0] && kiesAfbeelding(e.target.files[0])} />
+                  </label>
+                  <button className="btn btn-sm" onClick={verwijderAfbeelding} style={{ background: 'rgba(220,38,38,0.8)', color: '#fff', border: 'none', backdropFilter: 'blur(4px)' }}>
+                    <X size={12} /> Verwijderen
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <label style={{ cursor: 'pointer', display: 'block' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px', borderRadius: 10, border: '2px dashed var(--border-dark)', background: 'var(--bg)', transition: 'all 0.12s' }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--primary)' }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--border-dark)' }}
+                >
+                  <Upload size={18} color="var(--text-muted)" style={{ flexShrink: 0, opacity: 0.6 }} />
+                  <div>
+                    <div style={{ fontSize: 13, color: 'var(--text)', fontWeight: 500 }}>Klik om een foto te kiezen</div>
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>JPG, PNG of WebP</div>
+                  </div>
+                </div>
+                <input type="file" accept="image/*" style={{ display: 'none' }} onChange={e => e.target.files?.[0] && kiesAfbeelding(e.target.files[0])} />
+              </label>
+            )}
           </div>
 
           <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', fontSize: 14, color: 'var(--text)' }}>
