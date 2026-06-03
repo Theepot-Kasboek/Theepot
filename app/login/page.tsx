@@ -45,13 +45,15 @@ export default function LoginPage() {
       <div style={{ width: '100%', maxWidth: 380 }}>
         {/* Logo */}
         <div style={{ textAlign: 'center', marginBottom: 32 }}>
-          <Image
-            src="/logo.jpg"
-            alt="De Theepot"
-            width={80}
-            height={80}
-            style={{ borderRadius: 16, objectFit: 'contain', margin: '0 auto 14px', display: 'block' }}
-          />
+          <div style={{ width: 100, height: 100, margin: '0 auto 14px', borderRadius: 16, overflow: 'hidden', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Image
+              src="/logo.jpg"
+              alt="De Theepot"
+              width={100}
+              height={100}
+              style={{ objectFit: 'contain', width: '100%', height: '100%' }}
+            />
+          </div>
           <h1
             style={{
               fontFamily: 'Sora, sans-serif',
