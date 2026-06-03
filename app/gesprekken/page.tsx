@@ -194,6 +194,17 @@ async function exportFormulierPDF(formulier: Formulier, mentorNaam: string, loca
 export default function GesprekkenPage() {
   const { profiel, isSuperadmin } = useAuth()
 
+  async function getToegankelijkeLocaties(alleLocaties: string[]): Promise<string[]> {
+    if (isSuperadmin) return alleLocaties
+    const { data } = await getSupabase()
+      .from('locatie_toegang')
+      .select('locatie_naam, toegang')
+      .eq('profiel_id', profiel?.id ?? '')
+      .eq('locatie_type', 'gesprekken')
+    const toegankelijk = (data ?? []).filter((t: { toegang: string }) => t.toegang !== 'geen').map((t: { locatie_naam: string }) => t.locatie_naam)
+    return alleLocaties.filter(l => toegankelijk.includes(l))
+  }
+
   const [locaties, setLocaties] = useState<string[]>([])
   const [actieveLocatie, setActieveLocatie] = useState<string>('')
   const [mappen, setMappen] = useState<Map[]>([])
@@ -211,8 +222,9 @@ export default function GesprekkenPage() {
   // ── Locaties ophalen ────────────────────────────────────────────────────────
   useEffect(() => {
     getSupabase().from('kasboek_locaties').select('naam').eq('actief', true).order('naam')
-      .then(({ data }) => {
-        const namen = (data ?? []).map((l: { naam: string }) => l.naam)
+      .then(async ({ data }) => {
+        const allen = (data ?? []).map((l: { naam: string }) => l.naam)
+        const namen = await getToegankelijkeLocaties(allen)
         setLocaties(namen)
         if (namen.length > 0) setActieveLocatie(namen[0])
       })

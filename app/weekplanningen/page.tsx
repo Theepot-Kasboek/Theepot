@@ -223,6 +223,17 @@ async function exportPDF(planning: WeekPlanning, activiteiten: WeekActiviteit[])
 export default function WeekplanningenPage() {
   const { profiel, isSuperadmin } = useAuth()
 
+  async function getToegankelijkeLocaties(alleLocaties: string[]): Promise<string[]> {
+    if (isSuperadmin) return alleLocaties
+    const { data } = await getSupabase()
+      .from('locatie_toegang')
+      .select('locatie_naam, toegang')
+      .eq('profiel_id', profiel?.id ?? '')
+      .eq('locatie_type', 'weekplanningen')
+    const toegankelijk = (data ?? []).filter((t: { toegang: string }) => t.toegang !== 'geen').map((t: { locatie_naam: string }) => t.locatie_naam)
+    return alleLocaties.filter(l => toegankelijk.includes(l))
+  }
+
   const [locaties, setLocaties] = useState<string[]>([])
   const [actieveLocatie, setActieveLocatie] = useState<string>('')
   const [huidigWeekStart, setHuidigWeekStart] = useState(toDateStr(maandaagVanWeek(new Date())))
