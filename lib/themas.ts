@@ -8,11 +8,13 @@ const FALLBACK_KLEUREN = [
 const FALLBACK_EMOJI = ['🎉','🎊','🌸','❄️','🎭','🌻','🎃','🎄','🎈','🌺']
 
 export function getThemaKleur(thema: string): string {
+  if (!thema) return FALLBACK_KLEUREN[0]
   const idx = thema.split('').reduce((a, c) => a + c.charCodeAt(0), 0) % FALLBACK_KLEUREN.length
   return FALLBACK_KLEUREN[idx]
 }
 
-export function getThemaEmoji(thema: string): string {
+export function getThemaEmoji(thema: string | null | undefined): string {
+  if (!thema) return '🎨'
   const bekende: Record<string, string> = {
     sinterklaas: '🎅', kerst: '🎄', halloween: '🎃', pasen: '🐣',
     lente: '🌸', zomer: '☀️', herfst: '🍂', winter: '❄️',

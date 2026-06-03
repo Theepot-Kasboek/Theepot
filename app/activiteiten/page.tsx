@@ -518,9 +518,10 @@ function ActiviteitenPage() {
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 14 }}>
             {gefilterd.map(a => {
-              const catKleur = getCategorieKleur(a.categorie)
-              const catEmoji = getCategorieEmoji(a.categorie)
-              const themaEmoji = getThemaEmoji(Array.isArray(a.thema) ? a.thema[0] : a.thema)
+              const catKleur = getCategorieKleur(a.categorie ?? '')
+              const catEmoji = getCategorieEmoji(a.categorie ?? '')
+              const eersteThema = Array.isArray(a.thema) ? (a.thema[0] ?? '') : (a.thema ?? '')
+              const themaEmoji = eersteThema ? getThemaEmoji(eersteThema) : ''
               return (
                 <div
                   key={a.id}
