@@ -67,7 +67,7 @@ function JsonImportModal({
           naam: String(item.naam),
           beschrijving: String(item.beschrijving || ''),
           categorie: String(item.categorie || 'Creatief'),
-          thema: String(item.thema || ''),
+          thema: item.thema ? (Array.isArray(item.thema) ? item.thema : [String(item.thema)]) : [],
           leeftijd: String(item.leeftijd || '4-12 jaar'),
           tijdsduur: Number(item.tijdsduur) || 45,
           groepsgrootte: String(item.groepsgrootte || '2-15 kinderen'),

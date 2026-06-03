@@ -85,7 +85,7 @@ export default function ActiviteitFormModal({ activiteit, onSave, onClose }: Pro
       await onSave({
         naam: naam.trim(), beschrijving: beschrijving.trim(),
         categorie: categorie.trim(),
-        thema: themas,
+        thema: themas.length > 0 ? themas : [],
         leeftijd, tijdsduur: parseInt(tijdsduur) || 30, groepsgrootte,
         materialen: materialenRaw.split(',').map(s => s.trim()).filter(Boolean),
         stappen: stappenRaw.split('\n').map(s => s.trim()).filter(Boolean),
