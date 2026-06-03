@@ -35,7 +35,7 @@ export interface Activiteit {
   naam: string
   beschrijving: string
   categorie: string
-  thema: string
+  thema: string | string[]
   leeftijd: string
   tijdsduur: number
   groepsgrootte: string

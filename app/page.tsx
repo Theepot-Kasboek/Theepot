@@ -289,6 +289,127 @@ function WeekAgenda({ profielId }: { profielId: string }) {
   )
 }
 
+// ─── Weekplanning Widget ─────────────────────────────────────────────────────
+
+function WeekplanningWidget({ profielId }: { profielId: string }) {
+  const [locaties, setLocaties] = useState<string[]>([])
+  const [actieveLocatie, setActieveLocatie] = useState<string>('')
+  const [planning, setPlanning] = useState<{thema: string | null; knutsel?: string; kook_bak?: string; groepsspel?: string} | null>(null)
+  const [laden, setLaden] = useState(true)
+
+  const maandag = startVanWeek(new Date())
+  const weekStart = maandag.toISOString().split('T')[0]
+  const weekLabel = `${maandag.toLocaleDateString('nl-NL', { day: 'numeric', month: 'long' })} – ${new Date(maandag.getTime() + 4*86400000).toLocaleDateString('nl-NL', { day: 'numeric', month: 'long' })}`
+
+  useEffect(() => {
+    async function laad() {
+      const supabase = getSupabase()
+      const { data: locs } = await supabase.from('kasboek_locaties').select('naam').eq('actief', true).order('naam')
+      const namen = (locs ?? []).map((l: {naam: string}) => l.naam)
+      setLocaties(namen)
+      if (namen.length > 0) { setActieveLocatie(namen[0]); laadPlanning(namen[0]) }
+      else setLaden(false)
+    }
+    laad()
+  }, [])
+
+  async function laadPlanning(locatie: string) {
+    setLaden(true)
+    const supabase = getSupabase()
+    const { data: p } = await supabase.from('week_planningen').select('*').eq('locatie_naam', locatie).eq('week_start', weekStart).single()
+    if (!p) { setPlanning(null); setLaden(false); return }
+    const { data: acts } = await supabase.from('week_activiteiten').select('*').eq('planning_id', p.id)
+    const map: Record<string, string> = {}
+    ;(acts ?? []).forEach((a: {type: string; naam: string}) => { map[a.type] = a.naam })
+    setPlanning({ thema: p.thema, ...map })
+    setLaden(false)
+  }
+
+  function wissel(loc: string) { setActieveLocatie(loc); laadPlanning(loc) }
+
+  const SLOT_STIJL: Record<string, {kleur: string; bg: string; icon: string; label: string}> = {
+    knutsel:    { kleur: '#7C3AED', bg: '#EDE9FE', icon: '✂️', label: 'Knutsel' },
+    kook_bak:   { kleur: '#D97706', bg: '#FEF3C7', icon: '🍳', label: 'Koken/Bakken' },
+    groepsspel: { kleur: '#059669', bg: '#D1FAE5', icon: '🎮', label: 'Groepsspel' },
+  }
+
+  const slotType = planning?.knutsel ? 'knutsel' : planning?.kook_bak ? 'kook_bak' : 'knutsel'
+
+  return (
+    <div className="card">
+      <div className="card-header">
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span style={{ fontSize: 16 }}>✂️</span>
+          <span className="card-title">Weekplanning</span>
+          <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{weekLabel}</span>
+        </div>
+        <Link href="/weekplanningen" className="btn btn-sm" style={{ fontSize: 11, padding: '4px 10px', textDecoration: 'none' }}>
+          Openen <ChevronRight size={12} />
+        </Link>
+      </div>
+
+      {/* Locatie tabs */}
+      {locaties.length > 1 && (
+        <div style={{ padding: '0 16px 10px', display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          {locaties.map(loc => (
+            <button key={loc} onClick={() => wissel(loc)} style={{ padding: '3px 10px', borderRadius: 20, fontSize: 12, fontWeight: 500, cursor: 'pointer', border: '1.5px solid', borderColor: actieveLocatie === loc ? 'var(--primary)' : 'var(--border-dark)', background: actieveLocatie === loc ? 'var(--primary)' : 'transparent', color: actieveLocatie === loc ? '#fff' : 'var(--text-muted)' }}>
+              {loc}
+            </button>
+          ))}
+        </div>
+      )}
+
+      <div style={{ padding: '0 16px 16px' }}>
+        {laden ? (
+          <div style={{ textAlign: 'center', padding: 20, color: 'var(--text-muted)', fontSize: 13 }}>Laden...</div>
+        ) : !planning && !laden ? (
+          <div style={{ textAlign: 'center', padding: '16px 0', color: 'var(--text-muted)', fontSize: 13 }}>
+            <div style={{ fontSize: 24, marginBottom: 6 }}>📋</div>
+            Geen weekplanning voor deze week.
+          </div>
+        ) : (
+          <div>
+            {planning?.thema && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, padding: '6px 12px', borderRadius: 8, background: 'var(--primary-xlight)', border: '1px solid var(--border-dark)' }}>
+                <span style={{ fontSize: 14 }}>🎨</span>
+                <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--primary-text)' }}>Thema: {planning.thema}</span>
+              </div>
+            )}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+              {/* Knutsel/Koken slot */}
+              {(() => {
+                const naam = planning?.knutsel ?? planning?.kook_bak
+                const type = planning?.knutsel ? 'knutsel' : 'kook_bak'
+                const s = SLOT_STIJL[naam ? type : 'knutsel']
+                return (
+                  <div style={{ padding: '10px 12px', borderRadius: 10, background: s.bg, border: `1px solid ${s.kleur}30` }}>
+                    <div style={{ fontSize: 11, fontWeight: 600, color: s.kleur, marginBottom: 4 }}>{s.icon} {s.label}</div>
+                    <div style={{ fontSize: 13, fontWeight: naam ? 600 : 400, color: naam ? 'var(--text)' : 'var(--text-muted)', fontStyle: naam ? 'normal' : 'italic' }}>
+                      {naam ?? 'Niet ingevuld'}
+                    </div>
+                  </div>
+                )
+              })()}
+              {/* Groepsspel slot */}
+              {(() => {
+                const s = SLOT_STIJL['groepsspel']
+                return (
+                  <div style={{ padding: '10px 12px', borderRadius: 10, background: s.bg, border: `1px solid ${s.kleur}30` }}>
+                    <div style={{ fontSize: 11, fontWeight: 600, color: s.kleur, marginBottom: 4 }}>{s.icon} {s.label}</div>
+                    <div style={{ fontSize: 13, fontWeight: planning?.groepsspel ? 600 : 400, color: planning?.groepsspel ? 'var(--text)' : 'var(--text-muted)', fontStyle: planning?.groepsspel ? 'normal' : 'italic' }}>
+                      {planning?.groepsspel ?? 'Niet ingevuld'}
+                    </div>
+                  </div>
+                )
+              })()}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ─── Dashboard pagina ─────────────────────────────────────────────────────────
 
 export default function DashboardPage() {
@@ -361,6 +482,13 @@ export default function DashboardPage() {
         {user && (
           <div style={{ marginBottom: 20 }}>
             <WeekAgenda profielId={user.id} />
+          </div>
+        )}
+
+        {/* ── Weekplanning widget — altijd zichtbaar ── */}
+        {user && (
+          <div style={{ marginBottom: 20 }}>
+            <WeekplanningWidget profielId={user.id} />
           </div>
         )}
 

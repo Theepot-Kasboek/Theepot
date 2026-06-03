@@ -48,9 +48,13 @@ interface BibliotheekActiviteit {
   id: string
   naam: string
   categorie: string
-  thema: string
+  thema: string | string[]
   tijdsduur: number
   materialen: string[]
+  beschrijving: string | null
+  stappen: string[]
+  groepsgrootte: string | null
+  leeftijd: string | null
 }
 
 type Dag = 'maandag' | 'dinsdag' | 'woensdag' | 'donderdag' | 'vrijdag'
@@ -110,7 +114,7 @@ export default function VakantieplanningenPage() {
   }, [weken])
 
   const haalBibliotheekOp = useCallback(async () => {
-    const { data } = await getSupabase().from('activiteiten').select('id, naam, categorie, thema, tijdsduur, materialen').order('naam')
+    const { data } = await getSupabase().from('activiteiten').select('id, naam, categorie, thema, tijdsduur, materialen, beschrijving, stappen, groepsgrootte, leeftijd').order('naam')
     setBibliotheek((data ?? []) as BibliotheekActiviteit[])
   }, [])
 
@@ -847,8 +851,8 @@ function ActiviteitToevoegenModal({ weekId, dag, activiteit, bibliotheek, volgor
   function kiesUitBibliotheek(a: BibliotheekActiviteit) {
     setNaam(a.naam)
     setCategorie(a.categorie)
+    if (a.beschrijving) setBeschrijving(a.beschrijving)
     if (a.materialen?.length > 0) setBenodigdhedenRaw(a.materialen.join(', '))
-    if ((a as any).beschrijving) setBeschrijving((a as any).beschrijving)
     setTab('handmatig')
   }
 

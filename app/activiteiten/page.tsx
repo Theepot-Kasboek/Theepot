@@ -215,7 +215,7 @@ function JsonImportModal({
                         {a.naam}
                       </div>
                       <div style={{ fontSize: 11, color: 'var(--text-muted)', display: 'flex', gap: 8, marginTop: 2 }}>
-                        {a.thema && <span>{getThemaEmoji(a.thema)} {a.thema}</span>}
+                        {a.thema && <span>{Array.isArray(a.thema) ? a.thema.join(', ') : a.thema}</span>}
                         <span>⏱ {a.tijdsduur} min</span>
                         <span>{a.stappen.length} stappen</span>
                         <span>{a.materialen.length} materialen</span>
@@ -316,28 +316,31 @@ function ActiviteitenPage() {
     Array.from(new Set(activiteiten.map(a => a.categorie).filter(Boolean))).sort(),
     [activiteiten]
   )
-  const themas = useMemo(() =>
-    Array.from(new Set(activiteiten.map(a => a.thema).filter(Boolean))).sort(),
-    [activiteiten]
-  )
+  const themas = useMemo(() => {
+    const alle: string[] = []
+    activiteiten.forEach(a => {
+      if (Array.isArray(a.thema)) alle.push(...a.thema.filter(Boolean))
+      else if (a.thema) alle.push(a.thema)
+    })
+    return Array.from(new Set(alle)).sort()
+  }, [activiteiten])
 
   const gefilterd = activiteiten.filter(a => {
     const zoek = zoekterm.toLowerCase()
     const matchZoek = !zoekterm ||
       a.naam.toLowerCase().includes(zoek) ||
       a.beschrijving.toLowerCase().includes(zoek) ||
-      a.thema?.toLowerCase().includes(zoek) ||
+      (Array.isArray(a.thema) ? a.thema.join(' ') : (a.thema ?? '')).toLowerCase().includes(zoek) ||
       a.categorie?.toLowerCase().includes(zoek) ||
       a.materialen.some(m => m.toLowerCase().includes(zoek))
     let matchFilter = true
-    if (actieveFilter === 'beschikbaar') matchFilter = a.materiaal_aanwezig
-    else if (actieveFilter === 'kort') matchFilter = a.tijdsduur <= 30
+    if (actieveFilter === 'kort') matchFilter = a.tijdsduur <= 30
     else if (actieveFilter === 'leeftijd_jong') {
-      const l = a.leeftijd?.toLowerCase() ?? ''
+      const l = (typeof a.leeftijd === 'string' ? a.leeftijd : '').toLowerCase()
       matchFilter = l.includes('4') || l.includes('5') || l.includes('6') || l.includes('7') || l.includes('jong') || l.includes('klein')
     }
     else if (actieveFilter === 'leeftijd_oud') {
-      const l = a.leeftijd?.toLowerCase() ?? ''
+      const l = (typeof a.leeftijd === 'string' ? a.leeftijd : '').toLowerCase()
       const getallen = l.match(/\d+/g)?.map(Number) ?? []
       matchFilter = getallen.some(n => n >= 8) || l.includes('8') || l.includes('oud') || l.includes('groot')
     }
@@ -380,7 +383,7 @@ function ActiviteitenPage() {
     e.stopPropagation()
     const json = JSON.stringify([{
       naam: a.naam,
-      thema: a.thema,
+      thema: Array.isArray(a.thema) ? a.thema.join(', ') : a.thema,
       leeftijd: a.leeftijd,
       tijdsduur: a.tijdsduur,
       groepsgrootte: a.groepsgrootte,
@@ -468,7 +471,7 @@ function ActiviteitenPage() {
               { key: 'all', label: 'Alle' },
               { key: 'leeftijd_jong', label: '👶 4–7 jaar' },
               { key: 'leeftijd_oud', label: '🧒 8+ jaar' },
-              { key: 'beschikbaar', label: '✅ Beschikbaar' },
+
               { key: 'kort', label: '⏱ Kort (≤30 min)' },
             ].map(f => (
               <button key={f.key} onClick={() => setActieveFilter(f.key)} style={{ padding: '5px 12px', borderRadius: 20, fontSize: 12, fontWeight: 500, cursor: 'pointer', border: '1.5px solid', borderColor: actieveFilter === f.key ? 'var(--primary)' : 'var(--border-dark)', background: actieveFilter === f.key ? 'var(--primary)' : 'var(--bg-card)', color: actieveFilter === f.key ? '#fff' : 'var(--text-muted)', transition: 'all 0.12s' }}>
@@ -517,7 +520,7 @@ function ActiviteitenPage() {
             {gefilterd.map(a => {
               const catKleur = getCategorieKleur(a.categorie)
               const catEmoji = getCategorieEmoji(a.categorie)
-              const themaEmoji = getThemaEmoji(a.thema)
+              const themaEmoji = getThemaEmoji(Array.isArray(a.thema) ? a.thema[0] : a.thema)
               return (
                 <div
                   key={a.id}

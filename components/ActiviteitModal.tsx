@@ -92,7 +92,7 @@ export default function ActiviteitModal({ activiteit, onClose, onEdit, onDelete,
 
   const catKleur = getCategorieKleur(activiteit.categorie)
   const catEmoji = getCategorieEmoji(activiteit.categorie)
-  const themaEmoji = getThemaEmoji(activiteit.thema)
+  const themaEmoji = getThemaEmoji(Array.isArray(activiteit.thema) ? activiteit.thema[0] : activiteit.thema)
 
   return (
     <div className="modal-backdrop" onClick={e => { if (e.target === e.currentTarget) onClose() }}>
@@ -107,7 +107,9 @@ export default function ActiviteitModal({ activiteit, onClose, onEdit, onDelete,
               </h2>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 10 }}>
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 10px', borderRadius: 20, fontSize: 12, fontWeight: 500, background: catKleur + '18', color: catKleur, border: `1px solid ${catKleur}40` }}>{catEmoji} {activiteit.categorie}</span>
-                {activiteit.thema && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 10px', borderRadius: 20, fontSize: 12, fontWeight: 500, background: '#FEF3C7', color: '#92400E', border: '1px solid #FDE68A' }}>{themaEmoji} {activiteit.thema}</span>}
+                {(Array.isArray(activiteit.thema) ? activiteit.thema : activiteit.thema ? [activiteit.thema] : []).filter(Boolean).map((t: string, i: number) => (
+                  <span key={i} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 10px', borderRadius: 20, fontSize: 12, fontWeight: 500, background: '#FEF3C7', color: '#92400E', border: '1px solid #FDE68A' }}>{t}</span>
+                ))}
                 <span className="tag" style={{ background: 'var(--bg)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}>👶 {activiteit.leeftijd}</span>
                 <span className="tag" style={{ background: 'var(--bg)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}>⏱ {activiteit.tijdsduur} min</span>
                 <span className="tag" style={{ background: 'var(--bg)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}>👥 {activiteit.groepsgrootte}</span>

@@ -14,7 +14,11 @@ export default function ActiviteitFormModal({ activiteit, onSave, onClose }: Pro
   const [naam, setNaam] = useState(activiteit?.naam || '')
   const [beschrijving, setBeschrijving] = useState(activiteit?.beschrijving || '')
   const [categorie, setCategorie] = useState(activiteit?.categorie || '')
-  const [thema, setThema] = useState(activiteit?.thema || '')
+  const [themas, setThemas] = useState<string[]>(
+    Array.isArray(activiteit?.thema) ? activiteit.thema :
+    (activiteit?.thema ? activiteit.thema.split(',').map(t => t.trim()).filter(Boolean) : [])
+  )
+  const [themaInput, setThemaInput] = useState('')
   const [themaSuggesties, setThemaSuggesties] = useState<string[]>([])
   const [leeftijd, setLeeftijd] = useState(activiteit?.leeftijd || '4-12 jaar')
   const [tijdsduur, setTijdsduur] = useState(String(activiteit?.tijdsduur || 30))
@@ -81,7 +85,7 @@ export default function ActiviteitFormModal({ activiteit, onSave, onClose }: Pro
       await onSave({
         naam: naam.trim(), beschrijving: beschrijving.trim(),
         categorie: categorie.trim(),
-        thema: thema.trim(),
+        thema: themas,
         leeftijd, tijdsduur: parseInt(tijdsduur) || 30, groepsgrootte,
         materialen: materialenRaw.split(',').map(s => s.trim()).filter(Boolean),
         stappen: stappenRaw.split('\n').map(s => s.trim()).filter(Boolean),
@@ -122,10 +126,35 @@ export default function ActiviteitFormModal({ activiteit, onSave, onClose }: Pro
               </datalist>
             </div>
             <div>
-              <label className="form-label">Thema <span style={{ fontWeight: 400, textTransform: 'none', fontSize: 11 }}>(bijv. Kerst, Zomer)</span></label>
-              <input className="form-input" value={thema} onChange={e => setThema(e.target.value)} placeholder="Optioneel: Kerst, Lente..." list="thema-lijst" />
+              <label className="form-label">Thema&apos;s <span style={{ fontWeight: 400, textTransform: 'none', fontSize: 11 }}>(meerdere mogelijk)</span></label>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginBottom: 6 }}>
+                {themas.map((t, i) => (
+                  <span key={i} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 10px', borderRadius: 20, background: 'var(--primary-light)', color: 'var(--primary-text)', fontSize: 12, fontWeight: 500 }}>
+                    {t}
+                    <button type="button" onClick={() => setThemas(prev => prev.filter((_, j) => j !== i))} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--primary-text)', padding: 0, display: 'flex', lineHeight: 1, fontSize: 14 }}>×</button>
+                  </span>
+                ))}
+              </div>
+              <div style={{ display: 'flex', gap: 6 }}>
+                <input className="form-input" value={themaInput} onChange={e => setThemaInput(e.target.value)} placeholder="Kerst, Zomer, Lente..." list="thema-lijst"
+                  onKeyDown={e => {
+                    if ((e.key === 'Enter' || e.key === ',') && themaInput.trim()) {
+                      e.preventDefault()
+                      const nieuw = themaInput.trim().replace(/,$/, '')
+                      if (nieuw && !themas.includes(nieuw)) setThemas(prev => [...prev, nieuw])
+                      setThemaInput('')
+                    }
+                  }}
+                  style={{ flex: 1 }}
+                />
+                <button type="button" className="btn btn-sm" onClick={() => {
+                  const nieuw = themaInput.trim()
+                  if (nieuw && !themas.includes(nieuw)) setThemas(prev => [...prev, nieuw])
+                  setThemaInput('')
+                }} disabled={!themaInput.trim()}>+ Voeg toe</button>
+              </div>
               <datalist id="thema-lijst">
-                {themaSuggesties.map(t => <option key={t} value={t} />)}
+                {themaSuggesties.filter(t => !themas.includes(t)).map(t => <option key={t} value={t} />)}
               </datalist>
             </div>
             <div>
