@@ -217,8 +217,8 @@ function JsonImportModal({
                       <div style={{ fontSize: 11, color: 'var(--text-muted)', display: 'flex', gap: 8, marginTop: 2 }}>
                         {a.thema && <span>{Array.isArray(a.thema) ? a.thema.join(', ') : a.thema}</span>}
                         <span>⏱ {a.tijdsduur} min</span>
-                        <span>{a.stappen.length} stappen</span>
-                        <span>{a.materialen.length} materialen</span>
+                        <span>{(a.stappen ?? []).length} stappen</span>
+                        <span>{(a.materialen ?? []).length} materialen</span>
                       </div>
                     </div>
                   </div>
@@ -320,7 +320,7 @@ function ActiviteitenPage() {
     const alle: string[] = []
     activiteiten.forEach(a => {
       if (Array.isArray(a.thema)) alle.push(...a.thema.filter(Boolean))
-      else if (a.thema) alle.push(a.thema)
+      else if (a.thema) alle.push(a.thema as string)
     })
     return Array.from(new Set(alle)).sort()
   }, [activiteiten])
@@ -345,7 +345,7 @@ function ActiviteitenPage() {
       matchFilter = getallen.some(n => n >= 8) || l.includes('8') || l.includes('oud') || l.includes('groot')
     }
     else if (actieveFilter.startsWith('cat:')) matchFilter = a.categorie === actieveFilter.slice(4)
-    else if (actieveFilter.startsWith('thema:')) matchFilter = a.thema === actieveFilter.slice(6)
+    else if (actieveFilter.startsWith('thema:')) { const t = actieveFilter.slice(6); matchFilter = Array.isArray(a.thema) ? a.thema.includes(t) : a.thema === t }
     return matchZoek && matchFilter
   })
 
@@ -400,8 +400,8 @@ function ActiviteitenPage() {
     e.stopPropagation()
     const regels: string[] = [a.naam, '']
     if (a.beschrijving) { regels.push(a.beschrijving); regels.push('') }
-    if (a.stappen.length > 0) { a.stappen.forEach((s, i) => regels.push(`${i + 1}. ${s}`)); regels.push('') }
-    if (a.materialen.length > 0) { regels.push('Benodigdheden'); a.materialen.forEach(m => regels.push(`• ${m}`)) }
+    if ((a.stappen ?? []).length > 0) { (a.stappen ?? []).forEach((s, i) => regels.push(`${i + 1}. ${s}`)); regels.push('') }
+    if ((a.materialen ?? []).length > 0) { regels.push('Benodigdheden'); (a.materialen ?? []).forEach(m => regels.push(`• ${m}`)) }
     await navigator.clipboard.writeText(regels.join('\n'))
     setToast({ bericht: 'Gekopieerd!', type: 'success' })
   }
@@ -561,7 +561,7 @@ function ActiviteitenPage() {
                     </p>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginBottom: 12 }}>
                       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 9px', borderRadius: 20, fontSize: 11, fontWeight: 500, background: catKleur + '20', color: catKleur, border: `1px solid ${catKleur}40` }}>{catEmoji} {a.categorie}</span>
-                      {a.thema && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 9px', borderRadius: 20, fontSize: 11, fontWeight: 500, background: '#FEF3C7', color: '#92400E', border: '1px solid #FDE68A' }}>{themaEmoji} {a.thema}</span>}
+                      {(Array.isArray(a.thema) ? a.thema : a.thema ? [a.thema] : []).filter(Boolean).map((t: string, i: number) => (<span key={i} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 9px', borderRadius: 20, fontSize: 11, fontWeight: 500, background: '#FEF3C7', color: '#92400E', border: '1px solid #FDE68A', marginRight: 2 }}>{t}</span>))}
                       <span className="tag" style={{ background: 'var(--bg)', color: 'var(--text-muted)', border: '1px solid var(--border)', fontSize: 11 }}><Clock size={10} style={{ marginRight: 2 }} />{a.tijdsduur} min</span>
                       {a.materiaal_aanwezig && <span className="tag tag-green" style={{ fontSize: 11 }}>Beschikbaar</span>}
                     </div>
