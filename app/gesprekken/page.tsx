@@ -8,7 +8,7 @@ import Toast from '@/components/Toast'
 import {
   Plus, X, Folder, FolderOpen, FileText, Trash2,
   Pencil, Download, ChevronRight, ChevronDown,
-  MapPin, User, Calendar
+  MapPin, User, Calendar, Settings
 } from 'lucide-react'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -214,10 +214,22 @@ export default function GesprekkenPage() {
   const [laden, setLaden] = useState(false)
 
   const [nieuwMapModal, setNieuwMapModal] = useState(false)
+  const [instellingenOpen, setInstellingenOpen] = useState(false)
+  const [autoVerwijderNaPDF, setAutoVerwijderNaPDF] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('gesprekken_auto_verwijder') === 'true'
+    }
+    return false
+  })
   const [formulierModal, setFormulierModal] = useState<{ map: Map; formulier?: Formulier } | null>(null)
   const [detailFormulier, setDetailFormulier] = useState<{ formulier: Formulier; map: Map } | null>(null)
 
   const [toast, setToast] = useState<{ bericht: string; type: 'success' | 'error' } | null>(null)
+
+  function toggleAutoVerwijder(waarde: boolean) {
+    setAutoVerwijderNaPDF(waarde)
+    localStorage.setItem('gesprekken_auto_verwijder', String(waarde))
+  }
 
   // ── Locaties ophalen ────────────────────────────────────────────────────────
   useEffect(() => {
@@ -325,11 +337,16 @@ export default function GesprekkenPage() {
         titel="10-minutengesprekken"
         subtitel={actieveLocatie}
         acties={
-          isSuperadmin ? (
-            <button className="btn btn-primary" onClick={() => setNieuwMapModal(true)}>
-              <Plus size={14} /> Nieuwe map
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button className="btn" onClick={() => setInstellingenOpen(true)}>
+              <Settings size={14} /> Instellingen
             </button>
-          ) : undefined
+            {isSuperadmin && (
+              <button className="btn btn-primary" onClick={() => setNieuwMapModal(true)}>
+                <Plus size={14} /> Nieuwe map
+              </button>
+            )}
+          </div>
         }
       />
 
@@ -460,7 +477,7 @@ export default function GesprekkenPage() {
                           </div>
                           <div style={{ display: 'flex', gap: 6 }}>
                             <button
-                              onClick={e => { e.stopPropagation(); exportFormulierPDF(f, actieveMap.mentor_naam, actieveLocatie) }}
+                              onClick={async e => { e.stopPropagation(); await exportFormulierPDF(f, actieveMap.mentor_naam, actieveLocatie); if (autoVerwijderNaPDF) { await verwijderFormulier(f.id) } }}
                               className="btn btn-sm"
                               title="PDF exporteren"
                             >
@@ -521,9 +538,63 @@ export default function GesprekkenPage() {
           locatieNaam={actieveLocatie}
           onBewerk={() => { setFormulierModal({ map: detailFormulier.map, formulier: detailFormulier.formulier }); setDetailFormulier(null) }}
           onVerwijder={() => verwijderFormulier(detailFormulier.formulier.id)}
-          onExport={() => exportFormulierPDF(detailFormulier.formulier, detailFormulier.map.mentor_naam, actieveLocatie)}
+          onExport={async () => {
+            await exportFormulierPDF(detailFormulier.formulier, detailFormulier.map.mentor_naam, actieveLocatie)
+            if (autoVerwijderNaPDF) {
+              await verwijderFormulier(detailFormulier.formulier.id)
+            }
+          }}
           onClose={() => setDetailFormulier(null)}
         />
+      )}
+
+      {/* Instellingen modal */}
+      {instellingenOpen && (
+        <div className="modal-backdrop" onClick={e => { if (e.target === e.currentTarget) setInstellingenOpen(false) }}>
+          <div className="modal-box" style={{ maxWidth: 400 }} onClick={e => e.stopPropagation()}>
+            <div className="card-header">
+              <span className="card-title">Instellingen</span>
+              <button onClick={() => setInstellingenOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex' }}><X size={18} /></button>
+            </div>
+            <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              {/* Auto verwijder toggle */}
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14, padding: '14px 16px', borderRadius: 10, background: 'var(--bg)', border: '1px solid var(--border)' }}>
+                <button
+                  onClick={() => toggleAutoVerwijder(!autoVerwijderNaPDF)}
+                  style={{
+                    width: 40, height: 22, borderRadius: 11, border: 'none', cursor: 'pointer', flexShrink: 0,
+                    background: autoVerwijderNaPDF ? 'var(--primary)' : 'var(--border-dark)',
+                    position: 'relative', transition: 'background 0.2s', marginTop: 2,
+                  }}
+                >
+                  <div style={{
+                    position: 'absolute', top: 3,
+                    left: autoVerwijderNaPDF ? 20 : 3,
+                    width: 16, height: 16, borderRadius: '50%',
+                    background: '#fff', transition: 'left 0.2s',
+                  }} />
+                </button>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 3 }}>
+                    Automatisch verwijderen na PDF export
+                  </div>
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.5 }}>
+                    Als dit aan staat wordt een formulier automatisch verwijderd nadat het als PDF is geëxporteerd.
+                  </div>
+                  {autoVerwijderNaPDF && (
+                    <div style={{ marginTop: 8, padding: '6px 10px', borderRadius: 7, background: '#FEF3C7', border: '1px solid #FDE68A', fontSize: 11, color: '#92400E' }}>
+                      ⚠️ Let op: verwijderde formulieren zijn niet terug te halen.
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                <button className="btn btn-primary" onClick={() => setInstellingenOpen(false)}>Sluiten</button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
       {toast && <Toast bericht={toast.bericht} type={toast.type} onClose={() => setToast(null)} />}
