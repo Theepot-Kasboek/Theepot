@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { getSupabase } from '@/lib/supabase'
 import { Eye, EyeOff, LogIn } from 'lucide-react'
+import Image from 'next/image'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -44,24 +45,13 @@ export default function LoginPage() {
       <div style={{ width: '100%', maxWidth: 380 }}>
         {/* Logo */}
         <div style={{ textAlign: 'center', marginBottom: 32 }}>
-          <div
-            style={{
-              width: 52,
-              height: 52,
-              background: 'var(--primary)',
-              borderRadius: 14,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              margin: '0 auto 12px',
-              fontFamily: 'Sora, sans-serif',
-              fontSize: 20,
-              fontWeight: 700,
-              color: '#fff',
-            }}
-          >
-            DM
-          </div>
+          <Image
+            src="/logo.jpg"
+            alt="De Theepot"
+            width={80}
+            height={80}
+            style={{ borderRadius: 16, objectFit: 'contain', margin: '0 auto 14px', display: 'block' }}
+          />
           <h1
             style={{
               fontFamily: 'Sora, sans-serif',
@@ -70,7 +60,7 @@ export default function LoginPage() {
               marginBottom: 4,
             }}
           >
-            De Molen
+            Kinderopvang de Theepot
           </h1>
           <p style={{ fontSize: 13, color: 'var(--text-muted)' }}>
             Log in om verder te gaan
@@ -86,7 +76,7 @@ export default function LoginPage() {
                 <input
                   type="email"
                   className="form-input"
-                  placeholder="naam@demolen.nl"
+                  placeholder="naam@bsodetheepot.nl"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
