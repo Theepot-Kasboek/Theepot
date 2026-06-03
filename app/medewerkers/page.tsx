@@ -144,6 +144,14 @@ export default function MedewerkersPage() {
       if (profielError) {
         setFormFout('Account aangemaakt maar profiel opslaan mislukt: ' + profielError.message)
       } else {
+        // Maak automatisch een persoonlijke agenda aan
+        await supabase.from('agenda_kalenders').insert({
+          naam: formNaam.trim(),
+          type: 'persoonlijk',
+          eigenaar_id: authData.user.id,
+          kleur: '#8CC63F',
+        })
+
         setToonModal(false)
         setToast({ bericht: `${formNaam} toegevoegd.`, type: 'success' })
         laadMedewerkers()
