@@ -245,18 +245,19 @@ export default function WeekplanningenPage() {
   const [actieveSlot, setActieveSlot] = useState<ActType | null>(null)
   const [toast, setToast] = useState<{ bericht: string; type: 'success' | 'error' } | null>(null)
 
-  // ── Locaties ophalen ────────────────────────────────────────────────────────
+  // ── Locaties ophalen — wacht op profiel ────────────────────────────────────
   useEffect(() => {
+    if (!profiel) return  // Wacht tot profiel geladen is
     async function laad() {
       const supabase = getSupabase()
-      // Haal locaties op uit kasboek_locaties als basis
       const { data } = await supabase.from('kasboek_locaties').select('naam').eq('actief', true).order('naam')
-      const namen = (data ?? []).map((l: { naam: string }) => l.naam)
+      const allen = (data ?? []).map((l: { naam: string }) => l.naam)
+      const namen = await getToegankelijkeLocaties(allen)
       setLocaties(namen)
       if (namen.length > 0) setActieveLocatie(namen[0])
     }
     laad()
-  }, [])
+  }, [profiel?.id])  // Herlaad als profiel verandert
 
   // ── Planning ophalen of aanmaken ────────────────────────────────────────────
   const haalPlanningOp = useCallback(async () => {

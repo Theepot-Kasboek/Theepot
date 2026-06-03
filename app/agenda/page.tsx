@@ -271,7 +271,9 @@ export default function AgendaPage() {
   }
 
   // Bewerk rechten: superadmin en leidinggevende mogen alles, directie alleen lezen
-  const magBewerken = isSuperadmin || profiel?.rol === 'leidinggevende' || rechten.agenda_algemeen_bewerken
+  // Iedereen mag hun eigen persoonlijke agenda bewerken
+  // De modal filtert automatisch op beschikbare kalenders per gebruiker
+  const magBewerken = true
 
   function openNieuw(dag?: Date) {
     if (!magBewerken) return
@@ -545,7 +547,7 @@ export default function AgendaPage() {
             {/* Kalenders + Nieuw */}
             <button className="btn" onClick={() => setKalenderPanelOpen(true)}><Calendar size={14} /> Kalenders</button>
             <button className="btn" onClick={() => setIcsModal(true)}><Upload size={14} /> ICS</button>
-            {magBewerken && <button className="btn btn-primary" onClick={() => openNieuw()}><Plus size={14} /> Afspraak</button>}
+            <button className="btn btn-primary" onClick={() => openNieuw()}><Plus size={14} /> Afspraak</button>
           </div>
         }
       />
