@@ -541,11 +541,16 @@ function LocatieToegang({ profielen, kasboekLocaties, maaltijdLocaties, locatieT
   onToast: (t: { bericht: string; type: 'success' | 'error' }) => void
 }) {
   const [actieveProfiel, setActieveProfiel] = useState<string>(profielen[0]?.id ?? '')
+  // Lokale kopie van toegang zodat UI direct reageert zonder page refresh
+  const [lokaaleToegang, setLokaaleToegang] = useState<LocatieToegangsRij[]>(locatieToegang)
+
+  // Sync als parent data verandert
+  useEffect(() => { setLokaaleToegang(locatieToegang) }, [locatieToegang])
 
   const profiel = profielen.find(p => p.id === actieveProfiel)
 
   function huidigeToegang(locatieType: string, locatieNaam: string): string {
-    return locatieToegang.find(t =>
+    return lokaaleToegang.find(t =>
       t.profiel_id === actieveProfiel &&
       t.locatie_type === locatieType &&
       t.locatie_naam === locatieNaam
@@ -554,17 +559,37 @@ function LocatieToegang({ profielen, kasboekLocaties, maaltijdLocaties, locatieT
 
   async function setToegang(locatieType: string, locatieNaam: string, toegang: string) {
     const supabase = getSupabase()
-    const bestaand = locatieToegang.find(t =>
+    const bestaand = lokaaleToegang.find(t =>
       t.profiel_id === actieveProfiel &&
       t.locatie_type === locatieType &&
       t.locatie_naam === locatieNaam
     )
+
+    // Direct lokale state updaten zodat UI meteen reageert
     if (bestaand) {
+      setLokaaleToegang(prev => prev.map(t =>
+        t.id === bestaand.id ? { ...t, toegang } : t
+      ))
       await supabase.from('locatie_toegang').update({ toegang }).eq('id', bestaand.id)
     } else {
-      await supabase.from('locatie_toegang').insert({ profiel_id: actieveProfiel, locatie_type: locatieType, locatie_naam: locatieNaam, toegang })
+      // Tijdelijk id voor optimistic update
+      const tijdelijkId = `temp-${Date.now()}`
+      const nieuw: LocatieToegangsRij = {
+        id: tijdelijkId,
+        profiel_id: actieveProfiel,
+        locatie_type: locatieType,
+        locatie_naam: locatieNaam,
+        toegang,
+      }
+      setLokaaleToegang(prev => [...prev, nieuw])
+      const { data } = await supabase.from('locatie_toegang')
+        .insert({ profiel_id: actieveProfiel, locatie_type: locatieType, locatie_naam: locatieNaam, toegang })
+        .select().single()
+      // Vervang tijdelijk id met echt id
+      if (data) {
+        setLokaaleToegang(prev => prev.map(t => t.id === tijdelijkId ? data as LocatieToegangsRij : t))
+      }
     }
-    onRefresh()
   }
 
   // Weekplanningen en gesprekken gebruiken dezelfde locaties als kasboek
