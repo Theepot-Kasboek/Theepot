@@ -47,7 +47,7 @@ export default function LoginPage() {
           <img
             src="/logo.jpg"
             alt="De Theepot"
-            style={{ width: 100, height: 100, borderRadius: 16, objectFit: 'contain', display: 'block', margin: '0 auto 14px', background: '#fff', padding: 4 }}
+            style={{ width: 160, height: 160, objectFit: 'contain', display: 'block', margin: '0 auto 14px' }}
           />
           <h1
             style={{
