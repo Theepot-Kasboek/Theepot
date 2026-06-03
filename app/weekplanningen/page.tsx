@@ -7,7 +7,7 @@ import Topbar from '@/components/Topbar'
 import Toast from '@/components/Toast'
 import {
   Plus, X, ChevronLeft, ChevronRight, Scissors,
-  Users, Download, BookOpen, Pencil, Trash2, MapPin
+  Users, Download, BookOpen, Pencil, Trash2, MapPin, Upload
 } from 'lucide-react'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -598,6 +598,15 @@ function ActiviteitModal({ type, bestaand, onSave, onClose }: {
   const [bibliotheek, setBibliotheek] = useState<BibliotheekActiviteit[]>([])
   const [zoek, setZoek] = useState('')
   const [laden, setLaden] = useState(false)
+  const [afbeeldingBestand, setAfbeeldingBestand] = useState<File | null>(null)
+  const [afbeeldingPreview, setAfbeeldingPreview] = useState<string | null>(null)
+
+  function kiesAfbeelding(bestand: File) {
+    setAfbeeldingBestand(bestand)
+    const reader = new FileReader()
+    reader.onload = e => setAfbeeldingPreview(e.target?.result as string)
+    reader.readAsDataURL(bestand)
+  }
 
   useEffect(() => {
     getSupabase().from('activiteiten').select('id, naam, categorie, beschrijving, materialen').order('naam')
@@ -664,6 +673,28 @@ function ActiviteitModal({ type, bestaand, onSave, onClose }: {
                       <span key={i} style={{ padding: '2px 9px', borderRadius: 20, background: config.bg, color: config.kleur, fontSize: 11, fontWeight: 500 }}>{m}</span>
                     ))}
                   </div>
+                )}
+              </div>
+              <div>
+                <label className="form-label">Voorbeeldafbeelding (optioneel)</label>
+                {afbeeldingPreview ? (
+                  <div style={{ position: 'relative', borderRadius: 10, overflow: 'hidden', border: '1px solid var(--border)' }}>
+                    <img src={afbeeldingPreview} alt="Preview" style={{ width: '100%', maxHeight: 160, objectFit: 'cover', display: 'block' }} />
+                    <button onClick={() => { setAfbeeldingPreview(null); setAfbeeldingBestand(null) }} style={{ position: 'absolute', top: 6, right: 6, background: 'rgba(220,38,38,0.8)', border: 'none', color: '#fff', borderRadius: 6, padding: '3px 8px', cursor: 'pointer', fontSize: 11, display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <X size={11} /> Verwijderen
+                    </button>
+                  </div>
+                ) : (
+                  <label style={{ cursor: 'pointer', display: 'block' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', borderRadius: 9, border: '2px dashed var(--border-dark)', background: 'var(--bg)' }}
+                      onMouseEnter={e => (e.currentTarget.style.borderColor = config.kleur)}
+                      onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--border-dark)')}
+                    >
+                      <Upload size={16} color="var(--text-muted)" style={{ opacity: 0.6, flexShrink: 0 }} />
+                      <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>Klik om een foto te kiezen</span>
+                    </div>
+                    <input type="file" accept="image/*" style={{ display: 'none' }} onChange={e => e.target.files?.[0] && kiesAfbeelding(e.target.files[0])} />
+                  </label>
                 )}
               </div>
               <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
