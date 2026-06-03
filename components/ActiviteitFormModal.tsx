@@ -46,7 +46,7 @@ export default function ActiviteitFormModal({ activiteit, onSave, onClose }: Pro
         leeftijd, tijdsduur: parseInt(tijdsduur) || 30, groepsgrootte,
         materialen: materialenRaw.split(',').map(s => s.trim()).filter(Boolean),
         stappen: stappenRaw.split('\n').map(s => s.trim()).filter(Boolean),
-        materiaal_aanwezig: materiaalAanwezig, ai_gegenereerd: false,
+        materiaal_aanwezig: materiaalAanwezig, ai_gegenereerd: false, afbeelding_pad: activiteit?.afbeelding_pad ?? null,
       })
     } catch { setError('Er is iets misgegaan.') }
     setLoading(false)

@@ -43,6 +43,7 @@ export interface Activiteit {
   stappen: string[]
   materiaal_aanwezig: boolean
   ai_gegenereerd: boolean
+  afbeelding_pad: string | null
 }
 
 export interface KasboekEntry {

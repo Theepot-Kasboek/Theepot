@@ -75,6 +75,7 @@ function JsonImportModal({
           stappen: Array.isArray(item.stappen) ? item.stappen.map(String) : [],
           materiaal_aanwezig: Boolean(item.materiaal_aanwezig ?? false),
           ai_gegenereerd: true,
+          afbeelding_pad: null,
         }
       })
 
@@ -514,7 +515,17 @@ function ActiviteitenPage() {
                   onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--primary)'; (e.currentTarget as HTMLElement).style.boxShadow = '0 2px 12px rgba(140,198,63,0.15)' }}
                   onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--border)'; (e.currentTarget as HTMLElement).style.boxShadow = 'none' }}
                 >
-                  <div style={{ height: 4, background: catKleur }} />
+                  {a.afbeelding_pad && (
+                    <div style={{ height: 120, overflow: 'hidden', position: 'relative' }}>
+                      <img
+                        src={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/activiteit-afbeeldingen/${a.afbeelding_pad}`}
+                        alt={a.naam}
+                        style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                      />
+                      <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 3, background: catKleur }} />
+                    </div>
+                  )}
+                  {!a.afbeelding_pad && <div style={{ height: 4, background: catKleur }} />}
                   <div style={{ padding: 16 }}>
                     <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 8 }}>
                       <h3 style={{ fontFamily: 'Sora, sans-serif', fontSize: 14, fontWeight: 600, lineHeight: 1.35, flex: 1, paddingRight: 8 }}>{a.naam}</h3>

@@ -1,10 +1,11 @@
 'use client'
-import { X, Copy, Download, Edit2, Trash2 } from 'lucide-react'
+import { X, Copy, Download, Edit2, Trash2, Image } from 'lucide-react'
 import { Activiteit } from '@/lib/supabase'
+import { getSupabase } from '@/lib/supabase'
 import { exportActiviteitAlsPDF } from '@/lib/pdf-export'
 import { getCategorieKleur, getCategorieEmoji } from '@/lib/categorieen'
 import { getThemaEmoji } from '@/lib/themas'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 interface Props {
   activiteit: Activiteit
@@ -25,6 +26,19 @@ function maakKopieerTekst(a: Activiteit): string {
 export default function ActiviteitModal({ activiteit, onClose, onEdit, onDelete, onToast }: Props) {
   const [pdfLoading, setPdfLoading] = useState(false)
   const [bevestigVerwijder, setBevestigVerwijder] = useState(false)
+  const [afbeeldingUrl, setAfbeeldingUrl] = useState<string | null>(null)
+  const [uploadLaden, setUploadLaden] = useState(false)
+
+  // Laad afbeelding URL
+  useEffect(() => {
+    if (activiteit.afbeelding_pad) {
+      const supabase = getSupabase()
+      const { data } = supabase.storage.from('activiteit-afbeeldingen').getPublicUrl(activiteit.afbeelding_pad)
+      setAfbeeldingUrl(data.publicUrl)
+    } else {
+      setAfbeeldingUrl(null)
+    }
+  }, [activiteit.afbeelding_pad])
 
   function kopieer() {
     navigator.clipboard.writeText(maakKopieerTekst(activiteit))
@@ -38,13 +52,48 @@ export default function ActiviteitModal({ activiteit, onClose, onEdit, onDelete,
     setPdfLoading(false)
   }
 
+  async function uploadAfbeelding(bestand: File) {
+    setUploadLaden(true)
+    const supabase = getSupabase()
+    const ext = bestand.name.split('.').pop()
+    const pad = `${activiteit.id}.${ext}`
+
+    const { error: uploadError } = await supabase.storage
+      .from('activiteit-afbeeldingen')
+      .upload(pad, bestand, { upsert: true })
+
+    if (uploadError) {
+      onToast('⚠️ Upload mislukt: ' + uploadError.message)
+      setUploadLaden(false)
+      return
+    }
+
+    await supabase.from('activiteiten').update({ afbeelding_pad: pad }).eq('id', activiteit.id)
+    const { data } = supabase.storage.from('activiteit-afbeeldingen').getPublicUrl(pad)
+    setAfbeeldingUrl(data.publicUrl + '?t=' + Date.now())
+    activiteit.afbeelding_pad = pad
+    onToast('✅ Afbeelding opgeslagen!')
+    setUploadLaden(false)
+  }
+
+  async function verwijderAfbeelding() {
+    const supabase = getSupabase()
+    if (activiteit.afbeelding_pad) {
+      await supabase.storage.from('activiteit-afbeeldingen').remove([activiteit.afbeelding_pad])
+    }
+    await supabase.from('activiteiten').update({ afbeelding_pad: null }).eq('id', activiteit.id)
+    setAfbeeldingUrl(null)
+    activiteit.afbeelding_pad = null
+    onToast('✅ Afbeelding verwijderd')
+  }
+
   const catKleur = getCategorieKleur(activiteit.categorie)
   const catEmoji = getCategorieEmoji(activiteit.categorie)
   const themaEmoji = getThemaEmoji(activiteit.thema)
 
   return (
     <div className="modal-backdrop" onClick={e => { if (e.target === e.currentTarget) onClose() }}>
-      <div className="modal-box">
+      <div className="modal-box" style={{ maxWidth: 580 }} onClick={e => e.stopPropagation()}>
         <div style={{ height: 5, background: catKleur, borderRadius: '16px 16px 0 0' }} />
 
         <div style={{ padding: '24px 28px 0' }}>
@@ -56,9 +105,9 @@ export default function ActiviteitModal({ activiteit, onClose, onEdit, onDelete,
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 10 }}>
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 10px', borderRadius: 20, fontSize: 12, fontWeight: 500, background: catKleur + '18', color: catKleur, border: `1px solid ${catKleur}40` }}>{catEmoji} {activiteit.categorie}</span>
                 {activiteit.thema && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 10px', borderRadius: 20, fontSize: 12, fontWeight: 500, background: '#FEF3C7', color: '#92400E', border: '1px solid #FDE68A' }}>{themaEmoji} {activiteit.thema}</span>}
-                <span className="tag" style={{ background: '#F8FAFC', color: 'var(--text-muted)', border: '1px solid var(--border)' }}>👶 {activiteit.leeftijd}</span>
-                <span className="tag" style={{ background: '#F8FAFC', color: 'var(--text-muted)', border: '1px solid var(--border)' }}>⏱ {activiteit.tijdsduur} min</span>
-                <span className="tag" style={{ background: '#F8FAFC', color: 'var(--text-muted)', border: '1px solid var(--border)' }}>👥 {activiteit.groepsgrootte}</span>
+                <span className="tag" style={{ background: 'var(--bg)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}>👶 {activiteit.leeftijd}</span>
+                <span className="tag" style={{ background: 'var(--bg)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}>⏱ {activiteit.tijdsduur} min</span>
+                <span className="tag" style={{ background: 'var(--bg)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}>👥 {activiteit.groepsgrootte}</span>
                 {activiteit.materiaal_aanwezig && <span className="tag tag-green">✅ Beschikbaar</span>}
               </div>
             </div>
@@ -89,14 +138,59 @@ export default function ActiviteitModal({ activiteit, onClose, onEdit, onDelete,
 
         <div style={{ margin: '16px 28px 0', borderTop: '1px solid var(--border)' }} />
 
-        <div style={{ padding: '20px 28px 28px' }}>
+        <div style={{ padding: '20px 28px 28px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+          {/* Afbeelding sectie */}
+          <div>
+            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>
+              Voorbeeldafbeelding
+            </div>
+            {afbeeldingUrl ? (
+              <div style={{ position: 'relative', borderRadius: 10, overflow: 'hidden', border: '1px solid var(--border)' }}>
+                <img
+                  src={afbeeldingUrl}
+                  alt={activiteit.naam}
+                  style={{ width: '100%', maxHeight: 240, objectFit: 'cover', display: 'block' }}
+                />
+                <div style={{ position: 'absolute', top: 8, right: 8, display: 'flex', gap: 6 }}>
+                  <label style={{ cursor: 'pointer' }}>
+                    <div className="btn btn-sm" style={{ background: 'rgba(0,0,0,0.6)', color: '#fff', border: 'none', backdropFilter: 'blur(4px)' }}>
+                      <Image size={12} /> Wijzigen
+                    </div>
+                    <input type="file" accept="image/*" style={{ display: 'none' }} onChange={e => e.target.files?.[0] && uploadAfbeelding(e.target.files[0])} />
+                  </label>
+                  <button className="btn btn-sm" onClick={verwijderAfbeelding} style={{ background: 'rgba(220,38,38,0.8)', color: '#fff', border: 'none', backdropFilter: 'blur(4px)' }}>
+                    <X size={12} />
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <label style={{ cursor: 'pointer', display: 'block' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, padding: '24px 16px', borderRadius: 10, border: '2px dashed var(--border-dark)', background: 'var(--bg)', transition: 'all 0.12s' }}
+                  onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--primary)')}
+                  onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--border-dark)')}
+                >
+                  <Image size={24} color="var(--text-muted)" style={{ opacity: 0.5 }} />
+                  <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>
+                    {uploadLaden ? 'Uploaden...' : 'Klik om een afbeelding toe te voegen'}
+                  </span>
+                  <span style={{ fontSize: 11, color: 'var(--text-muted)', opacity: 0.7 }}>JPG, PNG, WebP</span>
+                </div>
+                <input type="file" accept="image/*" style={{ display: 'none' }} onChange={e => e.target.files?.[0] && uploadAfbeelding(e.target.files[0])} />
+              </label>
+            )}
+          </div>
+
+          {/* Beschrijving */}
           {activiteit.beschrijving && (
-            <p style={{ fontSize: 14, color: 'var(--text)', lineHeight: 1.7, marginBottom: activiteit.stappen.length > 0 ? 20 : 24 }}>
+            <p style={{ fontSize: 14, color: 'var(--text)', lineHeight: 1.7, margin: 0 }}>
               {activiteit.beschrijving}
             </p>
           )}
+
+          {/* Stappen */}
           {activiteit.stappen.length > 0 && (
-            <div style={{ marginBottom: 24 }}>
+            <div>
               {activiteit.stappen.map((stap, i) => (
                 <div key={i} style={{ display: 'flex', gap: 12, marginBottom: 10 }}>
                   <div style={{ minWidth: 26, height: 26, borderRadius: '50%', background: 'var(--primary)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, flexShrink: 0, marginTop: 1 }}>{i + 1}</div>
@@ -105,6 +199,8 @@ export default function ActiviteitModal({ activiteit, onClose, onEdit, onDelete,
               ))}
             </div>
           )}
+
+          {/* Materialen */}
           {activiteit.materialen.length > 0 && (
             <div>
               <p style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)', marginBottom: 10 }}>Benodigdheden</p>
