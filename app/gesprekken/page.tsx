@@ -620,7 +620,7 @@ function FormulierModal({ map, formulier, onSave, onClose }: {
               <input className="form-input" value={kindNaam} onChange={e => setKindNaam(e.target.value)} placeholder="Voor- en achternaam" autoFocus />
             </div>
             <div>
-              <label className="form-label">Datum gesprek *</label>
+              <label className="form-label">Datum ingevuld *</label>
               <input type="date" className="form-input" value={datum} onChange={e => setDatum(e.target.value)} />
             </div>
           </div>
