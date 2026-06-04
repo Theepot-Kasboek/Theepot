@@ -23,6 +23,9 @@ interface Recht {
   pagina_maaltijdlijst: Toegang
   pagina_weekplanningen: Toegang
   pagina_gesprekken: Toegang
+  pagina_beleid: Toegang
+  pagina_brandoefening: Toegang
+  pagina_nieuwsbrieven: Toegang
 
   chat_starten: boolean
   kasboek_export: boolean
@@ -121,6 +124,24 @@ const PAGINAS: PaginaDef[] = [
     ],
   },
   {
+    key: 'pagina_beleid',
+    label: 'Beleidsstukken',
+    icon: '📋',
+    functies: [],
+  },
+  {
+    key: 'pagina_brandoefening',
+    label: 'Brandoefening',
+    icon: '🔥',
+    functies: [],
+  },
+  {
+    key: 'pagina_nieuwsbrieven',
+    label: 'Nieuwsbrieven',
+    icon: '📰',
+    functies: [],
+  },
+  {
     key: 'pagina_medewerkers',
     label: 'Medewerkers',
     icon: '👥',
@@ -149,6 +170,9 @@ function leegRecht(): Omit<Recht, 'id' | 'rol' | 'profiel_id'> {
     pagina_maaltijdlijst: 'geen',
     pagina_weekplanningen: 'geen',
     pagina_gesprekken: 'geen',
+    pagina_beleid: 'geen',
+    pagina_brandoefening: 'geen',
+    pagina_nieuwsbrieven: 'geen',
     kasboek_export: false,
     kasboek_bonnetjes_inzien: false,
     activiteiten_importeren: false,
@@ -530,6 +554,7 @@ const LOCATIE_SECTIES = [
   { type: 'maaltijdlijst',   icon: '🍽️', label: 'Maaltijdlijst' },
   { type: 'weekplanningen',  icon: '✂️', label: 'Weekplanningen' },
   { type: 'gesprekken',      icon: '💬', label: '10-minutengesprekken' },
+  { type: 'brandoefening',   icon: '🔥', label: 'Brandoefening' },
 ]
 
 function LocatieToegang({ profielen, kasboekLocaties, maaltijdLocaties, locatieToegang, onRefresh, onToast }: {
@@ -599,6 +624,7 @@ function LocatieToegang({ profielen, kasboekLocaties, maaltijdLocaties, locatieT
     if (type === 'maaltijdlijst') return maaltijdLocaties
     if (type === 'weekplanningen') return kasboekLocaties
     if (type === 'gesprekken') return kasboekLocaties
+    if (type === 'brandoefening') return kasboekLocaties
     return []
   }
 
