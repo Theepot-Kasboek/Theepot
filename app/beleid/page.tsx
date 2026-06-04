@@ -53,7 +53,9 @@ const CATEGORIEEN = ['Beleid', 'Protocol', 'Handleiding', 'Formulier', 'Overig']
 // ─── Hoofd pagina ─────────────────────────────────────────────────────────────
 
 export default function BeleidPage() {
-  const { profiel, isSuperadmin } = useAuth()
+  const { profiel, isSuperadmin, rechten } = useAuth()
+  const magZien = isSuperadmin || rechten.pagina_beleid !== 'geen'
+  const magBewerken = isSuperadmin || rechten.pagina_beleid === 'bewerken'
 
   const [stukken, setStukken] = useState<Beleidsstuk[]>([])
   const [zoekterm, setZoekterm] = useState('')
@@ -122,13 +124,20 @@ export default function BeleidPage() {
 
   // ─── RENDER ─────────────────────────────────────────────────────────────────
 
+  if (!magZien) return (
+    <>
+      <Topbar titel="Beleidsstukken" subtitel="Geen toegang" />
+      <div className="page-content"><div className="empty-state"><FileText size={36} /><h3>Geen toegang</h3><p>Je hebt geen toegang tot de beleidsstukken.</p></div></div>
+    </>
+  )
+
   return (
     <>
       <Topbar
         titel="Beleidsstukken"
         subtitel={`${stukken.length} documenten`}
         acties={
-          isSuperadmin ? (
+          magBewerken ? (
             <button className="btn btn-primary" onClick={() => setUploadModal(true)}>
               <Upload size={14} /> Document uploaden
             </button>
@@ -237,7 +246,7 @@ export default function BeleidPage() {
                     <button className="btn btn-sm" onClick={() => download(stuk)} title="Downloaden">
                       <Download size={13} /> Download
                     </button>
-                    {isSuperadmin && (
+                    {magBewerken && (
                       <button
                         className="btn btn-sm"
                         onClick={() => verwijder(stuk)}

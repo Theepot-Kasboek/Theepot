@@ -235,7 +235,20 @@ async function exportPDF(week: BrandoefeningWeek) {
 // ─── Hoofd pagina ─────────────────────────────────────────────────────────────
 
 export default function BrandoefeningPage() {
-  const { profiel, isSuperadmin } = useAuth()
+  const { profiel, isSuperadmin, rechten } = useAuth()
+  const magZien = isSuperadmin || rechten.pagina_brandoefening !== 'geen'
+  const magBewerken = isSuperadmin || rechten.pagina_brandoefening === 'bewerken'
+
+  async function getToegankelijkeLocaties(alleLocaties: string[]): Promise<string[]> {
+    if (isSuperadmin) return alleLocaties
+    const { data } = await getSupabase()
+      .from('locatie_toegang')
+      .select('locatie_naam, toegang')
+      .eq('profiel_id', profiel?.id ?? '')
+      .eq('locatie_type', 'brandoefening')
+    const toegankelijk = (data ?? []).filter((t: { toegang: string }) => t.toegang !== 'geen').map((t: { locatie_naam: string }) => t.locatie_naam)
+    return alleLocaties.filter(l => toegankelijk.includes(l))
+  }
 
   const [locaties, setLocaties] = useState<string[]>([])
   const [actieveLocatie, setActieveLocatie] = useState<string>('')
@@ -248,13 +261,15 @@ export default function BrandoefeningPage() {
 
   // ── Locaties ────────────────────────────────────────────────────────────────
   useEffect(() => {
+    if (!profiel) return
     getSupabase().from('kasboek_locaties').select('naam').eq('actief', true).order('naam')
-      .then(({ data }) => {
-        const namen = (data ?? []).map((l: { naam: string }) => l.naam)
+      .then(async ({ data }) => {
+        const allen = (data ?? []).map((l: { naam: string }) => l.naam)
+        const namen = await getToegankelijkeLocaties(allen)
         setLocaties(namen)
         if (namen.length > 0) setActieveLocatie(namen[0])
       })
-  }, [])
+  }, [profiel?.id])
 
   // ── Weken ophalen ────────────────────────────────────────────────────────────
   const haalWekenOp = useCallback(async () => {
@@ -300,6 +315,13 @@ export default function BrandoefeningPage() {
 
   // ─── RENDER ─────────────────────────────────────────────────────────────────
 
+  if (!magZien) return (
+    <>
+      <Topbar titel="Brandoefening" subtitel="Geen toegang" />
+      <div className="page-content"><div className="empty-state"><Flame size={36} /><h3>Geen toegang</h3><p>Je hebt geen toegang tot de brandoefening evaluaties.</p></div></div>
+    </>
+  )
+
   return (
     <>
       <Topbar
@@ -312,9 +334,9 @@ export default function BrandoefeningPage() {
                 <Download size={14} /> PDF
               </button>
             )}
-            <button className="btn btn-primary" onClick={() => setNieuwWeekModal(true)}>
+            {magBewerken && <button className="btn btn-primary" onClick={() => setNieuwWeekModal(true)}>
               <Plus size={14} /> Week toevoegen
-            </button>
+            </button>}
           </div>
         }
       />
@@ -403,15 +425,15 @@ export default function BrandoefeningPage() {
                     <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>{actieveWeek.locatie_naam}</div>
                   </div>
                   <div style={{ display: 'flex', gap: 8 }}>
-                    <button className="btn btn-primary" onClick={() => setBewerkModal(actieveWeek)}>
+                    {magBewerken && <button className="btn btn-primary" onClick={() => setBewerkModal(actieveWeek)}>
                       <Pencil size={14} /> Invullen / Bewerken
-                    </button>
+                    </button>}
                     <button className="btn" onClick={() => exportPDF(actieveWeek)}>
                       <Download size={14} /> PDF
                     </button>
-                    <button className="btn btn-sm" style={{ color: '#DC2626', borderColor: '#FECACA' }} onClick={() => verwijder(actieveWeek.id)}>
+                    {magBewerken && <button className="btn btn-sm" style={{ color: '#DC2626', borderColor: '#FECACA' }} onClick={() => verwijder(actieveWeek.id)}>
                       <Trash2 size={13} />
-                    </button>
+                    </button>}
                   </div>
                 </div>
 

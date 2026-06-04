@@ -20,11 +20,12 @@ interface NavItem {
   badge?: string | number
   superadminOnly?: boolean
   notificatie?: number
+  vereistRecht?: string
 }
 
 export default function Sidebar({ isOpen, onClose }: { isOpen?: boolean; onClose?: () => void }) {
   const pathname = usePathname()
-  const { profiel, isSuperadmin, loading, signOut } = useAuth()
+  const { profiel, isSuperadmin, rechten, loading, signOut } = useAuth()
   const { theme, toggleTheme } = useTheme()
   const [ongelezen, setOngelezen] = useState(0)
 
@@ -108,10 +109,10 @@ export default function Sidebar({ isOpen, onClose }: { isOpen?: boolean; onClose
     {
       label: 'Administratie',
       items: [
-        { href: '/kasboek', label: 'Kasboek', icon: <Wallet size={16} /> },
-        { href: '/maaltijdlijst', label: 'Maaltijdlijst', icon: <UtensilsCrossed size={16} /> },
-        { href: '/beleid', label: 'Beleidsstukken', icon: <FileText size={16} /> },
-        { href: '/brandoefening', label: 'Brandoefening', icon: <Flame size={16} /> },
+        { href: '/kasboek', label: 'Kasboek', icon: <Wallet size={16} />, vereistRecht: 'pagina_kasboek' as const },
+        { href: '/maaltijdlijst', label: 'Maaltijdlijst', icon: <UtensilsCrossed size={16} />, vereistRecht: 'pagina_maaltijdlijst' as const },
+        { href: '/beleid', label: 'Beleidsstukken', icon: <FileText size={16} />, vereistRecht: 'pagina_beleid' as const },
+        { href: '/brandoefening', label: 'Brandoefening', icon: <Flame size={16} />, vereistRecht: 'pagina_brandoefening' as const },
       ],
     },
     {
@@ -131,9 +132,9 @@ export default function Sidebar({ isOpen, onClose }: { isOpen?: boolean; onClose
     {
       label: 'Communicatie',
       items: [
-        { href: '/agenda', label: 'Agenda', icon: <Calendar size={16} /> },
-        { href: '/chat', label: 'Chat', icon: <MessageSquare size={16} />, notificatie: ongelezen },
-        { href: '/nieuwsbrieven', label: 'Nieuwsbrieven', icon: <Newspaper size={16} /> },
+        { href: '/agenda', label: 'Agenda', icon: <Calendar size={16} />, vereistRecht: 'pagina_agenda' as const },
+        { href: '/chat', label: 'Chat', icon: <MessageSquare size={16} />, notificatie: ongelezen, vereistRecht: 'pagina_chat' as const },
+        { href: '/nieuwsbrieven', label: 'Nieuwsbrieven', icon: <Newspaper size={16} />, vereistRecht: 'pagina_nieuwsbrieven' as const },
       ],
     },
     {
@@ -166,7 +167,14 @@ export default function Sidebar({ isOpen, onClose }: { isOpen?: boolean; onClose
       <nav style={{ flex: 1 }}>
         {navGroepen.map((groep) => {
           const zichtbareItems = groep.items.filter(
-            (item) => !item.superadminOnly || isSuperadmin
+            (item) => {
+              if (item.superadminOnly && !isSuperadmin) return false
+              if (item.vereistRecht && !isSuperadmin) {
+                const toegang = (rechten as unknown as Record<string, string>)[item.vereistRecht]
+                if (toegang === 'geen') return false
+              }
+              return true
+            }
           )
           if (zichtbareItems.length === 0) return null
 

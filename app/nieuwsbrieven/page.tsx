@@ -181,7 +181,9 @@ async function exportPDF(brief: Nieuwsbrief) {
 // ─── Hoofd pagina ─────────────────────────────────────────────────────────────
 
 export default function NieuwsbrievenPage() {
-  const { profiel, isSuperadmin } = useAuth()
+  const { profiel, isSuperadmin, rechten } = useAuth()
+  const magZien = isSuperadmin || rechten.pagina_nieuwsbrieven !== 'geen'
+  const magBewerken = isSuperadmin || rechten.pagina_nieuwsbrieven === 'bewerken'
 
   const [nieuwsbrieven, setNieuwsbrieven] = useState<Nieuwsbrief[]>([])
   const [actieve, setActieve] = useState<Nieuwsbrief | null>(null)
@@ -302,6 +304,13 @@ export default function NieuwsbrievenPage() {
   }
 
   // ─── RENDER ─────────────────────────────────────────────────────────────────
+
+  if (!magZien) return (
+    <>
+      <Topbar titel="Nieuwsbrieven" subtitel="Geen toegang" />
+      <div className="page-content"><div className="empty-state"><FileText size={36} /><h3>Geen toegang</h3><p>Je hebt geen toegang tot de nieuwsbrieven.</p></div></div>
+    </>
+  )
 
   // Editor weergave
   if (bewerkModus) {
@@ -493,9 +502,9 @@ export default function NieuwsbrievenPage() {
         titel="Nieuwsbrieven"
         subtitel={`${nieuwsbrieven.length} brieven`}
         acties={
-          <button className="btn btn-primary" onClick={nieuwAanmaken}>
+          magBewerken ? <button className="btn btn-primary" onClick={nieuwAanmaken}>
             <Plus size={14} /> Nieuwe nieuwsbrief
-          </button>
+          </button> : undefined
         }
       />
 
@@ -535,10 +544,10 @@ export default function NieuwsbrievenPage() {
                     <button className="btn btn-sm" onClick={() => exportPDF(brief)}>
                       <Download size={13} /> PDF
                     </button>
-                    <button className="btn btn-sm" onClick={() => openBewerken(brief)}>
+                    {magBewerken && <button className="btn btn-sm" onClick={() => openBewerken(brief)}>
                       <Pencil size={13} /> Bewerken
-                    </button>
-                    {isSuperadmin && (
+                    </button>}
+                    {magBewerken && (
                       <button className="btn btn-sm" style={{ color: '#DC2626', borderColor: '#FECACA' }} onClick={() => verwijder(brief.id)}>
                         <Trash2 size={13} />
                       </button>
