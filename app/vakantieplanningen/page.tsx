@@ -91,6 +91,7 @@ export default function VakantieplanningenPage() {
   const [nieuweWeekModal, setNieuweWeekModal] = useState(false)
   const [activiteitModal, setActiviteitModal] = useState<{ weekId: string; dag: Dag } | null>(null)
   const [jsonImportModal, setJsonImportModal] = useState<{ weekId: string; dag: Dag } | null>(null)
+  const [themaBewerkenModal, setThemaBewerkenModal] = useState(false)
   const [bewerkActiviteit, setBewerkActiviteit] = useState<VakantieActiviteit | null>(null)
 
   // ── Data ophalen ────────────────────────────────────────────────────────────
@@ -358,6 +359,12 @@ export default function VakantieplanningenPage() {
         subtitel={`${actievePlanning.vakantie} · ${actievePlanning.thema} · ${fmtDatum(actievePlanning.start_datum)} – ${fmtDatum(actievePlanning.eind_datum)}`}
         acties={
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            {/* Thema bewerken */}
+            {magBewerken && (
+              <button className="btn btn-sm" onClick={() => setThemaBewerkenModal(true)}>
+                <Pencil size={13} /> Thema wijzigen
+              </button>
+            )}
             {/* Gepubliceerd badge */}
             {magBewerken && (
               <span style={{ padding: '4px 12px', borderRadius: 20, fontSize: 11, fontWeight: 600, background: actievePlanning.gepubliceerd ? 'var(--primary-light)' : 'var(--bg)', color: actievePlanning.gepubliceerd ? 'var(--primary-text)' : 'var(--text-muted)', border: '1px solid var(--border)' }}>
@@ -455,6 +462,21 @@ export default function VakantieplanningenPage() {
           dag={jsonImportModal.dag}
           onImport={(json) => importeerJsonActiviteiten(jsonImportModal.weekId, jsonImportModal.dag, json)}
           onClose={() => setJsonImportModal(null)}
+        />
+      )}
+
+      {/* Thema bewerken modal */}
+      {themaBewerkenModal && actievePlanning && (
+        <ThemaBewerkenModal
+          planning={actievePlanning}
+          onSave={async (nieuwThema, nieuweVakantie) => {
+            await getSupabase().from('vakantie_planningen').update({ thema: nieuwThema, vakantie: nieuweVakantie }).eq('id', actievePlanning.id)
+            setActievePlanning({ ...actievePlanning, thema: nieuwThema, vakantie: nieuweVakantie })
+            setThemaBewerkenModal(false)
+            setToast({ bericht: 'Thema bijgewerkt!', type: 'success' })
+            await haalPlanningenOp()
+          }}
+          onClose={() => setThemaBewerkenModal(false)}
         />
       )}
 
@@ -570,10 +592,10 @@ function WeekOverzicht({ week, activiteiten, planning, dagDatumStr, onNieuw, onB
                     <button
                       onClick={() => onJsonImport(dag)}
                       className="btn btn-sm"
-                      style={{ fontSize: 11, padding: '3px 6px' }}
+                      style={{ fontSize: 11, padding: '3px 6px', fontFamily: 'monospace', fontWeight: 700 }}
                       title="JSON importeren"
                     >
-                      <Upload size={11} />
+                      JSON
                     </button>
                   </div>
                 </td>
@@ -1002,3 +1024,43 @@ function JsonDagImportModal({ dag, onImport, onClose }: { dag: Dag; onImport: (j
 }
 
 
+
+// ─── Thema Bewerken Modal ─────────────────────────────────────────────────────
+
+function ThemaBewerkenModal({ planning, onSave, onClose }: {
+  planning: Planning
+  onSave: (thema: string, vakantie: string) => void
+  onClose: () => void
+}) {
+  const [thema, setThema] = useState(planning.thema)
+  const [vakantie, setVakantie] = useState(planning.vakantie)
+
+  return (
+    <div className="modal-backdrop" onClick={e => { if (e.target === e.currentTarget) onClose() }}>
+      <div className="modal-box" style={{ maxWidth: 420 }} onClick={e => e.stopPropagation()}>
+        <div className="card-header">
+          <span className="card-title">Thema & vakantie wijzigen</span>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex' }}><X size={18} /></button>
+        </div>
+        <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div>
+            <label className="form-label">Vakantie</label>
+            <select className="form-select" value={vakantie} onChange={e => setVakantie(e.target.value)}>
+              {VAKANTIES.map(v => <option key={v} value={v}>{v}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="form-label">Thema</label>
+            <input className="form-input" value={thema} onChange={e => setThema(e.target.value)} placeholder="Bijv. Jungle, Ruimte..." autoFocus />
+          </div>
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+            <button className="btn" onClick={onClose}>Annuleren</button>
+            <button className="btn btn-primary" onClick={() => thema.trim() && onSave(thema.trim(), vakantie)} disabled={!thema.trim()}>
+              Opslaan
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}

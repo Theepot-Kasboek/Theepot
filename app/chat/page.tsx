@@ -5,7 +5,7 @@ import { getSupabase, type Profiel } from '@/lib/supabase'
 import { useAuth } from '@/components/AuthProvider'
 import Topbar from '@/components/Topbar'
 import Toast from '@/components/Toast'
-import { Plus, X, Send, Users, User, MessageSquare, Search, Check, CheckCheck } from 'lucide-react'
+import { Plus, X, Send, Users, User, MessageSquare, Search, Check, CheckCheck, Paperclip, Download, FileText } from 'lucide-react'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -26,6 +26,10 @@ interface Bericht {
   verstuurd_op: string
   gelezen_door: string[]
   afzender?: Profiel
+  bericht_type?: 'tekst' | 'bestand'
+  bestand_pad?: string | null
+  bestand_naam?: string | null
+  bestand_type?: string | null
 }
 
 interface Deelnemer {
@@ -195,6 +199,41 @@ export default function ChatPage() {
 
     await haalBerichtenOp(actiefGesprek.id)
     await haalGesprekkenOp()
+  }
+
+  // ── Bestand versturen ──────────────────────────────────────────────────────
+  async function verstuurBestand(bestand: File) {
+    if (!actiefGesprek || !profiel) return
+    const supabase = getSupabase()
+    const pad = `chat/${actiefGesprek.id}/${Date.now()}_${bestand.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`
+
+    const { error: uploadError } = await supabase.storage.from('chat-bestanden').upload(pad, bestand)
+    if (uploadError) { setToast({ bericht: 'Upload mislukt: ' + uploadError.message, type: 'error' }); return }
+
+    await supabase.from('chat_berichten').insert({
+      gesprek_id: actiefGesprek.id,
+      afzender_id: profiel.id,
+      inhoud: bestand.name,
+      gelezen_door: [profiel.id],
+      bericht_type: 'bestand',
+      bestand_pad: pad,
+      bestand_naam: bestand.name,
+      bestand_type: bestand.type || null,
+    })
+    await supabase.from('chat_gesprekken').update({ laatste_bericht_op: new Date().toISOString() }).eq('id', actiefGesprek.id)
+    await haalBerichtenOp(actiefGesprek.id)
+    await haalGesprekkenOp()
+  }
+
+  async function downloadBestand(b: Bericht) {
+    if (!b.bestand_pad) return
+    const supabase = getSupabase()
+    const { data } = await supabase.storage.from('chat-bestanden').download(b.bestand_pad)
+    if (!data) return
+    const url = URL.createObjectURL(data)
+    const a = document.createElement('a')
+    a.href = url; a.download = b.bestand_naam ?? 'bestand'; a.click()
+    URL.revokeObjectURL(url)
   }
 
   // ── Gesprek aanmaken ────────────────────────────────────────────────────────
@@ -419,8 +458,21 @@ export default function ChatPage() {
                           lineHeight: 1.5,
                           border: isEigen ? 'none' : '1px solid var(--border)',
                           wordBreak: 'break-word',
-                        }}>
-                          {b.inhoud}
+                          cursor: b.bericht_type === 'bestand' ? 'pointer' : 'default',
+                        }}
+                          onClick={() => b.bericht_type === 'bestand' && downloadBestand(b)}
+                        >
+                          {b.bericht_type === 'bestand' ? (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                              <FileText size={18} style={{ flexShrink: 0, opacity: 0.8 }} />
+                              <div>
+                                <div style={{ fontWeight: 500 }}>{b.bestand_naam ?? b.inhoud}</div>
+                                <div style={{ fontSize: 11, opacity: 0.7, display: 'flex', alignItems: 'center', gap: 4, marginTop: 2 }}>
+                                  <Download size={10} /> Klik om te downloaden
+                                </div>
+                              </div>
+                            </div>
+                          ) : b.inhoud}
                         </div>
 
                         {/* Tijd + gelezen */}
@@ -441,6 +493,15 @@ export default function ChatPage() {
               {/* Berichtinvoer */}
               <div style={{ padding: '12px 16px', background: 'var(--bg-card)', borderTop: '1px solid var(--border)' }}>
                 <form onSubmit={verstuurBericht} style={{ display: 'flex', gap: 10, alignItems: 'flex-end' }}>
+                  <label title="Bestand toevoegen" style={{ cursor: 'pointer', flexShrink: 0 }}>
+                    <div style={{ width: 40, height: 40, borderRadius: 10, border: '1px solid var(--border-dark)', background: 'var(--bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', transition: 'all 0.12s' }}
+                      onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--primary)')}
+                      onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--border-dark)')}
+                    >
+                      <Paperclip size={16} />
+                    </div>
+                    <input type="file" style={{ display: 'none' }} onChange={e => e.target.files?.[0] && verstuurBestand(e.target.files[0])} />
+                  </label>
                   <textarea
                     value={nieuwBericht}
                     onChange={e => setNieuwBericht(e.target.value)}
