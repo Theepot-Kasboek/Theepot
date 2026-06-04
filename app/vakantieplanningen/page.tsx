@@ -153,6 +153,14 @@ export default function VakantieplanningenPage() {
     }
   }
 
+  async function verwijderWeek(weekId: string) {
+    if (!confirm('Week verwijderen? Alle activiteiten in deze week gaan verloren.')) return
+    await getSupabase().from('vakantie_weken').delete().eq('id', weekId)
+    if (actieveWeek === weekId) setActieveWeek(null)
+    setToast({ bericht: 'Week verwijderd.', type: 'success' })
+    await haalWekenOp(actievePlanning!.id)
+  }
+
   async function maakWeek(naam: string) {
     if (!actievePlanning) return
     const weekNr = weken.length + 1
@@ -399,13 +407,25 @@ export default function VakantieplanningenPage() {
         {/* Week tabs */}
         <div style={{ display: 'flex', gap: 8, marginBottom: 20, flexWrap: 'wrap', alignItems: 'center' }}>
           {weken.map(w => (
-            <button
-              key={w.id}
-              onClick={() => setActieveWeek(w.id)}
-              style={{ padding: '7px 16px', borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: 'pointer', border: '1.5px solid', transition: 'all 0.12s', borderColor: actieveWeek === w.id ? 'var(--primary)' : 'var(--border-dark)', background: actieveWeek === w.id ? 'var(--primary)' : 'var(--bg-card)', color: actieveWeek === w.id ? '#fff' : 'var(--text)' }}
-            >
-              Week {w.week_nummer} — {w.naam}
-            </button>
+            <div key={w.id} style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <button
+                onClick={() => setActieveWeek(w.id)}
+                style={{ padding: '7px 16px', borderRadius: actieveWeek === w.id ? '8px 0 0 8px' : 8, fontSize: 13, fontWeight: 500, cursor: 'pointer', border: '1.5px solid', borderRight: actieveWeek === w.id ? 'none' : undefined, transition: 'all 0.12s', borderColor: actieveWeek === w.id ? 'var(--primary)' : 'var(--border-dark)', background: actieveWeek === w.id ? 'var(--primary)' : 'var(--bg-card)', color: actieveWeek === w.id ? '#fff' : 'var(--text)' }}
+              >
+                Week {w.week_nummer} — {w.naam}
+              </button>
+              {magBewerken && (
+                <button
+                  onClick={() => verwijderWeek(w.id)}
+                  title="Week verwijderen"
+                  style={{ padding: '7px 8px', borderRadius: actieveWeek === w.id ? '0 8px 8px 0' : 8, fontSize: 13, cursor: 'pointer', border: '1.5px solid', transition: 'all 0.12s', borderColor: actieveWeek === w.id ? 'var(--primary)' : 'var(--border-dark)', background: actieveWeek === w.id ? 'var(--primary)' : 'var(--bg-card)', color: actieveWeek === w.id ? 'rgba(255,255,255,0.7)' : 'var(--text-muted)', display: 'flex', alignItems: 'center' }}
+                  onMouseEnter={e => (e.currentTarget.style.color = '#DC2626')}
+                  onMouseLeave={e => (e.currentTarget.style.color = actieveWeek === w.id ? 'rgba(255,255,255,0.7)' : 'var(--text-muted)')}
+                >
+                  <Trash2 size={12} />
+                </button>
+              )}
+            </div>
           ))}
           {magBewerken && (
             <button className="btn btn-sm" onClick={() => setNieuweWeekModal(true)}>
