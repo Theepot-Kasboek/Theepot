@@ -337,7 +337,7 @@ export default function MaaltijdlijstPage() {
     setLaden(true)
     const supabase = getSupabase()
 
-    let { data: weekData } = await supabase.from('maaltijd_weken').select('*').eq('locatie_id', actieveLocatie.id).eq('week_start', huidigWeekStart).single()
+    let { data: weekData } = await supabase.from('maaltijd_weken').select('*').eq('locatie_id', actieveLocatie.id).eq('week_start', huidigWeekStart).maybeSingle()
 
     if (!weekData) {
       // Maak nieuwe week aan en kopieer standaard kinderen
@@ -390,7 +390,7 @@ export default function MaaltijdlijstPage() {
       let { data: weekData } = await supabase
         .from('maaltijd_weken').select('*')
         .eq('locatie_id', actieveLocatie!.id)
-        .eq('week_start', huidigWeekStart).single()
+        .eq('week_start', huidigWeekStart).maybeSingle()
 
       if (!weekData) {
         const { data: nieuw } = await supabase.from('maaltijd_weken').insert({

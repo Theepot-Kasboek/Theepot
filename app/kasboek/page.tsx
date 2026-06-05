@@ -440,10 +440,17 @@ export default function KasboekPage() {
         const isHeic = ext === 'heic' || ext === 'heif'
 
         if (isHeic) {
-          const heic2any = (await import('heic2any')).default
-          const converted = await heic2any({ blob, toType: 'image/jpeg', quality: 0.85 })
-          const resultBlob = Array.isArray(converted) ? converted[0] : converted
-          setBonnetjeUrl(URL.createObjectURL(resultBlob))
+          try {
+            const heic2any = (await import('heic2any')).default
+            const converted = await heic2any({ blob, toType: 'image/jpeg', quality: 0.85 })
+            const resultBlob = Array.isArray(converted) ? converted[0] : converted
+            setBonnetjeUrl(URL.createObjectURL(resultBlob))
+          } catch (heicErr) {
+            console.warn('HEIC conversie mislukt, probeer direct:', heicErr)
+            // Probeer het toch direct als JPEG te tonen
+            const directBlob = new Blob([await blob.arrayBuffer()], { type: 'image/jpeg' })
+            setBonnetjeUrl(URL.createObjectURL(directBlob))
+          }
         } else {
           const mimeTypes: Record<string, string> = {
             jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png',
