@@ -643,8 +643,8 @@ export default function MaaltijdlijstPage() {
                                 {magBewerken && i === dagRegs.length - 1 && (
                                   <button onClick={() => setExtraModal(dag)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--primary)', display: 'flex' }} title="Extra toevoegen"><UserPlus size={13} /></button>
                                 )}
-                                {magBewerken && reg.is_extra && (
-                                  <button onClick={() => verwijderRegistratie(reg.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#DC2626', display: 'flex', opacity: 0.6 }} title="Verwijderen"><X size={13} /></button>
+                                {magBewerken && (
+                                  <button onClick={() => verwijderRegistratie(reg.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#DC2626', display: 'flex', opacity: 0.6 }} title={reg.is_extra ? 'Extra kind verwijderen' : 'Kind verwijderen van deze dag'}><Trash2 size={13} /></button>
                                 )}
                               </div>
                             </td>
