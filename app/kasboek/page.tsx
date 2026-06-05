@@ -420,20 +420,25 @@ export default function KasboekPage() {
     setBonnetjeUrl(null)
     setBonnetjeLaden(true)
     try {
-      // Download bestand en converteer naar object URL — werkt altijd ongeacht CORS
-      const { data: blob, error } = await getSupabase().storage.from('bonnetjes').download(entry.bonnetje_pad)
+      const { data: blob } = await getSupabase().storage.from('bonnetjes').download(entry.bonnetje_pad)
       if (blob) {
-        // Zorg voor juist MIME type op basis van extensie
         const ext = entry.bonnetje_pad.split('.').pop()?.toLowerCase() ?? ''
-        const mimeTypes: Record<string, string> = {
-          jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png',
-          gif: 'image/gif', webp: 'image/webp', pdf: 'application/pdf',
-          heic: 'image/heic', heif: 'image/heif',
+        const isHeic = ext === 'heic' || ext === 'heif'
+
+        if (isHeic) {
+          // Converteer HEIC naar JPEG zodat de browser het kan tonen
+          const heic2any = (await import('heic2any')).default
+          const converted = await heic2any({ blob, toType: 'image/jpeg', quality: 0.85 })
+          const resultBlob = Array.isArray(converted) ? converted[0] : converted
+          setBonnetjeUrl(URL.createObjectURL(resultBlob))
+        } else {
+          const mimeTypes: Record<string, string> = {
+            jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png',
+            gif: 'image/gif', webp: 'image/webp', pdf: 'application/pdf',
+          }
+          const mime = mimeTypes[ext] ?? blob.type ?? 'image/jpeg'
+          setBonnetjeUrl(URL.createObjectURL(new Blob([blob], { type: mime })))
         }
-        const mime = mimeTypes[ext] ?? blob.type ?? 'image/jpeg'
-        const juistBlob = new Blob([blob], { type: mime })
-        const url = URL.createObjectURL(juistBlob)
-        setBonnetjeUrl(url)
       }
     } catch {
       setBonnetjeUrl(null)
