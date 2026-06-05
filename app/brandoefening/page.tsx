@@ -254,7 +254,10 @@ export default function BrandoefeningPage() {
     setNieuwWeekModal(false)
     setToast({ bericht: `Week ${weekNummer} aangemaakt!`, type: 'success' })
     await haalWekenOp()
-    setActieveWeek(data as BrandoefeningWeek)
+    const nieuweWeek = data as BrandoefeningWeek
+    setActieveWeek(nieuweWeek)
+    // Direct leege dagen alvast zetten zodat tabs meteen zichtbaar zijn
+    setDagen(DAGEN.map(dag => ({ id: '', week_id: nieuweWeek.id, dag, datum: null, tijd: null, aanwezige_pmers: null, aard_incident: [], plek_incident: null, gealarmeerden: [], manier_alarmeren: null, bijzonderheden: null, evaluatie: null, ingevuld_door: null })))
   }
 
   async function verwijderWeek(id: string) {
@@ -337,7 +340,7 @@ export default function BrandoefeningPage() {
                   {weken.map(w => {
                     const isActief = actieveWeek?.id === w.id
                     return (
-                      <div key={w.id} onClick={() => { setActieveWeek(w); setActiveDag('Maandag') }}
+                      <div key={w.id} onClick={() => { setActieveWeek(w); setActiveDag('Maandag'); setDagen(DAGEN.map(dag => ({ id: '', week_id: w.id, dag, datum: null, tijd: null, aanwezige_pmers: null, aard_incident: [], plek_incident: null, gealarmeerden: [], manier_alarmeren: null, bijzonderheden: null, evaluatie: null, ingevuld_door: null }))) }}
                         style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 10, cursor: 'pointer', transition: 'all 0.12s', background: isActief ? 'var(--primary-light)' : 'var(--bg-card)', border: `1px solid ${isActief ? 'var(--border-dark)' : 'var(--border)'}`, borderLeft: `4px solid ${isActief ? 'var(--primary)' : 'var(--border-dark)'}` }}>
                         <div style={{ flex: 1 }}>
                           <div style={{ fontSize: 13, fontWeight: 700, fontFamily: 'Sora, sans-serif' }}>Week {w.week_nummer}</div>
