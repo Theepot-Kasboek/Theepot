@@ -7,7 +7,7 @@ import { useEffect, useState } from 'react'
 import {
   LayoutDashboard, Wallet, Map, BookOpen,
   Calendar, MessageSquare, ShieldCheck,
-  Users, LogOut, Sun, Moon, UtensilsCrossed, Scissors, MessageCircle, FileText, Newspaper, Flame,
+  Users, LogOut, Sun, Moon, UtensilsCrossed, Scissors, MessageCircle, FileText, Newspaper, Flame, CheckSquare,
 } from 'lucide-react'
 import { useAuth } from './AuthProvider'
 import { useTheme } from './ThemeProvider'
@@ -133,6 +133,7 @@ export default function Sidebar({ isOpen, onClose }: { isOpen?: boolean; onClose
       label: 'Communicatie',
       items: [
         { href: '/agenda', label: 'Agenda', icon: <Calendar size={16} />, vereistRecht: 'pagina_agenda' as const },
+        { href: '/taken', label: 'Taken', icon: <CheckSquare size={16} /> },
         { href: '/chat', label: 'Chat', icon: <MessageSquare size={16} />, notificatie: ongelezen, vereistRecht: 'pagina_chat' as const },
         { href: '/nieuwsbrieven', label: 'Nieuwsbrieven', icon: <Newspaper size={16} />, vereistRecht: 'pagina_nieuwsbrieven' as const },
       ],
