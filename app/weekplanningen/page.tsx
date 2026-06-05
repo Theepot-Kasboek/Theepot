@@ -584,6 +584,7 @@ function ActiviteitSlot({ type, activiteit, alternatiefType, onWijzigType, onBek
               </div>
             )}
             <div style={{ display: 'flex', gap: 8, paddingTop: 8, borderTop: '1px solid var(--border)' }}>
+              {onBekijk && <button className="btn btn-sm" onClick={onBekijk}>👁 Bekijken</button>}
               <button className="btn btn-sm" onClick={onBewerk}><Pencil size={12} /> Bewerken</button>
               <button className="btn btn-sm" style={{ color: '#DC2626', borderColor: '#FECACA', marginLeft: 'auto' }} onClick={onVerwijder}><Trash2 size={12} /> Verwijderen</button>
             </div>
