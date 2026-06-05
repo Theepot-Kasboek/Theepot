@@ -382,9 +382,9 @@ function WeekplanningWidget({ profielId }: { profielId: string }) {
                 const type = planning?.knutsel ? 'knutsel' : 'kook_bak'
                 const s = SLOT_STIJL[naam ? type : 'knutsel']
                 return (
-                  <div style={{ padding: '10px 12px', borderRadius: 10, background: s.bg, border: `1px solid ${s.kleur}30` }}>
-                    <div style={{ fontSize: 11, fontWeight: 600, color: s.kleur, marginBottom: 6, display: 'flex', alignItems: 'center', gap: 4 }}>{s.icon} {s.label}</div>
-                    <div style={{ fontSize: 14, fontWeight: naam ? 700 : 400, color: naam ? 'var(--text)' : 'var(--text-muted)', fontStyle: naam ? 'normal' : 'italic', fontFamily: naam ? 'Sora, sans-serif' : 'inherit' }}>
+                  <div style={{ padding: '10px 12px', borderRadius: 10, background: s.bg, border: `1px solid ${s.kleur}40` }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: s.kleur, marginBottom: 6, display: 'flex', alignItems: 'center', gap: 4, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{s.icon} {s.label}</div>
+                    <div style={{ fontSize: 14, fontWeight: naam ? 700 : 400, color: naam ? '#1a1a1a' : '#666', fontStyle: naam ? 'normal' : 'italic', fontFamily: naam ? 'Sora, sans-serif' : 'inherit', lineHeight: 1.3 }}>
                       {naam ?? 'Niet ingevuld'}
                     </div>
                   </div>
@@ -394,9 +394,9 @@ function WeekplanningWidget({ profielId }: { profielId: string }) {
               {(() => {
                 const s = SLOT_STIJL['groepsspel']
                 return (
-                  <div style={{ padding: '10px 12px', borderRadius: 10, background: s.bg, border: `1px solid ${s.kleur}30` }}>
-                    <div style={{ fontSize: 11, fontWeight: 600, color: s.kleur, marginBottom: 4 }}>{s.icon} {s.label}</div>
-                    <div style={{ fontSize: 13, fontWeight: planning?.groepsspel ? 600 : 400, color: planning?.groepsspel ? 'var(--text)' : 'var(--text-muted)', fontStyle: planning?.groepsspel ? 'normal' : 'italic' }}>
+                  <div style={{ padding: '10px 12px', borderRadius: 10, background: s.bg, border: `1px solid ${s.kleur}40` }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: s.kleur, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{s.icon} {s.label}</div>
+                    <div style={{ fontSize: 14, fontWeight: planning?.groepsspel ? 700 : 400, color: planning?.groepsspel ? '#1a1a1a' : '#666', fontStyle: planning?.groepsspel ? 'normal' : 'italic', fontFamily: planning?.groepsspel ? 'Sora, sans-serif' : 'inherit', lineHeight: 1.3 }}>
                       {planning?.groepsspel ?? 'Niet ingevuld'}
                     </div>
                   </div>
