@@ -243,6 +243,7 @@ export default function WeekplanningenPage() {
   const [themaBewerken, setThemaBewerken] = useState(false)
   const [laden, setLaden] = useState(false)
   const [actieveSlot, setActieveSlot] = useState<ActType | null>(null)
+  const [detailActiviteit, setDetailActiviteit] = useState<WeekActiviteit | null>(null)
   const [toast, setToast] = useState<{ bericht: string; type: 'success' | 'error' } | null>(null)
 
   // ── Locaties ophalen — wacht op profiel ────────────────────────────────────
@@ -460,10 +461,10 @@ export default function WeekplanningenPage() {
                   activiteit={slot1Act}
                   alternatiefType={slot1Type === 'knutsel' ? 'kook_bak' : 'knutsel'}
                   onWijzigType={async (nieuwType) => {
-                    // Verwijder huidige slot 1 activiteit en open nieuw type
                     if (slot1Act) await verwijderActiviteit(slot1Act.id)
                     setActieveSlot(nieuwType)
                   }}
+                  onBekijk={() => slot1Act && setDetailActiviteit(slot1Act)}
                   onBewerk={() => setActieveSlot(slot1Type)}
                   onVerwijder={() => slot1Act && verwijderActiviteit(slot1Act.id)}
                 />
@@ -472,6 +473,7 @@ export default function WeekplanningenPage() {
                 <ActiviteitSlot
                   type="groepsspel"
                   activiteit={groepAct ?? null}
+                  onBekijk={() => groepAct && setDetailActiviteit(groepAct)}
                   onBewerk={() => setActieveSlot('groepsspel')}
                   onVerwijder={() => groepAct && verwijderActiviteit(groepAct.id)}
                 />
@@ -491,6 +493,15 @@ export default function WeekplanningenPage() {
         />
       )}
 
+      {/* Detail modal */}
+      {detailActiviteit && (
+        <DetailModal
+          activiteit={detailActiviteit}
+          type={detailActiviteit.type as ActType}
+          onClose={() => setDetailActiviteit(null)}
+        />
+      )}
+
       {toast && <Toast bericht={toast.bericht} type={toast.type} onClose={() => setToast(null)} />}
     </>
   )
@@ -498,11 +509,12 @@ export default function WeekplanningenPage() {
 
 // ─── Activiteit Slot Card ─────────────────────────────────────────────────────
 
-function ActiviteitSlot({ type, activiteit, alternatiefType, onWijzigType, onBewerk, onVerwijder }: {
+function ActiviteitSlot({ type, activiteit, alternatiefType, onWijzigType, onBekijk, onBewerk, onVerwijder }: {
   type: ActType
   activiteit: WeekActiviteit | null
   alternatiefType?: ActType
   onWijzigType?: (nieuwType: ActType) => void
+  onBekijk?: () => void
   onBewerk: () => void
   onVerwijder: () => void
 }) {
@@ -734,6 +746,68 @@ function ActiviteitModal({ type, bestaand, onSave, onClose }: {
                 ))}
               </div>
             </>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Detail Modal ─────────────────────────────────────────────────────────────
+
+function DetailModal({ activiteit, type, onClose }: {
+  activiteit: WeekActiviteit
+  type: ActType
+  onClose: () => void
+}) {
+  const config = TYPE_CONFIG[type]
+
+  return (
+    <div className="modal-backdrop" onClick={e => { if (e.target === e.currentTarget) onClose() }}>
+      <div className="modal-box" style={{ maxWidth: 560 }} onClick={e => e.stopPropagation()}>
+        {/* Gekleurde top */}
+        <div style={{ height: 5, background: config.kleur, borderRadius: '14px 14px 0 0' }} />
+
+        <div className="card-header">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ width: 34, height: 34, borderRadius: 9, background: config.bg, color: config.kleur, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              {config.icon}
+            </div>
+            <div>
+              <div style={{ fontSize: 10, fontWeight: 600, color: config.kleur, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{config.label}</div>
+              <div style={{ fontFamily: 'Sora, sans-serif', fontSize: 17, fontWeight: 700, color: 'var(--text)' }}>{activiteit.naam}</div>
+            </div>
+          </div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex' }}><X size={18} /></button>
+        </div>
+
+        <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {activiteit.beschrijving && (
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>Beschrijving</div>
+              <p style={{ fontSize: 14, color: 'var(--text)', lineHeight: 1.7, margin: 0, whiteSpace: 'pre-wrap' }}>
+                {activiteit.beschrijving}
+              </p>
+            </div>
+          )}
+
+          {activiteit.materialen.length > 0 && (
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>Benodigdheden</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {activiteit.materialen.map((m, i) => (
+                  <span key={i} style={{ padding: '4px 12px', borderRadius: 20, background: config.bg, color: config.kleur, fontSize: 12, fontWeight: 500, border: `1px solid ${config.kleur}30` }}>
+                    {m}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {!activiteit.beschrijving && activiteit.materialen.length === 0 && (
+            <p style={{ fontSize: 13, color: 'var(--text-muted)', fontStyle: 'italic', textAlign: 'center', padding: '16px 0' }}>
+              Geen extra informatie beschikbaar.
+            </p>
           )}
         </div>
       </div>

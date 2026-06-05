@@ -383,8 +383,8 @@ function WeekplanningWidget({ profielId }: { profielId: string }) {
                 const s = SLOT_STIJL[naam ? type : 'knutsel']
                 return (
                   <div style={{ padding: '10px 12px', borderRadius: 10, background: s.bg, border: `1px solid ${s.kleur}30` }}>
-                    <div style={{ fontSize: 11, fontWeight: 600, color: s.kleur, marginBottom: 4 }}>{s.icon} {s.label}</div>
-                    <div style={{ fontSize: 13, fontWeight: naam ? 600 : 400, color: naam ? 'var(--text)' : 'var(--text-muted)', fontStyle: naam ? 'normal' : 'italic' }}>
+                    <div style={{ fontSize: 11, fontWeight: 600, color: s.kleur, marginBottom: 6, display: 'flex', alignItems: 'center', gap: 4 }}>{s.icon} {s.label}</div>
+                    <div style={{ fontSize: 14, fontWeight: naam ? 700 : 400, color: naam ? 'var(--text)' : 'var(--text-muted)', fontStyle: naam ? 'normal' : 'italic', fontFamily: naam ? 'Sora, sans-serif' : 'inherit' }}>
                       {naam ?? 'Niet ingevuld'}
                     </div>
                   </div>
