@@ -420,13 +420,26 @@ export default function KasboekPage() {
     setBonnetjeUrl(null)
     setBonnetjeLaden(true)
     try {
-      const { data: blob } = await getSupabase().storage.from('bonnetjes').download(entry.bonnetje_pad)
+      const { data: blob, error: downloadError } = await getSupabase().storage.from('bonnetjes').download(entry.bonnetje_pad)
+      
+      if (downloadError) {
+        console.error('Download error:', downloadError)
+        // Fallback: probeer signed URL
+        const { data: signed } = await getSupabase().storage.from('bonnetjes').createSignedUrl(entry.bonnetje_pad, 3600)
+        if (signed?.signedUrl) {
+          setBonnetjeUrl(signed.signedUrl)
+        } else {
+          setBonnetjeUrl('ERROR:' + downloadError.message)
+        }
+        setBonnetjeLaden(false)
+        return
+      }
+
       if (blob) {
         const ext = entry.bonnetje_pad.split('.').pop()?.toLowerCase() ?? ''
         const isHeic = ext === 'heic' || ext === 'heif'
 
         if (isHeic) {
-          // Converteer HEIC naar JPEG zodat de browser het kan tonen
           const heic2any = (await import('heic2any')).default
           const converted = await heic2any({ blob, toType: 'image/jpeg', quality: 0.85 })
           const resultBlob = Array.isArray(converted) ? converted[0] : converted
@@ -435,12 +448,14 @@ export default function KasboekPage() {
           const mimeTypes: Record<string, string> = {
             jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png',
             gif: 'image/gif', webp: 'image/webp', pdf: 'application/pdf',
+            heic: 'image/heic', heif: 'image/heif',
           }
           const mime = mimeTypes[ext] ?? blob.type ?? 'image/jpeg'
           setBonnetjeUrl(URL.createObjectURL(new Blob([blob], { type: mime })))
         }
       }
-    } catch {
+    } catch (err) {
+      console.error('Bonnetje laden fout:', err)
       setBonnetjeUrl(null)
     }
     setBonnetjeLaden(false)
@@ -1030,6 +1045,14 @@ export default function KasboekPage() {
                     style={{ width: '100%', maxHeight: 500, objectFit: 'contain', borderRadius: 8, background: 'var(--bg)' }}
                   />
                 )
+              ) : bonnetjeUrl?.startsWith('ERROR:') ? (
+                <div style={{ textAlign: 'center', padding: 40 }}>
+                  <div style={{ color: '#DC2626', fontSize: 13, marginBottom: 8 }}>⚠️ Kon bonnetje niet laden</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'monospace' }}>{bonnetjeUrl.replace('ERROR:', '')}</div>
+                  <div style={{ marginTop: 12, fontSize: 12, color: 'var(--text-muted)' }}>
+                    Controleer of de storage policies voor de &quot;bonnetjes&quot; bucket correct zijn ingesteld in Supabase.
+                  </div>
+                </div>
               ) : (
                 <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>
                   Bonnetje kon niet geladen worden.
