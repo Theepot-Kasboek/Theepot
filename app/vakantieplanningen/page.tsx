@@ -62,7 +62,7 @@ const DAGEN: Dag[] = ['maandag', 'dinsdag', 'woensdag', 'donderdag', 'vrijdag']
 const DAG_KORT: Record<Dag, string> = { maandag: 'Ma', dinsdag: 'Di', woensdag: 'Wo', donderdag: 'Do', vrijdag: 'Vr' }
 const DAG_LABEL: Record<Dag, string> = { maandag: 'Maandag', dinsdag: 'Dinsdag', woensdag: 'Woensdag', donderdag: 'Donderdag', vrijdag: 'Vrijdag' }
 
-const VAKANTIES = ['Herfstvakantie', 'Kerstvakantie', 'Voorjaarsvakantie', 'Meivakantie', 'Zomervakantie']
+const STANDAARD_VAKANTIES = ['Herfstvakantie', 'Kerstvakantie', 'Voorjaarsvakantie', 'Meivakantie', 'Zomervakantie']
 const STANDAARD_CATEGORIEEN = ['Knutsel', 'Groepsspel', 'Buiten', 'Koken', 'Overig']
 
 function fmtDatum(d: string) {
@@ -85,6 +85,25 @@ export default function VakantieplanningenPage() {
   const [actieveWeek, setActieveWeek] = useState<string | null>(null)
   const [weergave, setWeergave] = useState<'overzicht' | 'document'>('overzicht')
   const [toast, setToast] = useState<{ bericht: string; type: 'success' | 'error' } | null>(null)
+  const [vakanties, setVakanties] = useState<string[]>(() => {
+    if (typeof window !== 'undefined') {
+      const opgeslagen = localStorage.getItem('theepot_vakanties')
+      if (opgeslagen) return JSON.parse(opgeslagen)
+    }
+    return STANDAARD_VAKANTIES
+  })
+
+  function voegVakantieTypeToe(naam: string) {
+    const nieuw = [...vakanties, naam].sort()
+    setVakanties(nieuw)
+    localStorage.setItem('theepot_vakanties', JSON.stringify(nieuw))
+  }
+
+  function verwijderVakantieType(naam: string) {
+    const nieuw = vakanties.filter(v => v !== naam)
+    setVakanties(nieuw)
+    localStorage.setItem('theepot_vakanties', JSON.stringify(nieuw))
+  }
 
   // Modals
   const [nieuwePlanningModal, setNieuwePlanningModal] = useState(false)
@@ -344,7 +363,10 @@ export default function VakantieplanningenPage() {
         </div>
 
         {nieuwePlanningModal && (
-          <NieuwePlanningModal onSave={maakPlanning} onClose={() => setNieuwePlanningModal(false)} />
+          <NieuwePlanningModal
+          vakanties={vakanties}
+          onVakantieToevoegen={voegVakantieTypeToe}
+          onVakantieVerwijderen={verwijderVakantieType} onSave={maakPlanning} onClose={() => setNieuwePlanningModal(false)} />
         )}
         {toast && <Toast bericht={toast.bericht} type={toast.type} onClose={() => setToast(null)} />}
       </>
@@ -488,6 +510,8 @@ export default function VakantieplanningenPage() {
       {/* Thema bewerken modal */}
       {themaBewerkenModal && actievePlanning && (
         <ThemaBewerkenModal
+          vakanties={vakanties}
+          onVakantieToevoegen={voegVakantieTypeToe}
           planning={actievePlanning}
           onSave={async (nieuwThema, nieuweVakantie) => {
             await getSupabase().from('vakantie_planningen').update({ thema: nieuwThema, vakantie: nieuweVakantie }).eq('id', actievePlanning.id)
@@ -752,12 +776,17 @@ function DocumentWeergave({ planning, weken, activiteiten, dagDatumStr }: {
 
 // ─── Modals ───────────────────────────────────────────────────────────────────
 
-function NieuwePlanningModal({ onSave, onClose }: {
+function NieuwePlanningModal({ onSave, onClose, vakanties = STANDAARD_VAKANTIES, onVakantieToevoegen, onVakantieVerwijderen }: {
   onSave: (data: Omit<Planning, 'id' | 'aangemaakt_door' | 'aangemaakt_op'>) => void
   onClose: () => void
+  vakanties?: string[]
+  onVakantieToevoegen?: (naam: string) => void
+  onVakantieVerwijderen?: (naam: string) => void
 }) {
   const [naam, setNaam] = useState('')
-  const [vakantie, setVakantie] = useState(VAKANTIES[4])
+  const [vakantie, setVakantie] = useState(vakanties[vakanties.length - 1] ?? '')
+  const [nieuwVakantieNaam, setNieuwVakantieNaam] = useState('')
+  const [toonNieuw, setToonNieuw] = useState(false)
   const [thema, setThema] = useState('')
   const [startDatum, setStartDatum] = useState('')
   const [eindDatum, setEindDatum] = useState('')
@@ -777,9 +806,21 @@ function NieuwePlanningModal({ onSave, onClose }: {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <div>
               <label className="form-label">Vakantie</label>
-              <select className="form-select" value={vakantie} onChange={e => setVakantie(e.target.value)}>
-                {VAKANTIES.map(v => <option key={v} value={v}>{v}</option>)}
+              <select className="form-select" value={vakantie} onChange={e => {
+                if (e.target.value === '__nieuw__') { setToonNieuw(true); return }
+                setVakantie(e.target.value)
+              }}>
+                {vakanties.map(v => <option key={v} value={v}>{v}</option>)}
+                <option value="__nieuw__">+ Nieuwe toevoegen...</option>
               </select>
+              {toonNieuw && (
+                <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+                  <input className="form-input" style={{ flex: 1 }} value={nieuwVakantieNaam} onChange={e => setNieuwVakantieNaam(e.target.value)} placeholder="Bijv. Modderweekplanning" autoFocus
+                    onKeyDown={e => { if (e.key === 'Enter' && nieuwVakantieNaam.trim()) { onVakantieToevoegen && onVakantieToevoegen(nieuwVakantieNaam.trim()); setVakantie(nieuwVakantieNaam.trim()); setNieuwVakantieNaam(''); setToonNieuw(false) } }} />
+                  <button className="btn btn-primary btn-sm" onClick={() => { if (nieuwVakantieNaam.trim()) { onVakantieToevoegen && onVakantieToevoegen(nieuwVakantieNaam.trim()); setVakantie(nieuwVakantieNaam.trim()); setNieuwVakantieNaam(''); setToonNieuw(false) } }} disabled={!nieuwVakantieNaam.trim()}>Toevoegen</button>
+                  <button className="btn btn-sm" onClick={() => setToonNieuw(false)}>✕</button>
+                </div>
+              )}
             </div>
             <div>
               <label className="form-label">Thema</label>
@@ -1047,13 +1088,17 @@ function JsonDagImportModal({ dag, onImport, onClose }: { dag: Dag; onImport: (j
 
 // ─── Thema Bewerken Modal ─────────────────────────────────────────────────────
 
-function ThemaBewerkenModal({ planning, onSave, onClose }: {
+function ThemaBewerkenModal({ planning, onSave, onClose, vakanties, onVakantieToevoegen }: {
   planning: Planning
   onSave: (thema: string, vakantie: string) => void
   onClose: () => void
+  vakanties: string[]
+  onVakantieToevoegen: (naam: string) => void
 }) {
   const [thema, setThema] = useState(planning.thema)
   const [vakantie, setVakantie] = useState(planning.vakantie)
+  const [nieuwVakantieNaam, setNieuwVakantieNaam] = useState('')
+  const [toonNieuw, setToonNieuw] = useState(false)
 
   return (
     <div className="modal-backdrop" onClick={e => { if (e.target === e.currentTarget) onClose() }}>
@@ -1065,9 +1110,21 @@ function ThemaBewerkenModal({ planning, onSave, onClose }: {
         <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div>
             <label className="form-label">Vakantie</label>
-            <select className="form-select" value={vakantie} onChange={e => setVakantie(e.target.value)}>
-              {VAKANTIES.map(v => <option key={v} value={v}>{v}</option>)}
+            <select className="form-select" value={vakantie} onChange={e => {
+              if (e.target.value === '__nieuw__') { setToonNieuw(true); return }
+              setVakantie(e.target.value)
+            }}>
+              {vakanties.map(v => <option key={v} value={v}>{v}</option>)}
+              <option value="__nieuw__">+ Nieuwe toevoegen...</option>
             </select>
+            {toonNieuw && (
+              <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+                <input className="form-input" style={{ flex: 1 }} value={nieuwVakantieNaam} onChange={e => setNieuwVakantieNaam(e.target.value)} placeholder="Bijv. Modderweekplanning" autoFocus
+                  onKeyDown={e => { if (e.key === 'Enter' && nieuwVakantieNaam.trim()) { onVakantieToevoegen(nieuwVakantieNaam.trim()); setVakantie(nieuwVakantieNaam.trim()); setNieuwVakantieNaam(''); setToonNieuw(false) } }} />
+                <button className="btn btn-primary btn-sm" onClick={() => { if (nieuwVakantieNaam.trim()) { onVakantieToevoegen(nieuwVakantieNaam.trim()); setVakantie(nieuwVakantieNaam.trim()); setNieuwVakantieNaam(''); setToonNieuw(false) } }} disabled={!nieuwVakantieNaam.trim()}>Toevoegen</button>
+                <button className="btn btn-sm" onClick={() => setToonNieuw(false)}>✕</button>
+              </div>
+            )}
           </div>
           <div>
             <label className="form-label">Thema</label>
