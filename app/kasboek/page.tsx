@@ -380,8 +380,22 @@ export default function KasboekPage() {
     // Upload bonnetje indien aanwezig
     let bonnetje_pad: string | null = null
     if (bonnetjeBestand) {
-      const pad = `${actieveLocatie.naam}/${huidigePeriode}/${Date.now()}_${bonnetjeBestand.name}`
-      const { error: uploadError } = await supabase.storage.from('bonnetjes').upload(pad, bonnetjeBestand)
+      // Converteer HEIC/HEIF naar JPEG voor upload
+      let uploadBestand: File | Blob = bonnetjeBestand
+      let uploadNaam = bonnetjeBestand.name
+      const ext = bonnetjeBestand.name.split('.').pop()?.toLowerCase() ?? ''
+      if (ext === 'heic' || ext === 'heif') {
+        try {
+          const heic2any = (await import('heic2any')).default
+          const converted = await heic2any({ blob: bonnetjeBestand, toType: 'image/jpeg', quality: 0.85 })
+          uploadBestand = Array.isArray(converted) ? converted[0] : converted
+          uploadNaam = bonnetjeBestand.name.replace(/\.(heic|heif)$/i, '.jpg')
+        } catch (e) {
+          console.warn('HEIC conversie mislukt bij upload, origineel gebruiken')
+        }
+      }
+      const pad = `${actieveLocatie.naam}/${huidigePeriode}/${Date.now()}_${uploadNaam}`
+      const { error: uploadError } = await supabase.storage.from('bonnetjes').upload(pad, uploadBestand)
       if (uploadError) {
         setFout('Bonnetje uploaden mislukt: ' + uploadError.message)
         setOpslaan(false)
@@ -437,29 +451,12 @@ export default function KasboekPage() {
 
       if (blob) {
         const ext = entry.bonnetje_pad.split('.').pop()?.toLowerCase() ?? ''
-        const isHeic = ext === 'heic' || ext === 'heif'
-
-        if (isHeic) {
-          try {
-            const heic2any = (await import('heic2any')).default
-            const converted = await heic2any({ blob, toType: 'image/jpeg', quality: 0.85 })
-            const resultBlob = Array.isArray(converted) ? converted[0] : converted
-            setBonnetjeUrl(URL.createObjectURL(resultBlob))
-          } catch (heicErr) {
-            console.warn('HEIC conversie mislukt, probeer direct:', heicErr)
-            // Probeer het toch direct als JPEG te tonen
-            const directBlob = new Blob([await blob.arrayBuffer()], { type: 'image/jpeg' })
-            setBonnetjeUrl(URL.createObjectURL(directBlob))
-          }
-        } else {
-          const mimeTypes: Record<string, string> = {
-            jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png',
-            gif: 'image/gif', webp: 'image/webp', pdf: 'application/pdf',
-            heic: 'image/heic', heif: 'image/heif',
-          }
-          const mime = mimeTypes[ext] ?? blob.type ?? 'image/jpeg'
-          setBonnetjeUrl(URL.createObjectURL(new Blob([blob], { type: mime })))
+        const mimeTypes: Record<string, string> = {
+          jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png',
+          gif: 'image/gif', webp: 'image/webp', pdf: 'application/pdf',
         }
+        const mime = mimeTypes[ext] ?? blob.type ?? 'image/jpeg'
+        setBonnetjeUrl(URL.createObjectURL(new Blob([blob], { type: mime })))
       }
     } catch (err) {
       console.error('Bonnetje laden fout:', err)
