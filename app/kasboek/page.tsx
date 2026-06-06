@@ -437,35 +437,49 @@ export default function KasboekPage() {
     setBonnetjeUrl(null)
     setBonnetjeLaden(true)
     try {
+      const ext = entry.bonnetje_pad.split('.').pop()?.toLowerCase() ?? ''
+      const mimeTypes: Record<string, string> = {
+        jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png',
+        gif: 'image/gif', webp: 'image/webp', pdf: 'application/pdf',
+        heic: 'image/jpeg', heif: 'image/jpeg',
+      }
+
       const { data: blob, error: downloadError } = await getSupabase().storage.from('bonnetjes').download(entry.bonnetje_pad)
-      
-      if (downloadError) {
-        console.error('Download error:', downloadError)
-        // Fallback: probeer signed URL
-        const { data: signed } = await getSupabase().storage.from('bonnetjes').createSignedUrl(entry.bonnetje_pad, 3600)
-        if (signed?.signedUrl) {
-          setBonnetjeUrl(signed.signedUrl)
-        } else {
-          setBonnetjeUrl('ERROR:' + downloadError.message)
-        }
+
+      if (downloadError || !blob) {
+        console.error('Download fout:', downloadError)
+        setBonnetjeUrl('ERROR:' + (downloadError?.message ?? 'Onbekende fout'))
         setBonnetjeLaden(false)
         return
       }
 
-      if (blob) {
-        const ext = entry.bonnetje_pad.split('.').pop()?.toLowerCase() ?? ''
-        const mimeTypes: Record<string, string> = {
-          jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png',
-          gif: 'image/gif', webp: 'image/webp', pdf: 'application/pdf',
+      // HEIC: converteer naar JPEG
+      if (ext === 'heic' || ext === 'heif') {
+        try {
+          const heic2any = (await import('heic2any')).default
+          const converted = await heic2any({ blob, toType: 'image/jpeg', quality: 0.85 })
+          const resultBlob = Array.isArray(converted) ? converted[0] : converted
+          const reader = new FileReader()
+          reader.onloadend = () => { setBonnetjeUrl(reader.result as string); setBonnetjeLaden(false) }
+          reader.readAsDataURL(resultBlob)
+          return
+        } catch (e) {
+          console.warn('HEIC conversie mislukt:', e)
         }
-        const mime = mimeTypes[ext] ?? blob.type ?? 'image/jpeg'
-        setBonnetjeUrl(URL.createObjectURL(new Blob([blob], { type: mime })))
       }
+
+      // Alle andere types: lees als base64 data URL
+      const mime = mimeTypes[ext] ?? 'image/jpeg'
+      const juistBlob = new Blob([blob], { type: mime })
+      const reader = new FileReader()
+      reader.onloadend = () => { setBonnetjeUrl(reader.result as string); setBonnetjeLaden(false) }
+      reader.readAsDataURL(juistBlob)
+
     } catch (err) {
       console.error('Bonnetje laden fout:', err)
-      setBonnetjeUrl(null)
+      setBonnetjeUrl('ERROR:Kon bestand niet laden')
+      setBonnetjeLaden(false)
     }
-    setBonnetjeLaden(false)
   }
 
   // ── Boeking verwijderen ─────────────────────────────────────────────────────
