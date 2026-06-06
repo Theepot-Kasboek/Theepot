@@ -7,11 +7,13 @@ import Topbar from '@/components/Topbar'
 import Toast from '@/components/Toast'
 import {
   Plus, X, Trash2, Download, Pencil,
-  ChevronUp, ChevronDown, Eye, ArrowLeft,
-  GripVertical, FileText, Send
+  ChevronUp, ChevronDown, ArrowLeft,
+  GripVertical, FileText, Newspaper
 } from 'lucide-react'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
+
+type Format = 'weekmemo' | 'theepraatje'
 
 interface Sectie {
   id: string
@@ -25,40 +27,50 @@ interface Nieuwsbrief {
   nummer: string | null
   locatie_naam: string | null
   datum: string
+  format: Format
   secties: Sectie[]
-  gepubliceerd: boolean
   aangemaakt_op: string
 }
 
-// ─── Standaard secties ────────────────────────────────────────────────────────
+// ─── Secties per format ───────────────────────────────────────────────────────
 
-const STANDAARD_SECTIES: Omit<Sectie, 'id'>[] = [
-  { titel: 'Persoonlijk woordje', inhoud: '' },
-  { titel: 'Vanuit de Directie', inhoud: '' },
-  { titel: 'PP-er en stage info', inhoud: '' },
-  { titel: 'Locatie info', inhoud: '' },
-  { titel: 'Beleid info', inhoud: '' },
-  { titel: 'Ouder en/of Kind info', inhoud: '' },
-  { titel: 'Pedagogische info', inhoud: '' },
-  { titel: 'Rooster info', inhoud: '' },
-  { titel: 'Agenda Leidinggevende', inhoud: '' },
+const WEEKMEMO_SECTIES = [
+  'Persoonlijk woordje',
+  'Vanuit de Directie',
+  'PP-er en stage info',
+  'Locatie info',
+  'Beleid info',
+  'Ouder en/of Kind info',
+  'Pedagogische info',
+  'Rooster info',
+  'Agenda Leidinggevende',
+]
+
+const THEEPRAATJE_SECTIES = [
+  'Redactioneel',
+  'Organisatie nieuws',
+  'Activiteiten & programma',
+  'Ouderinformatie',
+  'Medewerkers',
+  'Agenda & data',
 ]
 
 function nieuwId() { return Math.random().toString(36).slice(2) }
-
-function maakStandaardSecties(): Sectie[] {
-  return STANDAARD_SECTIES.map(s => ({ ...s, id: nieuwId() }))
+function maakSecties(format: Format): Sectie[] {
+  const titels = format === 'weekmemo' ? WEEKMEMO_SECTIES : THEEPRAATJE_SECTIES
+  return titels.map(t => ({ id: nieuwId(), titel: t, inhoud: '' }))
 }
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
 function fmtDatum(d: string) {
   return new Date(d).toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric' })
 }
 
-// ─── PDF Export ───────────────────────────────────────────────────────────────
 
-async function exportPDF(brief: Nieuwsbrief) {
+// ─── Logo (ingebakken) ────────────────────────────────────────────────────────
+const LOGO_B64 = "data:image/jpeg;base64,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"
+
+// ─── PDF Export Weekmemo ──────────────────────────────────────────────────────
+
+async function exportWeekmemoPDF(brief: Nieuwsbrief) {
   const { jsPDF } = await import('jspdf')
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
 
@@ -68,114 +80,186 @@ async function exportPDF(brief: Nieuwsbrief) {
   const zwart: [number, number, number] = [30, 30, 30]
   const grijs: [number, number, number] = [150, 150, 150]
   const lichtGroen: [number, number, number] = [235, 245, 214]
-  const marge = 16
+  const marge = 15
   const breedte = 210 - marge * 2
   let y = 0
 
-  function nieuwePaginaAlsNodig(benodigdHoogte: number) {
-    if (y + benodigdHoogte > 272) {
-      doc.addPage()
-      y = 20
-    }
-  }
-
   // Header balk
   doc.setFillColor(...groen)
-  doc.rect(0, 0, 210, 28, 'F')
+  doc.rect(0, 0, 210, 30, "F")
+
+  // Logo rechts in header
+  try {
+    doc.addImage(LOGO_B64, "JPEG", 210 - marge - 22, 4, 22, 22)
+  } catch {}
+
+  // Titel links
   doc.setTextColor(...wit)
-  doc.setFontSize(22)
-  doc.setFont('helvetica', 'bold')
-  doc.text('Theepraatje', marge, 17)
-  if (brief.nummer) {
+  doc.setFontSize(16)
+  doc.setFont("helvetica", "bold")
+  doc.text("WEEKMEMO", marge, 13)
+  if (brief.locatie_naam) {
     doc.setFontSize(10)
-    doc.setFont('helvetica', 'normal')
-    doc.text(`Nr. ${brief.nummer}`, 210 - marge, 12, { align: 'right' })
+    doc.setFont("helvetica", "normal")
+    doc.text(`Locatie: ${brief.locatie_naam}`, marge, 20)
   }
   doc.setFontSize(9)
-  doc.text(fmtDatum(brief.datum), 210 - marge, 18.5, { align: 'right' })
-  if (brief.locatie_naam) {
-    doc.text(`Locatie: ${brief.locatie_naam}`, 210 - marge, 24.5, { align: 'right' })
-  }
-
-  // Theepot logo tekst rechtsonder header
-  doc.setFillColor(255, 255, 255, 0.2)
-  doc.setTextColor(255, 255, 255, 0.6)
+  doc.text(`Week: ${brief.nummer ?? ""} | ${fmtDatum(brief.datum)}`, marge, 27)
 
   y = 38
 
-  // Titel
-  doc.setTextColor(...zwart)
-  doc.setFontSize(18)
-  doc.setFont('helvetica', 'bold')
-  doc.text(brief.titel, marge, y)
-  y += 10
-
-  // Lijn
-  doc.setDrawColor(...groen)
-  doc.setLineWidth(0.8)
-  doc.line(marge, y, 210 - marge, y)
-  y += 8
-
   // Secties
-  const gevuld = brief.secties.filter(s => s.inhoud.trim())
+  for (const sectie of brief.secties.filter(s => s.inhoud.trim())) {
+    if (y > 248) { doc.addPage(); y = 20 }
 
-  for (const sectie of gevuld) {
-    nieuwePaginaAlsNodig(20)
-
-    // Sectie header
-    doc.setFillColor(...lichtGroen)
-    doc.rect(marge, y, breedte, 8, 'F')
-    doc.setDrawColor(...donkerGroen)
-    doc.setLineWidth(0.3)
-    doc.rect(marge, y, breedte, 8)
-
-    // Groene linkerbalk
+    // Sectie header - groene balk
     doc.setFillColor(...groen)
-    doc.rect(marge, y, 3, 8, 'F')
-
-    doc.setTextColor(...donkerGroen)
+    doc.rect(marge, y, breedte, 8, "F")
+    doc.setTextColor(...wit)
     doc.setFontSize(10)
-    doc.setFont('helvetica', 'bold')
-    doc.text(sectie.titel, marge + 6, y + 5.5)
-    y += 12
+    doc.setFont("helvetica", "bold")
+    doc.text(sectie.titel, marge + 3, y + 5.5)
+    y += 10
 
     // Inhoud
     const regels = doc.splitTextToSize(sectie.inhoud.trim(), breedte - 4)
-    const inhoudHoogte = regels.length * 5.5 + 6
+    const hoogte = Math.max(regels.length * 5.5 + 6, 12)
+    if (y + hoogte > 270) { doc.addPage(); y = 20 }
 
-    nieuwePaginaAlsNodig(inhoudHoogte)
-
-    doc.setFillColor(252, 254, 252)
-    doc.rect(marge, y, breedte, inhoudHoogte, 'F')
+    doc.setFillColor(250, 252, 250)
+    doc.rect(marge, y, breedte, hoogte, "F")
     doc.setDrawColor(...grijs)
     doc.setLineWidth(0.2)
-    doc.rect(marge, y, breedte, inhoudHoogte)
-
+    doc.rect(marge, y, breedte, hoogte)
     doc.setTextColor(...zwart)
     doc.setFontSize(9.5)
-    doc.setFont('helvetica', 'normal')
+    doc.setFont("helvetica", "normal")
     doc.text(regels, marge + 3, y + 5)
-    y += inhoudHoogte + 6
+    y += hoogte + 5
   }
 
-  // Footer op alle pagina's
-  const aantalPaginas = doc.getNumberOfPages()
-  for (let p = 1; p <= aantalPaginas; p++) {
+  // Footer
+  const n = doc.getNumberOfPages()
+  for (let p = 1; p <= n; p++) {
     doc.setPage(p)
     doc.setFillColor(245, 247, 245)
-    doc.rect(0, 284, 210, 13, 'F')
-    doc.setDrawColor(...grijs)
-    doc.setLineWidth(0.2)
-    doc.line(0, 284, 210, 284)
+    doc.rect(0, 284, 210, 13, "F")
     doc.setFontSize(7)
-    doc.setFont('helvetica', 'normal')
     doc.setTextColor(...grijs)
-    doc.text('De Theepot — Kinderopvang', marge, 291)
-    if (brief.locatie_naam) doc.text(brief.locatie_naam, 210 / 2, 291, { align: 'center' })
-    doc.text(`${p} / ${aantalPaginas}`, 210 - marge, 291, { align: 'right' })
+    doc.text(`De Theepot — Weekmemo${brief.locatie_naam ? " " + brief.locatie_naam : ""}`, marge, 291)
+    doc.text(`${p} / ${n}`, 210 - marge, 291, { align: "right" })
   }
 
-  doc.save(`Nieuwsbrief_${brief.titel.replace(/\s+/g, '_')}_${brief.datum}.pdf`)
+  doc.save(`Weekmemo_${brief.locatie_naam ?? ""}_${brief.datum}.pdf`)
+}
+
+// ─── PDF Export Theepraatje ───────────────────────────────────────────────────
+
+async function exportTheepraatjePDF(brief: Nieuwsbrief) {
+  const { jsPDF } = await import('jspdf')
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
+
+  const groen: [number, number, number] = [140, 198, 63]
+  const donkerGroen: [number, number, number] = [61, 107, 26]
+  const wit: [number, number, number] = [255, 255, 255]
+  const zwart: [number, number, number] = [30, 30, 30]
+  const grijs: [number, number, number] = [150, 150, 150]
+  const lichtGroen: [number, number, number] = [235, 245, 214]
+  const marge = 15
+  const breedte = 210 - marge * 2
+  let y = 0
+
+  // Header — grote groene balk met logo
+  doc.setFillColor(...groen)
+  doc.rect(0, 0, 210, 42, "F")
+
+  // Logo links
+  try {
+    doc.addImage(LOGO_B64, "JPEG", marge, 6, 28, 28)
+  } catch {}
+
+  // Titel midden/rechts
+  doc.setTextColor(...wit)
+  doc.setFontSize(28)
+  doc.setFont("helvetica", "bold")
+  doc.text("Theepraatje", marge + 34, 22)
+  doc.setFontSize(10)
+  doc.setFont("helvetica", "normal")
+  if (brief.nummer) doc.text(`Nr. ${brief.nummer} | ${fmtDatum(brief.datum)}`, marge + 34, 30)
+  else doc.text(fmtDatum(brief.datum), marge + 34, 30)
+
+  // Groene streep decoratie
+  doc.setFillColor(61, 107, 26)
+  doc.rect(0, 42, 210, 2, "F")
+
+  y = 52
+
+  // Secties in twee kolommen
+  const kolBreedte = (breedte - 6) / 2
+  let kolom = 0
+  let yLinks = y
+  let yRechts = y
+
+  for (const sectie of brief.secties.filter(s => s.inhoud.trim())) {
+    const huidigY = kolom === 0 ? yLinks : yRechts
+    const huidigX = kolom === 0 ? marge : marge + kolBreedte + 6
+
+    if (huidigY > 240) {
+      doc.addPage()
+      yLinks = 20; yRechts = 20
+      kolom = 0
+    }
+
+    let curY = kolom === 0 ? yLinks : yRechts
+
+    // Sectie header
+    doc.setFillColor(...lichtGroen)
+    doc.rect(huidigX, curY, kolBreedte, 7, "F")
+    doc.setFillColor(...groen)
+    doc.rect(huidigX, curY, 3, 7, "F")
+    doc.setTextColor(...donkerGroen)
+    doc.setFontSize(9)
+    doc.setFont("helvetica", "bold")
+    doc.text(sectie.titel, huidigX + 5, curY + 5)
+    curY += 9
+
+    // Inhoud
+    const regels = doc.splitTextToSize(sectie.inhoud.trim(), kolBreedte - 4)
+    const hoogte = Math.max(regels.length * 5 + 5, 10)
+    doc.setFillColor(252, 254, 252)
+    doc.rect(huidigX, curY, kolBreedte, hoogte, "F")
+    doc.setDrawColor(...grijs)
+    doc.setLineWidth(0.15)
+    doc.rect(huidigX, curY, kolBreedte, hoogte)
+    doc.setTextColor(...zwart)
+    doc.setFont("helvetica", "normal")
+    doc.setFontSize(8.5)
+    doc.text(regels, huidigX + 3, curY + 4.5)
+    curY += hoogte + 6
+
+    if (kolom === 0) { yLinks = curY; kolom = 1 }
+    else { yRechts = curY; kolom = 0 }
+  }
+
+  // Footer
+  const n = doc.getNumberOfPages()
+  for (let p = 1; p <= n; p++) {
+    doc.setPage(p)
+    doc.setFillColor(...groen)
+    doc.rect(0, 284, 210, 13, "F")
+    doc.setFontSize(7)
+    doc.setTextColor(...wit)
+    doc.text("De Theepot — Kinderopvang", marge, 291)
+    if (brief.locatie_naam) doc.text(brief.locatie_naam, 210 / 2, 291, { align: "center" })
+    doc.text(`${p} / ${n}`, 210 - marge, 291, { align: "right" })
+  }
+
+  doc.save(`Theepraatje_Nr${brief.nummer ?? ""}_${brief.datum}.pdf`)
+}
+
+async function exportPDF(brief: Nieuwsbrief) {
+  if (brief.format === 'weekmemo') await exportWeekmemoPDF(brief)
+  else await exportTheepraatjePDF(brief)
 }
 
 // ─── Hoofd pagina ─────────────────────────────────────────────────────────────
@@ -197,98 +281,86 @@ export default function NieuwsbrievenPage() {
   const [editorNummer, setEditorNummer] = useState('')
   const [editorLocatie, setEditorLocatie] = useState('')
   const [editorDatum, setEditorDatum] = useState('')
+  const [editorFormat, setEditorFormat] = useState<Format>('weekmemo')
   const [editorSecties, setEditorSecties] = useState<Sectie[]>([])
   const [actieveSectie, setActieveSectie] = useState<string | null>(null)
   const [nieuwSectieNaam, setNieuwSectieNaam] = useState('')
 
-  // ── Data ophalen ────────────────────────────────────────────────────────────
   const haalOp = useCallback(async () => {
     setLaden(true)
-    const { data } = await getSupabase()
-      .from('nieuwsbrieven')
-      .select('*')
-      .order('aangemaakt_op', { ascending: false })
+    const { data } = await getSupabase().from('nieuwsbrieven').select('*').order('aangemaakt_op', { ascending: false })
     setNieuwsbrieven((data ?? []) as Nieuwsbrief[])
     setLaden(false)
   }, [])
 
   useEffect(() => { haalOp() }, [haalOp])
 
-  // ── Nieuw aanmaken ──────────────────────────────────────────────────────────
-  function nieuwAanmaken() {
-    setEditorTitel('Theepraatje')
+  function nieuwAanmaken(format: Format) {
+    setEditorTitel(format === 'weekmemo' ? 'Weekmemo' : 'Theepraatje')
     setEditorNummer('')
     setEditorLocatie('')
     setEditorDatum(new Date().toISOString().split('T')[0])
-    setEditorSecties(maakStandaardSecties())
+    setEditorFormat(format)
+    setEditorSecties(maakSecties(format))
     setActieve(null)
     setActieveSectie(null)
     setBewerkModus(true)
   }
 
-  // ── Bewerken ────────────────────────────────────────────────────────────────
   function openBewerken(brief: Nieuwsbrief) {
     setEditorTitel(brief.titel)
     setEditorNummer(brief.nummer ?? '')
     setEditorLocatie(brief.locatie_naam ?? '')
     setEditorDatum(brief.datum)
+    setEditorFormat(brief.format ?? 'weekmemo')
     setEditorSecties(brief.secties)
     setActieve(brief)
     setActieveSectie(null)
     setBewerkModus(true)
   }
 
-  // ── Opslaan ─────────────────────────────────────────────────────────────────
   async function slaOp() {
     if (!editorTitel.trim()) return
     setOpslaan(true)
     const supabase = getSupabase()
     const data = {
-      titel: editorTitel.trim(),
-      nummer: editorNummer.trim() || null,
-      locatie_naam: editorLocatie.trim() || null,
-      datum: editorDatum,
-      secties: editorSecties,
-      aangemaakt_door: profiel?.id,
-      bijgewerkt_op: new Date().toISOString(),
+      titel: editorTitel.trim(), nummer: editorNummer.trim() || null,
+      locatie_naam: editorLocatie.trim() || null, datum: editorDatum,
+      format: editorFormat, secties: editorSecties,
+      aangemaakt_door: profiel?.id, bijgewerkt_op: new Date().toISOString(),
     }
-
     if (actieve) {
       await supabase.from('nieuwsbrieven').update(data).eq('id', actieve.id)
       setToast({ bericht: 'Opgeslagen!', type: 'success' })
     } else {
       const { data: nieuw } = await supabase.from('nieuwsbrieven').insert(data).select().single()
       if (nieuw) setActieve(nieuw as Nieuwsbrief)
-      setToast({ bericht: 'Nieuwsbrief aangemaakt!', type: 'success' })
+      setToast({ bericht: 'Aangemaakt!', type: 'success' })
     }
     setOpslaan(false)
     await haalOp()
   }
 
-  // ── Verwijderen ─────────────────────────────────────────────────────────────
   async function verwijder(id: string) {
     if (!confirm('Nieuwsbrief verwijderen?')) return
     await getSupabase().from('nieuwsbrieven').delete().eq('id', id)
-    setBewerkModus(false)
-    setActieve(null)
+    setBewerkModus(false); setActieve(null)
     setToast({ bericht: 'Verwijderd.', type: 'success' })
     await haalOp()
   }
 
-  // ── Sectie acties ────────────────────────────────────────────────────────────
   function verwijderSectie(id: string) {
     setEditorSecties(prev => prev.filter(s => s.id !== id))
     if (actieveSectie === id) setActieveSectie(null)
   }
 
-  function verplaatsSectie(id: string, richting: 'up' | 'down') {
+  function verplaatsSectie(id: string, r: 'up' | 'down') {
     setEditorSecties(prev => {
       const idx = prev.findIndex(s => s.id === id)
-      if (idx === -1) return prev
       const nieuw = [...prev]
-      const swapIdx = richting === 'up' ? idx - 1 : idx + 1
-      if (swapIdx < 0 || swapIdx >= nieuw.length) return prev
-      ;[nieuw[idx], nieuw[swapIdx]] = [nieuw[swapIdx], nieuw[idx]]
+      const swap = r === 'up' ? idx - 1 : idx + 1
+      if (swap < 0 || swap >= nieuw.length) return prev
+      ;[nieuw[idx], nieuw[swap]] = [nieuw[swap], nieuw[idx]]
       return nieuw
     })
   }
@@ -303,190 +375,112 @@ export default function NieuwsbrievenPage() {
     setNieuwSectieNaam('')
   }
 
-  // ─── RENDER ─────────────────────────────────────────────────────────────────
-
   if (!magZien) return (
     <>
       <Topbar titel="Nieuwsbrieven" subtitel="Geen toegang" />
-      <div className="page-content"><div className="empty-state"><FileText size={36} /><h3>Geen toegang</h3><p>Je hebt geen toegang tot de nieuwsbrieven.</p></div></div>
+      <div className="page-content"><div className="empty-state"><FileText size={36} /><h3>Geen toegang</h3></div></div>
     </>
   )
 
-  // Editor weergave
+  // ── Editor ──────────────────────────────────────────────────────────────────
   if (bewerkModus) {
+    const huidigeBrief = actieve ? { ...actieve, titel: editorTitel, nummer: editorNummer || null, locatie_naam: editorLocatie || null, datum: editorDatum, format: editorFormat, secties: editorSecties } : null
+
     return (
       <>
         <Topbar
-          titel={actieve ? 'Bewerken' : 'Nieuwe nieuwsbrief'}
+          titel={editorFormat === 'weekmemo' ? 'Weekmemo' : 'Theepraatje'}
           acties={
             <div style={{ display: 'flex', gap: 8 }}>
-              <button className="btn" onClick={() => {
-                if (actieve) {
-                  exportPDF({ ...actieve, titel: editorTitel, nummer: editorNummer || null, locatie_naam: editorLocatie || null, datum: editorDatum, secties: editorSecties })
-                }
-              }} disabled={!actieve}>
-                <Download size={14} /> PDF
-              </button>
-              <button className="btn btn-primary" onClick={slaOp} disabled={opslaan || !editorTitel.trim()}>
-                {opslaan ? 'Opslaan...' : 'Opslaan'}
-              </button>
-              <button className="btn" onClick={() => { setBewerkModus(false); setActieve(null) }}>
-                <ArrowLeft size={14} /> Terug
-              </button>
+              {actieve && <button className="btn" onClick={() => exportPDF({ ...actieve, titel: editorTitel, nummer: editorNummer || null, locatie_naam: editorLocatie || null, datum: editorDatum, format: editorFormat, secties: editorSecties })}><Download size={14} /> PDF</button>}
+              <button className="btn btn-primary" onClick={slaOp} disabled={opslaan || !editorTitel.trim()}>{opslaan ? 'Opslaan...' : 'Opslaan'}</button>
+              <button className="btn" onClick={() => { setBewerkModus(false); setActieve(null) }}><ArrowLeft size={14} /> Terug</button>
             </div>
           }
         />
 
-        <div className="page-content" style={{ display: 'grid', gridTemplateColumns: '340px 1fr', gap: 16 }}>
+        <div className="page-content" style={{ display: 'grid', gridTemplateColumns: '320px 1fr', gap: 16 }}>
 
-          {/* Linker paneel: metadata + secties */}
+          {/* Links: instellingen + secties */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+
+            {/* Format badge */}
+            <div style={{ display: 'flex', gap: 8 }}>
+              <div style={{ flex: 1, padding: '10px 14px', borderRadius: 10, background: editorFormat === 'weekmemo' ? 'var(--primary-xlight)' : 'var(--bg)', border: `1.5px solid ${editorFormat === 'weekmemo' ? 'var(--primary)' : 'var(--border)'}`, textAlign: 'center' }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: editorFormat === 'weekmemo' ? 'var(--primary-text)' : 'var(--text-muted)' }}>📋 Weekmemo</div>
+                <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>Intern voor team</div>
+              </div>
+              <div style={{ flex: 1, padding: '10px 14px', borderRadius: 10, background: editorFormat === 'theepraatje' ? 'var(--primary-xlight)' : 'var(--bg)', border: `1.5px solid ${editorFormat === 'theepraatje' ? 'var(--primary)' : 'var(--border)'}`, textAlign: 'center' }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: editorFormat === 'theepraatje' ? 'var(--primary-text)' : 'var(--text-muted)' }}>📰 Theepraatje</div>
+                <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>Voor ouders</div>
+              </div>
+            </div>
 
             {/* Meta */}
             <div className="card">
               <div className="card-header"><span className="card-title">Instellingen</span></div>
               <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                <div>
-                  <label className="form-label">Titel *</label>
-                  <input className="form-input" value={editorTitel} onChange={e => setEditorTitel(e.target.value)} placeholder="Bijv. Theepraatje" />
-                </div>
+                <div><label className="form-label">Titel</label><input className="form-input" value={editorTitel} onChange={e => setEditorTitel(e.target.value)} /></div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                  <div>
-                    <label className="form-label">Nummer</label>
-                    <input className="form-input" value={editorNummer} onChange={e => setEditorNummer(e.target.value)} placeholder="119" />
-                  </div>
-                  <div>
-                    <label className="form-label">Datum</label>
-                    <input type="date" className="form-input" value={editorDatum} onChange={e => setEditorDatum(e.target.value)} />
-                  </div>
+                  <div><label className="form-label">{editorFormat === 'weekmemo' ? 'Weeknummer' : 'Nummer'}</label><input className="form-input" value={editorNummer} onChange={e => setEditorNummer(e.target.value)} placeholder={editorFormat === 'weekmemo' ? '20' : '119'} /></div>
+                  <div><label className="form-label">Datum</label><input type="date" className="form-input" value={editorDatum} onChange={e => setEditorDatum(e.target.value)} /></div>
                 </div>
-                <div>
-                  <label className="form-label">Locatie (optioneel)</label>
-                  <input className="form-input" value={editorLocatie} onChange={e => setEditorLocatie(e.target.value)} placeholder="Bijv. Lisse" />
-                </div>
+                <div><label className="form-label">Locatie (optioneel)</label><input className="form-input" value={editorLocatie} onChange={e => setEditorLocatie(e.target.value)} placeholder="Bijv. Lisse" /></div>
               </div>
             </div>
 
-            {/* Secties beheren */}
+            {/* Secties */}
             <div className="card">
               <div className="card-header"><span className="card-title">Secties</span></div>
               <div style={{ padding: '6px 0' }}>
                 {editorSecties.map((s, idx) => (
-                  <div
-                    key={s.id}
-                    onClick={() => setActieveSectie(s.id)}
-                    style={{
-                      display: 'flex', alignItems: 'center', gap: 8, padding: '8px 14px',
-                      cursor: 'pointer', transition: 'background 0.1s',
-                      background: actieveSectie === s.id ? 'var(--primary-xlight)' : 'transparent',
-                      borderLeft: actieveSectie === s.id ? '3px solid var(--primary)' : '3px solid transparent',
-                    }}
-                    onMouseEnter={e => { if (actieveSectie !== s.id) e.currentTarget.style.background = 'var(--bg)' }}
-                    onMouseLeave={e => { if (actieveSectie !== s.id) e.currentTarget.style.background = 'transparent' }}
-                  >
-                    <GripVertical size={13} color="var(--border-dark)" style={{ flexShrink: 0 }} />
-                    <span style={{ flex: 1, fontSize: 12, fontWeight: actieveSectie === s.id ? 600 : 400, color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      {s.titel}
-                    </span>
+                  <div key={s.id} onClick={() => setActieveSectie(s.id)}
+                    style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', cursor: 'pointer', background: actieveSectie === s.id ? 'var(--primary-xlight)' : 'transparent', borderLeft: actieveSectie === s.id ? '3px solid var(--primary)' : '3px solid transparent' }}>
+                    <GripVertical size={12} color="var(--border-dark)" style={{ flexShrink: 0 }} />
+                    <span style={{ flex: 1, fontSize: 12, fontWeight: actieveSectie === s.id ? 600 : 400, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: 'var(--text)' }}>{s.titel}</span>
                     {s.inhoud.trim() && <div style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--primary)', flexShrink: 0 }} />}
-                    <div style={{ display: 'flex', gap: 2, flexShrink: 0 }}>
-                      <button onClick={e => { e.stopPropagation(); verplaatsSectie(s.id, 'up') }} disabled={idx === 0} style={{ background: 'none', border: 'none', cursor: idx === 0 ? 'default' : 'pointer', color: 'var(--text-muted)', opacity: idx === 0 ? 0.3 : 1, padding: '2px 3px', display: 'flex' }}>
-                        <ChevronUp size={12} />
-                      </button>
-                      <button onClick={e => { e.stopPropagation(); verplaatsSectie(s.id, 'down') }} disabled={idx === editorSecties.length - 1} style={{ background: 'none', border: 'none', cursor: idx === editorSecties.length - 1 ? 'default' : 'pointer', color: 'var(--text-muted)', opacity: idx === editorSecties.length - 1 ? 0.3 : 1, padding: '2px 3px', display: 'flex' }}>
-                        <ChevronDown size={12} />
-                      </button>
-                      <button onClick={e => { e.stopPropagation(); verwijderSectie(s.id) }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', opacity: 0.5, padding: '2px 3px', display: 'flex' }}>
-                        <X size={12} />
-                      </button>
-                    </div>
+                    <button onClick={e => { e.stopPropagation(); verplaatsSectie(s.id, 'up') }} disabled={idx === 0} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', opacity: idx === 0 ? 0.2 : 0.6, padding: '1px 2px', display: 'flex' }}><ChevronUp size={11} /></button>
+                    <button onClick={e => { e.stopPropagation(); verplaatsSectie(s.id, 'down') }} disabled={idx === editorSecties.length - 1} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', opacity: idx === editorSecties.length - 1 ? 0.2 : 0.6, padding: '1px 2px', display: 'flex' }}><ChevronDown size={11} /></button>
+                    <button onClick={e => { e.stopPropagation(); verwijderSectie(s.id) }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', opacity: 0.4, padding: '1px 2px', display: 'flex' }}><X size={11} /></button>
                   </div>
                 ))}
               </div>
-              {/* Nieuwe sectie */}
-              <div style={{ padding: '8px 14px', borderTop: '1px solid var(--border)' }}>
-                <div style={{ display: 'flex', gap: 6 }}>
-                  <input
-                    className="form-input"
-                    style={{ flex: 1, fontSize: 12, padding: '5px 9px' }}
-                    value={nieuwSectieNaam}
-                    onChange={e => setNieuwSectieNaam(e.target.value)}
-                    placeholder="Nieuwe sectie..."
-                    onKeyDown={e => e.key === 'Enter' && voegSectieToe()}
-                  />
-                  <button className="btn btn-sm" onClick={voegSectieToe} disabled={!nieuwSectieNaam.trim()}>
-                    <Plus size={12} />
-                  </button>
-                </div>
+              <div style={{ padding: '8px 14px', borderTop: '1px solid var(--border)', display: 'flex', gap: 6 }}>
+                <input className="form-input" style={{ flex: 1, fontSize: 12, padding: '5px 9px' }} value={nieuwSectieNaam} onChange={e => setNieuwSectieNaam(e.target.value)} placeholder="Nieuwe sectie..." onKeyDown={e => e.key === 'Enter' && voegSectieToe()} />
+                <button className="btn btn-sm" onClick={voegSectieToe} disabled={!nieuwSectieNaam.trim()}><Plus size={12} /></button>
               </div>
             </div>
 
-            {/* Verwijder knop */}
             {actieve && (
               <button className="btn" style={{ color: '#DC2626', borderColor: '#FECACA' }} onClick={() => verwijder(actieve.id)}>
-                <Trash2 size={14} /> Nieuwsbrief verwijderen
+                <Trash2 size={14} /> Verwijderen
               </button>
             )}
           </div>
 
-          {/* Rechter paneel: editor */}
+          {/* Rechts: editor */}
           <div>
             {!actieveSectie ? (
-              <div className="empty-state" style={{ padding: 60 }}>
-                <FileText size={32} />
-                <h3>Kies een sectie</h3>
-                <p>Klik op een sectie links om de inhoud te bewerken.</p>
-              </div>
+              <div className="empty-state" style={{ padding: 60 }}><FileText size={32} /><h3>Kies een sectie</h3><p>Klik op een sectie links om te bewerken.</p></div>
             ) : (() => {
               const sectie = editorSecties.find(s => s.id === actieveSectie)
               if (!sectie) return null
               return (
                 <div className="card">
                   <div className="card-header">
-                    <input
-                      className="form-input"
-                      value={sectie.titel}
-                      onChange={e => updateSectie(sectie.id, 'titel', e.target.value)}
-                      style={{ fontFamily: 'Sora, sans-serif', fontWeight: 600, fontSize: 14, border: 'none', background: 'none', padding: '4px 0', flex: 1 }}
-                    />
+                    <input value={sectie.titel} onChange={e => updateSectie(sectie.id, 'titel', e.target.value)}
+                      style={{ fontFamily: 'Sora, sans-serif', fontWeight: 600, fontSize: 14, border: 'none', background: 'none', color: 'var(--text)', flex: 1, outline: 'none', padding: '4px 0' }} />
                   </div>
                   <div className="card-body">
-                    <textarea
-                      value={sectie.inhoud}
-                      onChange={e => updateSectie(sectie.id, 'inhoud', e.target.value)}
-                      placeholder={`Schrijf hier de inhoud voor "${sectie.titel}"...`}
-                      style={{
-                        width: '100%', minHeight: 360, border: '1px solid var(--border-dark)',
-                        borderRadius: 9, padding: '12px 14px', fontSize: 13,
-                        fontFamily: 'DM Sans, sans-serif', lineHeight: 1.7,
-                        background: 'var(--bg)', color: 'var(--text)', resize: 'vertical', outline: 'none',
-                      }}
-                      onFocus={e => (e.target.style.borderColor = 'var(--primary)')}
-                      onBlur={e => (e.target.style.borderColor = 'var(--border-dark)')}
-                      autoFocus
-                    />
-                    <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 6 }}>
-                      {sectie.inhoud.trim().split('\n').filter(Boolean).length} regels · {sectie.inhoud.length} tekens
-                    </div>
+                    <textarea value={sectie.inhoud} onChange={e => updateSectie(sectie.id, 'inhoud', e.target.value)}
+                      placeholder={`Inhoud voor "${sectie.titel}"...`} autoFocus
+                      style={{ width: '100%', minHeight: 380, border: '1px solid var(--border-dark)', borderRadius: 9, padding: '12px 14px', fontSize: 13, fontFamily: 'DM Sans, sans-serif', lineHeight: 1.8, background: 'var(--bg)', color: 'var(--text)', resize: 'vertical', outline: 'none' }}
+                      onFocus={e => (e.target.style.borderColor = 'var(--primary)')} onBlur={e => (e.target.style.borderColor = 'var(--border-dark)')} />
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 6 }}>{sectie.inhoud.length} tekens</div>
                   </div>
                 </div>
               )
             })()}
-
-            {/* Preview onderaan */}
-            {actieveSectie && editorSecties.find(s => s.id === actieveSectie)?.inhoud && (
-              <div className="card" style={{ marginTop: 14 }}>
-                <div className="card-header"><span className="card-title" style={{ fontSize: 12 }}>Preview</span></div>
-                <div style={{ padding: '12px 18px' }}>
-                  <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--primary-text)', textTransform: 'uppercase', letterSpacing: '0.06em', padding: '4px 8px', background: 'var(--primary-light)', display: 'inline-block', borderRadius: 4, marginBottom: 8 }}>
-                    {editorSecties.find(s => s.id === actieveSectie)?.titel}
-                  </div>
-                  <div style={{ fontSize: 13, lineHeight: 1.7, color: 'var(--text)', whiteSpace: 'pre-wrap' }}>
-                    {editorSecties.find(s => s.id === actieveSectie)?.inhoud}
-                  </div>
-                </div>
-              </div>
-            )}
           </div>
         </div>
 
@@ -495,16 +489,19 @@ export default function NieuwsbrievenPage() {
     )
   }
 
-  // Overzicht
+  // ── Overzicht ───────────────────────────────────────────────────────────────
   return (
     <>
       <Topbar
         titel="Nieuwsbrieven"
-        subtitel={`${nieuwsbrieven.length} brieven`}
+        subtitel={`${nieuwsbrieven.length} documenten`}
         acties={
-          magBewerken ? <button className="btn btn-primary" onClick={nieuwAanmaken}>
-            <Plus size={14} /> Nieuwe nieuwsbrief
-          </button> : undefined
+          magBewerken ? (
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button className="btn" onClick={() => nieuwAanmaken('weekmemo')}><Plus size={14} /> Weekmemo</button>
+              <button className="btn btn-primary" onClick={() => nieuwAanmaken('theepraatje')}><Plus size={14} /> Theepraatje</button>
+            </div>
+          ) : undefined
         }
       />
 
@@ -515,43 +512,41 @@ export default function NieuwsbrievenPage() {
           <div className="empty-state">
             <FileText size={36} />
             <h3>Geen nieuwsbrieven</h3>
-            <p>Maak de eerste nieuwsbrief aan.</p>
-            <button className="btn btn-primary" onClick={nieuwAanmaken}><Plus size={14} /> Nieuwe nieuwsbrief</button>
+            <p>Maak een Weekmemo of Theepraatje aan.</p>
+            {magBewerken && (
+              <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                <button className="btn" onClick={() => nieuwAanmaken('weekmemo')}><Plus size={14} /> Weekmemo</button>
+                <button className="btn btn-primary" onClick={() => nieuwAanmaken('theepraatje')}><Plus size={14} /> Theepraatje</button>
+              </div>
+            )}
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {nieuwsbrieven.map(brief => (
-              <div key={brief.id} className="card" style={{ transition: 'border-color 0.15s' }}
-                onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--primary)')}
-                onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--border)')}
-              >
+              <div key={brief.id} className="card" onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--primary)')} onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--border)')}>
                 <div style={{ padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 14 }}>
-                  <div style={{ width: 44, height: 44, borderRadius: 10, background: 'var(--primary-light)', color: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                    <FileText size={20} />
+                  {/* Format icoon */}
+                  <div style={{ width: 44, height: 44, borderRadius: 10, background: brief.format === 'theepraatje' ? 'var(--primary-light)' : 'var(--bg)', border: '1px solid var(--border)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <span style={{ fontSize: brief.format === 'theepraatje' ? 18 : 16 }}>{brief.format === 'theepraatje' ? '📰' : '📋'}</span>
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3 }}>
                       <span style={{ fontFamily: 'Sora, sans-serif', fontWeight: 600, fontSize: 14 }}>{brief.titel}</span>
                       {brief.nummer && <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Nr. {brief.nummer}</span>}
+                      <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 20, background: brief.format === 'theepraatje' ? 'var(--primary-light)' : 'var(--bg)', color: brief.format === 'theepraatje' ? 'var(--primary-text)' : 'var(--text-muted)', border: '1px solid var(--border)', fontWeight: 500 }}>
+                        {brief.format === 'theepraatje' ? 'Theepraatje' : 'Weekmemo'}
+                      </span>
                     </div>
                     <div style={{ fontSize: 12, color: 'var(--text-muted)', display: 'flex', gap: 12 }}>
                       <span>📅 {fmtDatum(brief.datum)}</span>
                       {brief.locatie_naam && <span>📍 {brief.locatie_naam}</span>}
-                      <span>📝 {brief.secties.filter(s => s.inhoud.trim()).length} / {brief.secties.length} secties ingevuld</span>
+                      <span>📝 {brief.secties.filter(s => s.inhoud.trim()).length}/{brief.secties.length} secties</span>
                     </div>
                   </div>
                   <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-                    <button className="btn btn-sm" onClick={() => exportPDF(brief)}>
-                      <Download size={13} /> PDF
-                    </button>
-                    {magBewerken && <button className="btn btn-sm" onClick={() => openBewerken(brief)}>
-                      <Pencil size={13} /> Bewerken
-                    </button>}
-                    {magBewerken && (
-                      <button className="btn btn-sm" style={{ color: '#DC2626', borderColor: '#FECACA' }} onClick={() => verwijder(brief.id)}>
-                        <Trash2 size={13} />
-                      </button>
-                    )}
+                    <button className="btn btn-sm" onClick={() => exportPDF(brief)}><Download size={13} /> PDF</button>
+                    {magBewerken && <button className="btn btn-sm" onClick={() => openBewerken(brief)}><Pencil size={13} /> Bewerken</button>}
+                    {magBewerken && <button className="btn btn-sm" style={{ color: '#DC2626', borderColor: '#FECACA' }} onClick={() => verwijder(brief.id)}><Trash2 size={13} /></button>}
                   </div>
                 </div>
               </div>
