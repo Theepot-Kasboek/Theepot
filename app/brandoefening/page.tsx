@@ -202,7 +202,8 @@ export default function BrandoefeningPage() {
   const [toast, setToast] = useState<{ bericht: string; type: 'success' | 'error' } | null>(null)
 
   async function getToegankelijkeLocaties(alleLocaties: string[]): Promise<string[]> {
-    if (isSuperadmin) return alleLocaties
+    const magAllesZien = isSuperadmin || profiel?.rol === 'directie' || profiel?.rol === 'leidinggevende'
+    if (magAllesZien) return alleLocaties
     const { data } = await getSupabase()
       .from('locatie_toegang').select('locatie_naam, toegang')
       .eq('profiel_id', profiel?.id ?? '').eq('locatie_type', 'brandoefening')

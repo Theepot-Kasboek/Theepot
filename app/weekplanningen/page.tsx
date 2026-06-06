@@ -224,7 +224,8 @@ export default function WeekplanningenPage() {
   const { profiel, isSuperadmin } = useAuth()
 
   async function getToegankelijkeLocaties(alleLocaties: string[]): Promise<string[]> {
-    if (isSuperadmin) return alleLocaties
+    const magAllesZien = isSuperadmin || profiel?.rol === 'directie' || profiel?.rol === 'leidinggevende'
+    if (magAllesZien) return alleLocaties
     const { data } = await getSupabase()
       .from('locatie_toegang')
       .select('locatie_naam, toegang')

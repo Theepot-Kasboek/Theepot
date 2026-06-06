@@ -160,14 +160,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Helper: geeft toegangsniveau voor een specifieke locatie
   // Superadmin heeft altijd 'bewerken', anders op basis van locatie_toegang tabel
+  const magAllesZien = isSuperadmin || profiel?.rol === 'directie' || profiel?.rol === 'leidinggevende'
+
   function kasboekToegang(locatieNaam: string): Toegang {
-    if (isSuperadmin) return 'bewerken'
+    if (magAllesZien) return 'bewerken'
     const gevonden = locatieToegang.find(t => t.locatie_type === 'kasboek' && t.locatie_naam === locatieNaam)
     return (gevonden?.toegang as Toegang) ?? 'geen'
   }
 
   function maaltijdToegang(locatieNaam: string): Toegang {
-    if (isSuperadmin) return 'bewerken'
+    if (magAllesZien) return 'bewerken'
     const gevonden = locatieToegang.find(t => t.locatie_type === 'maaltijdlijst' && t.locatie_naam === locatieNaam)
     return (gevonden?.toegang as Toegang) ?? 'geen'
   }

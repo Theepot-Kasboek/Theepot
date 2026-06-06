@@ -292,7 +292,7 @@ function WeekAgenda({ profielId }: { profielId: string }) {
 // ─── Weekplanning Widget ─────────────────────────────────────────────────────
 
 function WeekplanningWidget({ profielId }: { profielId: string }) {
-  const { isSuperadmin } = useAuth()
+  const { isSuperadmin, profiel: widgetProfiel } = useAuth()
   const [locaties, setLocaties] = useState<string[]>([])
   const [actieveLocatie, setActieveLocatie] = useState<string>('')
   const [planning, setPlanning] = useState<{thema: string | null; knutsel?: string; kook_bak?: string; groepsspel?: string} | null>(null)
@@ -308,9 +308,10 @@ function WeekplanningWidget({ profielId }: { profielId: string }) {
       const { data: locs } = await supabase.from('kasboek_locaties').select('naam').eq('actief', true).order('naam')
       const allen = (locs ?? []).map((l: {naam: string}) => l.naam)
 
-      // Filter op locatietoegang weekplanningen (tenzij superadmin)
+      // Filter op locatietoegang weekplanningen
+      const magAllesZien = isSuperadmin || widgetProfiel?.rol === 'directie' || widgetProfiel?.rol === 'leidinggevende'
       let namen = allen
-      if (!isSuperadmin) {
+      if (!magAllesZien) {
         const { data: toegang } = await supabase
           .from('locatie_toegang')
           .select('locatie_naam')
