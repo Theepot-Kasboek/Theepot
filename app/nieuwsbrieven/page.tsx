@@ -79,63 +79,81 @@ async function exportWeekmemoPDF(brief: Nieuwsbrief) {
   const wit: [number, number, number] = [255, 255, 255]
   const zwart: [number, number, number] = [30, 30, 30]
   const grijs: [number, number, number] = [150, 150, 150]
-  const lichtGroen: [number, number, number] = [235, 245, 214]
   const marge = 15
   const breedte = 210 - marge * 2
+  const regelHoogte = 5.4
   let y = 0
 
-  // Header balk
-  doc.setFillColor(...groen)
-  doc.rect(0, 0, 210, 30, "F")
-
-  // Logo rechts in header
-  try {
-    doc.addImage(LOGO_B64, "JPEG", 210 - marge - 22, 4, 22, 22)
-  } catch {}
-
-  // Titel links
-  doc.setTextColor(...wit)
-  doc.setFontSize(16)
-  doc.setFont("helvetica", "bold")
-  doc.text("WEEKMEMO", marge, 13)
-  if (brief.locatie_naam) {
-    doc.setFontSize(10)
-    doc.setFont("helvetica", "normal")
-    doc.text(`Locatie: ${brief.locatie_naam}`, marge, 20)
+  // Helper: bullet-aware tekstverwerking
+  function verwerkTekst(tekst: string, maxBreedte: number): { regel: string; isBullet: boolean }[] {
+    const resultaat: { regel: string; isBullet: boolean }[] = []
+    for (const invoer of tekst.split('\n')) {
+      const getrimd = invoer.trim()
+      const isBullet = /^[●•\*\-–]\s/.test(getrimd)
+      const schoon = isBullet ? getrimd.replace(/^[●•\*\-–]\s*/, '') : getrimd
+      if (!schoon) { resultaat.push({ regel: '', isBullet: false }); continue }
+      const gesplitst = doc.splitTextToSize(schoon, isBullet ? maxBreedte - 6 : maxBreedte)
+      gesplitst.forEach((r: string, i: number) => resultaat.push({ regel: r, isBullet: isBullet && i === 0 }))
+    }
+    return resultaat
   }
-  doc.setFontSize(9)
-  doc.text(`Week: ${brief.nummer ?? ""} | ${fmtDatum(brief.datum)}`, marge, 27)
 
-  y = 38
+  function berekenHoogte(tekst: string, maxBreedte: number): number {
+    return verwerkTekst(tekst, maxBreedte).reduce((h, { regel }) => h + (regel ? regelHoogte : regelHoogte * 0.5), 0)
+  }
+
+  function tekenInhoud(tekst: string, x: number, startY: number, maxBreedte: number): number {
+    let curY = startY
+    for (const { regel, isBullet } of verwerkTekst(tekst, maxBreedte)) {
+      if (!regel) { curY += regelHoogte * 0.5; continue }
+      if (isBullet) {
+        doc.setFillColor(...groen)
+        doc.circle(x + 2, curY - 1.2, 1.2, 'F')
+        doc.text(regel, x + 6, curY)
+      } else {
+        doc.text(regel, x, curY)
+      }
+      curY += regelHoogte
+    }
+    return curY
+  }
+
+  // Header
+  doc.setFillColor(...groen)
+  doc.rect(0, 0, 210, 32, 'F')
+  try { doc.addImage(LOGO_B64, 'JPEG', 210 - marge - 24, 4, 24, 24) } catch {}
+  doc.setTextColor(...wit)
+  doc.setFontSize(18)
+  doc.setFont('helvetica', 'bold')
+  doc.text('WEEKMEMO', marge, 14)
+  doc.setFontSize(9)
+  doc.setFont('helvetica', 'normal')
+  const meta = [brief.locatie_naam, brief.nummer ? `Week ${brief.nummer}` : null, fmtDatum(brief.datum)].filter(Boolean).join('  •  ')
+  doc.text(meta, marge, 22)
+  doc.setFillColor(...donkerGroen)
+  doc.rect(0, 32, 210, 2.5, 'F')
+  y = 41
 
   // Secties
   for (const sectie of brief.secties.filter(s => s.inhoud.trim())) {
-    if (y > 248) { doc.addPage(); y = 20 }
+    const inhoudhoogte = berekenHoogte(sectie.inhoud.trim(), breedte - 8)
+    if (y + inhoudhoogte + 18 > 272) { doc.addPage(); y = 16 }
 
-    // Sectie header - groene balk
+    // Sectietitel
     doc.setFillColor(...groen)
-    doc.rect(marge, y, breedte, 8, "F")
+    doc.rect(marge, y, breedte, 8.5, 'F')
     doc.setTextColor(...wit)
     doc.setFontSize(10)
-    doc.setFont("helvetica", "bold")
-    doc.text(sectie.titel, marge + 3, y + 5.5)
-    y += 10
+    doc.setFont('helvetica', 'bold')
+    doc.text(sectie.titel, marge + 4, y + 5.8)
+    y += 11
 
     // Inhoud
-    const regels = doc.splitTextToSize(sectie.inhoud.trim(), breedte - 4)
-    const hoogte = Math.max(regels.length * 5.5 + 6, 12)
-    if (y + hoogte > 270) { doc.addPage(); y = 20 }
-
-    doc.setFillColor(250, 252, 250)
-    doc.rect(marge, y, breedte, hoogte, "F")
-    doc.setDrawColor(...grijs)
-    doc.setLineWidth(0.2)
-    doc.rect(marge, y, breedte, hoogte)
     doc.setTextColor(...zwart)
+    doc.setFont('helvetica', 'normal')
     doc.setFontSize(9.5)
-    doc.setFont("helvetica", "normal")
-    doc.text(regels, marge + 3, y + 5)
-    y += hoogte + 5
+    const eindY = tekenInhoud(sectie.inhoud.trim(), marge + 4, y + 4.5, breedte - 8)
+    y = eindY + 8
   }
 
   // Footer
@@ -143,14 +161,14 @@ async function exportWeekmemoPDF(brief: Nieuwsbrief) {
   for (let p = 1; p <= n; p++) {
     doc.setPage(p)
     doc.setFillColor(245, 247, 245)
-    doc.rect(0, 284, 210, 13, "F")
-    doc.setFontSize(7)
+    doc.rect(0, 284, 210, 13, 'F')
+    doc.setFontSize(7.5)
     doc.setTextColor(...grijs)
-    doc.text(`De Theepot — Weekmemo${brief.locatie_naam ? " " + brief.locatie_naam : ""}`, marge, 291)
-    doc.text(`${p} / ${n}`, 210 - marge, 291, { align: "right" })
+    doc.text(`De Theepot — Weekmemo${brief.locatie_naam ? ' ' + brief.locatie_naam : ''}`, marge, 291)
+    doc.text(`${p} / ${n}`, 210 - marge, 291, { align: 'right' })
   }
 
-  doc.save(`Weekmemo_${brief.locatie_naam ?? ""}_${brief.datum}.pdf`)
+  doc.save(`Weekmemo_${brief.locatie_naam ?? ''}_${brief.datum}.pdf`)
 }
 
 // ─── PDF Export Theepraatje ───────────────────────────────────────────────────
@@ -163,98 +181,147 @@ async function exportTheepraatjePDF(brief: Nieuwsbrief) {
   const donkerGroen: [number, number, number] = [61, 107, 26]
   const wit: [number, number, number] = [255, 255, 255]
   const zwart: [number, number, number] = [30, 30, 30]
-  const grijs: [number, number, number] = [150, 150, 150]
+  const grijs: [number, number, number] = [130, 130, 130]
   const lichtGroen: [number, number, number] = [235, 245, 214]
-  const marge = 15
+  const accentOranje: [number, number, number] = [255, 165, 0]
+  const marge = 14
   const breedte = 210 - marge * 2
   let y = 0
 
-  // Header — grote groene balk met logo
+  // Helper: verwerk tekst met bullets correct
+  function verwerkTekst(tekst: string, maxBreedte: number): { regel: string; isBullet: boolean }[] {
+    const resultaat: { regel: string; isBullet: boolean }[] = []
+    const invoerRegels = tekst.split('\n')
+
+    for (const invoer of invoerRegels) {
+      const getrimd = invoer.trim()
+      // Detecteer bullet tekens: ●, •, *, -, –
+      const isBullet = /^[●•\*\-–]\s/.test(getrimd)
+      const schoneTekst = isBullet
+        ? getrimd.replace(/^[●•\*\-–]\s*/, '').trim()
+        : getrimd
+
+      if (!schoneTekst) { resultaat.push({ regel: '', isBullet: false }); continue }
+
+      const regelBreedte = isBullet ? maxBreedte - 6 : maxBreedte
+      const gesplitst = doc.splitTextToSize(schoneTekst, regelBreedte)
+      gesplitst.forEach((r: string, i: number) => {
+        resultaat.push({ regel: r, isBullet: isBullet && i === 0 })
+      })
+    }
+    return resultaat
+  }
+
+  // Helper: teken sectie inhoud met bullet support
+  function tekenInhoud(tekst: string, x: number, startY: number, maxBreedte: number, regelHoogte: number): number {
+    const regels = verwerkTekst(tekst, maxBreedte)
+    let curY = startY
+    for (const { regel, isBullet } of regels) {
+      if (!regel) { curY += regelHoogte * 0.5; continue }
+      if (isBullet) {
+        // Groene bullet stip
+        doc.setFillColor(...groen)
+        doc.circle(x + 2, curY - 1.2, 1.2, 'F')
+        doc.text(regel, x + 6, curY)
+      } else {
+        doc.text(regel, x, curY)
+      }
+      curY += regelHoogte
+    }
+    return curY
+  }
+
+  // Bereken hoogte van een sectie inhoud
+  function berekenHoogte(tekst: string, maxBreedte: number, regelHoogte: number): number {
+    const regels = verwerkTekst(tekst, maxBreedte)
+    let hoogte = 0
+    for (const { regel } of regels) {
+      hoogte += regel ? regelHoogte : regelHoogte * 0.5
+    }
+    return Math.max(hoogte, 8)
+  }
+
+  // ── Header ──────────────────────────────────────────────────────────────────
+  // Grote vrolijke groene header
   doc.setFillColor(...groen)
-  doc.rect(0, 0, 210, 42, "F")
+  doc.rect(0, 0, 210, 46, 'F')
 
-  // Logo links
-  try {
-    doc.addImage(LOGO_B64, "JPEG", marge, 6, 28, 28)
-  } catch {}
+  // Golvend wit accent rechtsonder in header (gesimuleerd met ronde rechthoek)
+  doc.setFillColor(255, 255, 255, 0.1)
 
-  // Titel midden/rechts
+  // Logo links in header
+  try { doc.addImage(LOGO_B64, 'JPEG', marge, 7, 30, 30) } catch {}
+
+  // Naam rechts
   doc.setTextColor(...wit)
-  doc.setFontSize(28)
-  doc.setFont("helvetica", "bold")
-  doc.text("Theepraatje", marge + 34, 22)
-  doc.setFontSize(10)
-  doc.setFont("helvetica", "normal")
-  if (brief.nummer) doc.text(`Nr. ${brief.nummer} | ${fmtDatum(brief.datum)}`, marge + 34, 30)
-  else doc.text(fmtDatum(brief.datum), marge + 34, 30)
+  doc.setFontSize(30)
+  doc.setFont('helvetica', 'bold')
+  doc.text('Theepraatje', marge + 36, 24)
 
-  // Groene streep decoratie
-  doc.setFillColor(61, 107, 26)
-  doc.rect(0, 42, 210, 2, "F")
+  doc.setFontSize(9)
+  doc.setFont('helvetica', 'normal')
+  const subTekst = [
+    brief.nummer ? `Nr. ${brief.nummer}` : null,
+    fmtDatum(brief.datum),
+    brief.locatie_naam,
+  ].filter(Boolean).join('  •  ')
+  doc.text(subTekst, marge + 36, 33)
 
-  y = 52
+  // Decoratieve gekleurde balk onder header
+  doc.setFillColor(...donkerGroen)
+  doc.rect(0, 46, 210, 3, 'F')
 
-  // Secties in twee kolommen
-  const kolBreedte = (breedte - 6) / 2
-  let kolom = 0
-  let yLinks = y
-  let yRechts = y
+  y = 56
+
+  // ── Secties — één kolom breed, lekker leesbaar ───────────────────────────────
+  const regelHoogte = 5.2
+  const inhoudbreedte = breedte - 8
 
   for (const sectie of brief.secties.filter(s => s.inhoud.trim())) {
-    const huidigY = kolom === 0 ? yLinks : yRechts
-    const huidigX = kolom === 0 ? marge : marge + kolBreedte + 6
+    const sectieHoogte = berekenHoogte(sectie.inhoud.trim(), inhoudbreedte, regelHoogte)
+    const totaalHoogte = sectieHoogte + 22
 
-    if (huidigY > 240) {
-      doc.addPage()
-      yLinks = 20; yRechts = 20
-      kolom = 0
-    }
+    if (y + totaalHoogte > 272) { doc.addPage(); y = 16 }
 
-    let curY = kolom === 0 ? yLinks : yRechts
-
-    // Sectie header
+    // Sectietitel — vrolijke groene afgeronde balk
     doc.setFillColor(...lichtGroen)
-    doc.rect(huidigX, curY, kolBreedte, 7, "F")
+    doc.roundedRect(marge, y, breedte, 9, 2, 2, 'F')
     doc.setFillColor(...groen)
-    doc.rect(huidigX, curY, 3, 7, "F")
+    doc.roundedRect(marge, y, 4, 9, 1, 1, 'F')
     doc.setTextColor(...donkerGroen)
-    doc.setFontSize(9)
-    doc.setFont("helvetica", "bold")
-    doc.text(sectie.titel, huidigX + 5, curY + 5)
-    curY += 9
+    doc.setFontSize(10)
+    doc.setFont('helvetica', 'bold')
+    doc.text(sectie.titel, marge + 7, y + 6.2)
+    y += 12
 
     // Inhoud
-    const regels = doc.splitTextToSize(sectie.inhoud.trim(), kolBreedte - 4)
-    const hoogte = Math.max(regels.length * 5 + 5, 10)
-    doc.setFillColor(252, 254, 252)
-    doc.rect(huidigX, curY, kolBreedte, hoogte, "F")
-    doc.setDrawColor(...grijs)
-    doc.setLineWidth(0.15)
-    doc.rect(huidigX, curY, kolBreedte, hoogte)
     doc.setTextColor(...zwart)
-    doc.setFont("helvetica", "normal")
-    doc.setFontSize(8.5)
-    doc.text(regels, huidigX + 3, curY + 4.5)
-    curY += hoogte + 6
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(9.5)
+    const eindY = tekenInhoud(sectie.inhoud.trim(), marge + 4, y + 4.5, inhoudbreedte, regelHoogte)
+    y = eindY + 7
 
-    if (kolom === 0) { yLinks = curY; kolom = 1 }
-    else { yRechts = curY; kolom = 0 }
+    // Subtiele scheidingslijn
+    doc.setDrawColor(220, 220, 220)
+    doc.setLineWidth(0.3)
+    doc.line(marge, y - 3, marge + breedte, y - 3)
   }
 
-  // Footer
-  const n = doc.getNumberOfPages()
-  for (let p = 1; p <= n; p++) {
+  // ── Footer ───────────────────────────────────────────────────────────────────
+  const aantalPaginas = doc.getNumberOfPages()
+  for (let p = 1; p <= aantalPaginas; p++) {
     doc.setPage(p)
     doc.setFillColor(...groen)
-    doc.rect(0, 284, 210, 13, "F")
-    doc.setFontSize(7)
+    doc.rect(0, 284, 210, 13, 'F')
+    doc.setFontSize(7.5)
+    doc.setFont('helvetica', 'normal')
     doc.setTextColor(...wit)
-    doc.text("De Theepot — Kinderopvang", marge, 291)
-    if (brief.locatie_naam) doc.text(brief.locatie_naam, 210 / 2, 291, { align: "center" })
-    doc.text(`${p} / ${n}`, 210 - marge, 291, { align: "right" })
+    doc.text('De Theepot — Kinderopvang', marge, 291)
+    if (brief.locatie_naam) doc.text(brief.locatie_naam, 210 / 2, 291, { align: 'center' })
+    doc.text(`${p} / ${aantalPaginas}`, 210 - marge, 291, { align: 'right' })
   }
 
-  doc.save(`Theepraatje_Nr${brief.nummer ?? ""}_${brief.datum}.pdf`)
+  doc.save(`Theepraatje_Nr${brief.nummer ?? ''}_${brief.datum}.pdf`)
 }
 
 async function exportPDF(brief: Nieuwsbrief) {
