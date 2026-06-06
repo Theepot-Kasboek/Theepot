@@ -277,9 +277,12 @@ export default function KasboekPage() {
 
     let zichtbaar: Locatie[] = []
 
-    if (isSuperadmin) {
-      // Superadmin ziet alles
+    const magAllesZien = isSuperadmin || profiel.rol === 'directie' || profiel.rol === 'leidinggevende'
+
+    if (magAllesZien) {
+      // Superadmin, directie en leidinggevende zien alles
       zichtbaar = alleLocaties as Locatie[]
+      setToegestaneLocaties((alleLocaties as Locatie[]).map(l => ({ naam: l.naam, toegang: 'bewerken' })))
     } else {
       // Haal locatietoegang op voor dit account
       const { data: toegangData } = await supabase

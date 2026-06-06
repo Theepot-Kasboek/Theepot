@@ -302,8 +302,11 @@ export default function MaaltijdlijstPage() {
 
     let zichtbaar: Locatie[] = []
 
-    if (isSuperadmin) {
+    const magAllesZien = isSuperadmin || profiel.rol === 'directie' || profiel.rol === 'leidinggevende'
+
+    if (magAllesZien) {
       zichtbaar = alleLocaties as Locatie[]
+      setToegestaneLocaties((alleLocaties as Locatie[]).map(l => ({ naam: l.naam, toegang: 'bewerken' })))
     } else {
       const { data: toegangData } = await supabase
         .from('locatie_toegang')
