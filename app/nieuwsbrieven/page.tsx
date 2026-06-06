@@ -404,16 +404,16 @@ export default function NieuwsbrievenPage() {
           {/* Links: instellingen + secties */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
 
-            {/* Format badge */}
+            {/* Format wisselaar */}
             <div style={{ display: 'flex', gap: 8 }}>
-              <div style={{ flex: 1, padding: '10px 14px', borderRadius: 10, background: editorFormat === 'weekmemo' ? 'var(--primary-xlight)' : 'var(--bg)', border: `1.5px solid ${editorFormat === 'weekmemo' ? 'var(--primary)' : 'var(--border)'}`, textAlign: 'center' }}>
+              <button onClick={() => setEditorFormat('weekmemo')} style={{ flex: 1, padding: '10px 14px', borderRadius: 10, background: editorFormat === 'weekmemo' ? 'var(--primary-xlight)' : 'var(--bg)', border: `1.5px solid ${editorFormat === 'weekmemo' ? 'var(--primary)' : 'var(--border)'}`, textAlign: 'center', cursor: 'pointer', transition: 'all 0.15s' }}>
                 <div style={{ fontSize: 11, fontWeight: 700, color: editorFormat === 'weekmemo' ? 'var(--primary-text)' : 'var(--text-muted)' }}>📋 Weekmemo</div>
                 <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>Intern voor team</div>
-              </div>
-              <div style={{ flex: 1, padding: '10px 14px', borderRadius: 10, background: editorFormat === 'theepraatje' ? 'var(--primary-xlight)' : 'var(--bg)', border: `1.5px solid ${editorFormat === 'theepraatje' ? 'var(--primary)' : 'var(--border)'}`, textAlign: 'center' }}>
+              </button>
+              <button onClick={() => setEditorFormat('theepraatje')} style={{ flex: 1, padding: '10px 14px', borderRadius: 10, background: editorFormat === 'theepraatje' ? 'var(--primary-xlight)' : 'var(--bg)', border: `1.5px solid ${editorFormat === 'theepraatje' ? 'var(--primary)' : 'var(--border)'}`, textAlign: 'center', cursor: 'pointer', transition: 'all 0.15s' }}>
                 <div style={{ fontSize: 11, fontWeight: 700, color: editorFormat === 'theepraatje' ? 'var(--primary-text)' : 'var(--text-muted)' }}>📰 Theepraatje</div>
                 <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>Voor ouders</div>
-              </div>
+              </button>
             </div>
 
             {/* Meta */}
