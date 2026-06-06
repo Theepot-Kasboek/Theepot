@@ -222,9 +222,9 @@ async function exportTheepraatjePDF(brief: Nieuwsbrief) {
         // Groene bullet stip
         doc.setFillColor(...groen)
         doc.circle(x + 2, curY - 1.2, 1.2, 'F')
-        doc.text(regel, x + 6, curY)
+        doc.text(regel, x + 6, curY, { align: 'left' })
       } else {
-        doc.text(regel, x, curY)
+        doc.text(regel, x, curY, { align: 'left' })
       }
       curY += regelHoogte
     }
