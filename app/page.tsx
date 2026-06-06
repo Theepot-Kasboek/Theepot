@@ -292,6 +292,7 @@ function WeekAgenda({ profielId }: { profielId: string }) {
 // ─── Weekplanning Widget ─────────────────────────────────────────────────────
 
 function WeekplanningWidget({ profielId }: { profielId: string }) {
+  const { isSuperadmin } = useAuth()
   const [locaties, setLocaties] = useState<string[]>([])
   const [actieveLocatie, setActieveLocatie] = useState<string>('')
   const [planning, setPlanning] = useState<{thema: string | null; knutsel?: string; kook_bak?: string; groepsspel?: string} | null>(null)
@@ -305,13 +306,27 @@ function WeekplanningWidget({ profielId }: { profielId: string }) {
     async function laad() {
       const supabase = getSupabase()
       const { data: locs } = await supabase.from('kasboek_locaties').select('naam').eq('actief', true).order('naam')
-      const namen = (locs ?? []).map((l: {naam: string}) => l.naam)
+      const allen = (locs ?? []).map((l: {naam: string}) => l.naam)
+
+      // Filter op locatietoegang weekplanningen (tenzij superadmin)
+      let namen = allen
+      if (!isSuperadmin) {
+        const { data: toegang } = await supabase
+          .from('locatie_toegang')
+          .select('locatie_naam')
+          .eq('profiel_id', profielId)
+          .eq('locatie_type', 'weekplanningen')
+          .neq('toegang', 'geen')
+        const toegankelijk = (toegang ?? []).map((t: {locatie_naam: string}) => t.locatie_naam)
+        namen = allen.filter(l => toegankelijk.includes(l))
+      }
+
       setLocaties(namen)
       if (namen.length > 0) { setActieveLocatie(namen[0]); laadPlanning(namen[0]) }
       else setLaden(false)
     }
     laad()
-  }, [])
+  }, [profielId, isSuperadmin])
 
   async function laadPlanning(locatie: string) {
     setLaden(true)
