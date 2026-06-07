@@ -591,7 +591,7 @@ function WeekOverzicht({ week, activiteiten, planning, dagDatumStr, onNieuw, onB
                           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                             <span
                               onClick={() => onBewerk(act)}
-                              style={{ color: 'var(--primary)', textDecoration: 'underline', cursor: 'pointer', fontSize: 13, flex: 1, fontWeight: 500 }}
+                              style={{ color: 'var(--primary)', textDecoration: 'underline', cursor: 'pointer', fontSize: 14, flex: 1, fontWeight: 600 }}
                             >
                               {act.naam}
                             </span>
@@ -745,20 +745,19 @@ function DocumentWeergave({ planning, weken, activiteiten, dagDatumStr }: {
                             borderLeft: `4px solid ${i % 2 === 0 ? 'var(--primary)' : '#8B5CF6'}`,
                           }}
                         >
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-                            <span style={{ background: i % 2 === 0 ? 'var(--primary-light)' : '#EDE9FE', color: i % 2 === 0 ? 'var(--primary-text)' : '#6D28D9', padding: '2px 9px', borderRadius: 20, fontSize: 11, fontWeight: 500 }}>{act.categorie}</span>
-                            <span style={{ fontFamily: 'Sora, sans-serif', fontWeight: 700, fontSize: 14 }}>{act.naam}</span>
+                          <div style={{ marginBottom: 8 }}>
+                            <span style={{ fontFamily: 'Sora, sans-serif', fontWeight: 700, fontSize: 16, color: 'var(--text)' }}>{act.naam}</span>
                           </div>
                           {act.beschrijving && (
-                            <p style={{ fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.6, margin: '0 0 8px 0' }}>{act.beschrijving}</p>
+                            <p style={{ fontSize: 14, color: 'var(--text)', lineHeight: 1.7, margin: '0 0 10px 0' }}>{act.beschrijving}</p>
                           )}
                           {act.benodigdheden?.length > 0 && (
                             <div style={{ marginTop: 6 }}>
                               <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 5 }}>📦 Benodigdheden</div>
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                                 {act.benodigdheden.map((b, bi) => (
-                                  <div key={bi} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
-                                    <div style={{ width: 5, height: 5, borderRadius: '50%', background: i % 2 === 0 ? 'var(--primary)' : '#8B5CF6', flexShrink: 0 }} />
+                                  <div key={bi} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
+                                    <div style={{ width: 6, height: 6, borderRadius: '50%', background: i % 2 === 0 ? 'var(--primary)' : '#8B5CF6', flexShrink: 0 }} />
                                     <span style={{ color: 'var(--text)' }}>{b}</span>
                                   </div>
                                 ))}
