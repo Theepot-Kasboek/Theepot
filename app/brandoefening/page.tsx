@@ -145,6 +145,19 @@ async function exportWeekPDF(week: BrandoefeningWeek, dagen: BrandoefeningDag[])
       y += 8
     }
 
+    // Bijzonderheden
+    if (dag.bijzonderheden) {
+      doc.setFontSize(8)
+      doc.setFont('helvetica', 'bold')
+      doc.setTextColor(...donkerGroen)
+      doc.text('Bijzonderheden:', marge + 3, y + 4)
+      doc.setFont('helvetica', 'normal')
+      doc.setTextColor(...zwart)
+      const bijzRegels = doc.splitTextToSize(dag.bijzonderheden, breedte - 40)
+      doc.text(bijzRegels, marge + 40, y + 4)
+      y += bijzRegels.length * 5 + 4
+    }
+
     // Evaluatie
     if (dag.evaluatie) {
       doc.setFontSize(8)
