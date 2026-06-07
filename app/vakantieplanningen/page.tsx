@@ -626,7 +626,6 @@ function WeekOverzicht({ week, activiteiten, planning, dagDatumStr, onNieuw, onB
             })}
             {/* Toevoegen rij */}
             <tr>
-              <td style={{ padding: '6px 10px', border: '1px solid var(--border)', background: 'var(--bg)' }} />
               {DAGEN.map(dag => (
                 <td key={dag} style={{ padding: '6px 10px', border: '1px solid var(--border)', background: 'var(--bg)' }}>
                   <div style={{ display: 'flex', gap: 4 }}>
