@@ -78,6 +78,7 @@ export default function VakantieplanningenPage() {
 
   const [planningen, setPlanningen] = useState<Planning[]>([])
   const [actievePlanning, setActievePlanning] = useState<Planning | null>(null)
+  const [tekstGrootte, setTekstGrootte] = useState(16)
   const [weken, setWeken] = useState<Week[]>([])
   const [activiteiten, setActiviteiten] = useState<VakantieActiviteit[]>([])
   const [bibliotheek, setBibliotheek] = useState<BibliotheekActiviteit[]>([])
@@ -395,6 +396,13 @@ export default function VakantieplanningenPage() {
                 <Pencil size={13} /> Thema wijzigen
               </button>
             )}
+            {/* Tekstgrootte */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--bg)', border: '1px solid var(--border-dark)', borderRadius: 10, padding: '5px 10px' }}>
+              <button onClick={() => setTekstGrootte(g => Math.max(12, g - 1))} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: 13, fontWeight: 700, padding: '0 4px', lineHeight: 1 }}>A−</button>
+              <input type="range" min={12} max={28} value={tekstGrootte} onChange={e => setTekstGrootte(Number(e.target.value))} style={{ width: 80, accentColor: 'var(--primary)', cursor: 'pointer' }} />
+              <span style={{ fontSize: 12, color: 'var(--primary-text)', fontWeight: 600, minWidth: 28, textAlign: 'center', background: 'var(--primary-light)', borderRadius: 6, padding: '1px 6px' }}>{tekstGrootte}</span>
+              <button onClick={() => setTekstGrootte(g => Math.min(28, g + 1))} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: 17, fontWeight: 700, padding: '0 4px', lineHeight: 1 }}>A+</button>
+            </div>
             {/* Gepubliceerd badge */}
             {magBewerken && (
               <span style={{ padding: '4px 12px', borderRadius: 20, fontSize: 11, fontWeight: 600, background: actievePlanning.gepubliceerd ? 'var(--primary-light)' : 'var(--bg)', color: actievePlanning.gepubliceerd ? 'var(--primary-text)' : 'var(--text-muted)', border: '1px solid var(--border)' }}>
@@ -477,6 +485,7 @@ export default function VakantieplanningenPage() {
             weken={weken}
             activiteiten={activiteiten}
             dagDatumStr={dagDatumStr}
+            tekstGrootte={tekstGrootte}
           />
         )}
       </div>
@@ -649,11 +658,12 @@ function WeekOverzicht({ week, activiteiten, planning, dagDatumStr, onNieuw, onB
 
 // ─── Document weergave ────────────────────────────────────────────────────────
 
-function DocumentWeergave({ planning, weken, activiteiten, dagDatumStr }: {
+function DocumentWeergave({ planning, weken, activiteiten, dagDatumStr, tekstGrootte }: {
   planning: Planning
   weken: Week[]
   activiteiten: VakantieActiviteit[]
   dagDatumStr: (week: Week, dag: Dag) => string
+  tekstGrootte: number
 }) {
   function activiteitenVan(weekId: string, dag: Dag) {
     return activiteiten.filter(a => a.week_id === weekId && a.dag === dag).sort((a, b) => a.volgorde - b.volgorde)
@@ -682,9 +692,7 @@ function DocumentWeergave({ planning, weken, activiteiten, dagDatumStr }: {
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                 <thead>
                   <tr>
-                    <th style={{ width: 100, padding: '10px 14px', background: '#DC2626', color: '#fff', fontWeight: 700, fontSize: 12, textAlign: 'left', border: '1px solid rgba(0,0,0,0.1)' }}>
-                      Dag + datum
-                    </th>
+
                     {DAGEN.map(dag => (
                       <th key={dag} style={{ padding: '10px 14px', background: 'var(--primary)', color: '#fff', fontWeight: 700, fontSize: 13, textAlign: 'left', border: '1px solid var(--primary-dark)' }}>
                         <a href={`#week-${week.week_nummer}-${dag}`} style={{ color: '#fff', textDecoration: 'underline', textUnderlineOffset: 3 }}>
@@ -698,9 +706,7 @@ function DocumentWeergave({ planning, weken, activiteiten, dagDatumStr }: {
                 <tbody>
                   {Array.from({ length: maxRijen }).map((_, rijIdx) => (
                     <tr key={rijIdx} style={{ background: rijIdx % 2 === 0 ? 'var(--bg-card)' : 'var(--bg)' }}>
-                      <td style={{ padding: '8px 14px', border: '1px solid var(--border)', fontWeight: 500, fontSize: 12, color: 'var(--text-muted)' }}>
-                        {DAGEN.map(dag => activiteitenVan(week.id, dag)[rijIdx]?.categorie).find(Boolean) ?? ''}
-                      </td>
+
                       {DAGEN.map(dag => {
                         const act = activiteitenVan(week.id, dag)[rijIdx]
                         return (
@@ -746,17 +752,17 @@ function DocumentWeergave({ planning, weken, activiteiten, dagDatumStr }: {
                           }}
                         >
                           <div style={{ marginBottom: 8 }}>
-                            <span style={{ fontFamily: 'Sora, sans-serif', fontWeight: 700, fontSize: 16, color: 'var(--text)' }}>{act.naam}</span>
+                            <span style={{ fontFamily: 'Sora, sans-serif', fontWeight: 700, fontSize: tekstGrootte + 3, color: 'var(--text)' }}>{act.naam}</span>
                           </div>
                           {act.beschrijving && (
-                            <p style={{ fontSize: 14, color: 'var(--text)', lineHeight: 1.7, margin: '0 0 10px 0' }}>{act.beschrijving}</p>
+                            <p style={{ fontSize: tekstGrootte, color: 'var(--text)', lineHeight: 1.75, margin: '0 0 10px 0' }}>{act.beschrijving}</p>
                           )}
                           {act.benodigdheden?.length > 0 && (
                             <div style={{ marginTop: 6 }}>
-                              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 5 }}>📦 Benodigdheden</div>
+                              <div style={{ fontSize: tekstGrootte - 2, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 5 }}>📦 Benodigdheden</div>
                               <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                                 {act.benodigdheden.map((b, bi) => (
-                                  <div key={bi} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
+                                  <div key={bi} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: tekstGrootte - 1 }}>
                                     <div style={{ width: 6, height: 6, borderRadius: '50%', background: i % 2 === 0 ? 'var(--primary)' : '#8B5CF6', flexShrink: 0 }} />
                                     <span style={{ color: 'var(--text)' }}>{b}</span>
                                   </div>
