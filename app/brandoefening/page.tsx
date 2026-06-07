@@ -312,7 +312,15 @@ export default function BrandoefeningPage() {
         acties={
           <div style={{ display: 'flex', gap: 8 }}>
             {actieveWeek && (
-              <button className="btn" onClick={() => exportWeekPDF(actieveWeek, dagen)}>
+              <button className="btn" onClick={async () => {
+                // Haal verse data op direct uit database voor PDF
+                const { data } = await getSupabase().from('brandoefening_dagen').select('*').eq('week_id', actieveWeek.id)
+                const verseDagen = DAGEN.map(dagNaam => {
+                  const gevonden = (data ?? []).find((d: BrandoefeningDag) => d.dag === dagNaam)
+                  return gevonden ?? { id: '', week_id: actieveWeek.id, dag: dagNaam, datum: null, tijd: null, aanwezige_pmers: null, aard_incident: [], plek_incident: null, gealarmeerden: [], manier_alarmeren: null, bijzonderheden: null, evaluatie: null, ingevuld_door: null }
+                })
+                await exportWeekPDF(actieveWeek, verseDagen)
+              }}>
                 <Download size={14} /> PDF week
               </button>
             )}
