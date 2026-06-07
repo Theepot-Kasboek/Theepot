@@ -340,12 +340,14 @@ export default function TakenPage() {
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 10 }}>
                 {actieveNotities.map(n => (
                   <div key={n.id} onClick={() => setActieveNotitie(n)}
-                    style={{ padding: '12px', borderRadius: 10, background: n.kleur === '#ffffff' ? 'var(--bg-card)' : n.kleur, border: `1.5px solid ${actieveNotitie?.id === n.id ? actiefKleur : 'var(--border)'}`, cursor: 'pointer', minHeight: 100, transition: 'border-color 0.15s', position: 'relative' }}>
-                    <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 6, color: '#1a1a1a' }}>{n.titel}</div>
-                    <div style={{ fontSize: 12, color: '#555', lineHeight: 1.5, display: '-webkit-box', WebkitLineClamp: 4, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-                      {n.inhoud || <span style={{ fontStyle: 'italic', opacity: 0.5 }}>Leeg</span>}
+                    style={{ padding: '14px', borderRadius: 10, background: n.kleur === '#ffffff' ? 'var(--bg-card)' : n.kleur, border: `2px solid ${actieveNotitie?.id === n.id ? actiefKleur : n.kleur === '#ffffff' ? 'var(--border)' : 'transparent'}`, cursor: 'pointer', minHeight: 110, transition: 'all 0.15s', position: 'relative' }}
+                    onMouseEnter={e => (e.currentTarget.style.transform = 'translateY(-2px)')}
+                    onMouseLeave={e => (e.currentTarget.style.transform = 'translateY(0)')}>
+                    <div style={{ fontFamily: 'Sora, sans-serif', fontWeight: 700, fontSize: 14, marginBottom: 8, color: n.kleur === '#ffffff' ? 'var(--text)' : '#1a1a1a', lineHeight: 1.3 }}>{n.titel}</div>
+                    <div style={{ fontSize: 12.5, color: n.kleur === '#ffffff' ? 'var(--text-muted)' : '#333', lineHeight: 1.6, display: '-webkit-box', WebkitLineClamp: 4, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                      {n.inhoud || <span style={{ fontStyle: 'italic', opacity: 0.4 }}>Leeg</span>}
                     </div>
-                    <div style={{ fontSize: 10, color: '#888', marginTop: 8 }}>{fmtBijgewerkt(n.bijgewerkt_op)}</div>
+                    <div style={{ fontSize: 10, color: n.kleur === '#ffffff' ? 'var(--text-muted)' : '#666', marginTop: 10, borderTop: `1px solid ${n.kleur === '#ffffff' ? 'var(--border)' : 'rgba(0,0,0,0.1)'}`, paddingTop: 6 }}>{fmtBijgewerkt(n.bijgewerkt_op)}</div>
                   </div>
                 ))}
               </div>
