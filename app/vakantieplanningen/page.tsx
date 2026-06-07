@@ -567,11 +567,9 @@ function WeekOverzicht({ week, activiteiten, planning, dagDatumStr, onNieuw, onB
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, tableLayout: 'fixed' }}>
           <thead>
             <tr>
-              <th style={{ width: 110, padding: '10px 12px', background: 'var(--primary)', color: '#fff', fontFamily: 'Sora, sans-serif', fontSize: 12, textAlign: 'left', borderRadius: '8px 0 0 0', border: '1px solid var(--primary-dark)' }}>
-                Dag + datum
-              </th>
+
               {DAGEN.map((dag, i) => (
-                <th key={dag} style={{ padding: '10px 12px', background: 'var(--primary)', color: '#fff', fontFamily: 'Sora, sans-serif', fontSize: 13, textAlign: 'left', border: '1px solid var(--primary-dark)', borderRadius: i === DAGEN.length - 1 ? '0 8px 0 0' : 0 }}>
+                <th key={dag} style={{ padding: '10px 12px', background: 'var(--primary)', color: '#fff', fontFamily: 'Sora, sans-serif', fontSize: 13, textAlign: 'left', border: '1px solid var(--primary-dark)', borderRadius: i === 0 ? '8px 0 0 0' : i === DAGEN.length - 1 ? '0 8px 0 0' : 0 }}>
                   <div style={{ fontWeight: 700 }}>{DAG_LABEL[dag]}</div>
                   <div style={{ fontSize: 11, opacity: 0.85, fontWeight: 400 }}>{dagDatumStr(week, dag)}</div>
                 </th>
@@ -583,10 +581,7 @@ function WeekOverzicht({ week, activiteiten, planning, dagDatumStr, onNieuw, onB
               const heeftInhoud = DAGEN.some(dag => activiteitenVan(dag)[rijIdx])
               return (
                 <tr key={rijIdx} style={{ background: rijIdx % 2 === 0 ? 'var(--bg-card)' : 'var(--bg)' }}>
-                  {/* Categorie kolom */}
-                  <td style={{ padding: '8px 12px', border: '1px solid var(--border)', fontWeight: 500, fontSize: 12, color: 'var(--text-muted)', verticalAlign: 'middle' }}>
-                    {DAGEN.map(dag => activiteitenVan(dag)[rijIdx]?.categorie).find(Boolean) ?? ''}
-                  </td>
+
                   {/* Dag kolommen */}
                   {DAGEN.map(dag => {
                     const act = activiteitenVan(dag)[rijIdx]
