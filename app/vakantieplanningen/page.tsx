@@ -555,7 +555,7 @@ function WeekOverzicht({ week, activiteiten, planning, dagDatumStr, onNieuw, onB
     return activiteiten.filter(a => a.week_id === week.id && a.dag === dag).sort((a, b) => a.volgorde - b.volgorde)
   }
 
-  const maxRijen = Math.max(...DAGEN.map(d => activiteitenVan(d).length), 3)
+  const maxRijen = Math.max(...DAGEN.map(d => activiteitenVan(d).length), 1)
 
   return (
     <div>
@@ -679,7 +679,7 @@ function DocumentWeergave({ planning, weken, activiteiten, dagDatumStr, tekstGro
 
       {/* Per week */}
       {weken.map(week => {
-        const maxRijen = Math.max(...DAGEN.map(d => activiteitenVan(week.id, d).length), 2)
+        const maxRijen = Math.max(...DAGEN.map(d => activiteitenVan(week.id, d).length), 1)
         return (
           <div key={week.id} style={{ marginBottom: 48 }}>
             {/* Week titel */}
