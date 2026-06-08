@@ -443,6 +443,27 @@ export default function VakantieplanningenPage() {
 
       <div className="page-content">
 
+        {/* Regio wisselaar */}
+        {actievePlanning.start_datum_noord && (
+          <div style={{ display: 'flex', gap: 8, marginBottom: 14, alignItems: 'center', flexWrap: 'wrap', padding: '10px 14px', background: 'var(--bg-card)', borderRadius: 10, border: '1px solid var(--border)' }}>
+            <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)' }}>Regio:</span>
+            {(['midden', 'noord'] as Regio[]).map(r => (
+              <button key={r} onClick={() => setActieveRegio(r)}
+                style={{ padding: '6px 16px', borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: 'pointer', border: '1.5px solid', transition: 'all 0.12s',
+                  borderColor: actieveRegio === r ? 'var(--primary)' : 'var(--border-dark)',
+                  background: actieveRegio === r ? 'var(--primary)' : 'var(--bg-card)',
+                  color: actieveRegio === r ? '#fff' : 'var(--text)' }}>
+                {r === 'midden' ? '📍 Lisse / Hillegom' : '📍 Lisserbroek'}
+              </button>
+            ))}
+            <span style={{ fontSize: 11, color: 'var(--text-muted)', marginLeft: 4 }}>
+              {actieveRegio === 'midden'
+                ? `${fmtDatum(actievePlanning.start_datum)} – ${fmtDatum(actievePlanning.eind_datum)}`
+                : `${fmtDatum(actievePlanning.start_datum_noord!)} – ${fmtDatum(actievePlanning.eind_datum_noord ?? actievePlanning.eind_datum)}`}
+            </span>
+          </div>
+        )}
+
         {/* Week tabs */}
         <div style={{ display: 'flex', gap: 8, marginBottom: 20, flexWrap: 'wrap', alignItems: 'center' }}>
           {weken.map(w => (
