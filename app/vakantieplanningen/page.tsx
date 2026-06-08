@@ -23,7 +23,11 @@ interface Planning {
   gepubliceerd: boolean
   aangemaakt_door: string | null
   aangemaakt_op: string
+  start_datum_noord: string | null
+  eind_datum_noord: string | null
 }
+
+type Regio = 'midden' | 'noord'
 
 interface Week {
   id: string
@@ -78,6 +82,7 @@ export default function VakantieplanningenPage() {
 
   const [planningen, setPlanningen] = useState<Planning[]>([])
   const [actievePlanning, setActievePlanning] = useState<Planning | null>(null)
+  const [actieveRegio, setActieveRegio] = useState<Regio>('midden')
   const [tekstGrootte, setTekstGrootte] = useState(16)
   const [weken, setWeken] = useState<Week[]>([])
   const [activiteiten, setActiviteiten] = useState<VakantieActiviteit[]>([])
@@ -245,10 +250,14 @@ export default function VakantieplanningenPage() {
     return activiteiten.filter(a => a.week_id === weekId && a.dag === dag).sort((a, b) => a.volgorde - b.volgorde)
   }
 
+  const actiefStartDatum = actieveRegio === 'noord' && actievePlanning?.start_datum_noord
+    ? actievePlanning.start_datum_noord
+    : actievePlanning?.start_datum ?? ''
+
   function dagDatumStr(week: Week, dag: Dag): string {
     if (!actievePlanning) return ''
     try {
-      const start = new Date(actievePlanning.start_datum)
+      const start = new Date(actiefStartDatum || actievePlanning.start_datum)
       const dow = start.getDay() === 0 ? 6 : start.getDay() - 1
       const eersteMA = new Date(start)
       eersteMA.setDate(start.getDate() - dow)
@@ -387,7 +396,7 @@ export default function VakantieplanningenPage() {
     <>
       <Topbar
         titel={actievePlanning.naam}
-        subtitel={`${actievePlanning.vakantie} · ${actievePlanning.thema} · ${fmtDatum(actievePlanning.start_datum)} – ${fmtDatum(actievePlanning.eind_datum)}`}
+        subtitel={`${actievePlanning.vakantie} · ${actievePlanning.thema}`}
         acties={
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             {/* Thema bewerken */}
@@ -522,9 +531,9 @@ export default function VakantieplanningenPage() {
           vakanties={vakanties}
           onVakantieToevoegen={voegVakantieTypeToe}
           planning={actievePlanning}
-          onSave={async (nieuwThema, nieuweVakantie) => {
-            await getSupabase().from('vakantie_planningen').update({ thema: nieuwThema, vakantie: nieuweVakantie }).eq('id', actievePlanning.id)
-            setActievePlanning({ ...actievePlanning, thema: nieuwThema, vakantie: nieuweVakantie })
+          onSave={async (nieuwThema, nieuweVakantie, startNoord, eindNoord) => {
+            await getSupabase().from('vakantie_planningen').update({ thema: nieuwThema, vakantie: nieuweVakantie, start_datum_noord: startNoord, eind_datum_noord: eindNoord }).eq('id', actievePlanning.id)
+            setActievePlanning({ ...actievePlanning, thema: nieuwThema, vakantie: nieuweVakantie, start_datum_noord: startNoord, eind_datum_noord: eindNoord })
             setThemaBewerkenModal(false)
             setToast({ bericht: 'Thema bijgewerkt!', type: 'success' })
             await haalPlanningenOp()
@@ -846,7 +855,7 @@ function NieuwePlanningModal({ onSave, onClose, vakanties = STANDAARD_VAKANTIES,
           </div>
           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
             <button className="btn" onClick={onClose}>Annuleren</button>
-            <button className="btn btn-primary" onClick={() => naam && thema && startDatum && eindDatum && onSave({ naam, vakantie, thema, start_datum: startDatum, eind_datum: eindDatum, gepubliceerd: false })} disabled={!naam || !thema || !startDatum || !eindDatum}>
+            <button className="btn btn-primary" onClick={() => naam && thema && startDatum && eindDatum && onSave({ naam, vakantie, thema, start_datum: startDatum, eind_datum: eindDatum, start_datum_noord: null, eind_datum_noord: null, gepubliceerd: false })} disabled={!naam || !thema || !startDatum || !eindDatum}>
               Aanmaken
             </button>
           </div>
@@ -1099,13 +1108,15 @@ function JsonDagImportModal({ dag, onImport, onClose }: { dag: Dag; onImport: (j
 
 function ThemaBewerkenModal({ planning, onSave, onClose, vakanties, onVakantieToevoegen }: {
   planning: Planning
-  onSave: (thema: string, vakantie: string) => void
+  onSave: (thema: string, vakantie: string, startNoord: string | null, eindNoord: string | null) => void
   onClose: () => void
   vakanties: string[]
   onVakantieToevoegen: (naam: string) => void
 }) {
   const [thema, setThema] = useState(planning.thema)
   const [vakantie, setVakantie] = useState(planning.vakantie)
+  const [startNoord, setStartNoord] = useState(planning.start_datum_noord ?? '')
+  const [eindNoord, setEindNoord] = useState(planning.eind_datum_noord ?? '')
   const [nieuwVakantieNaam, setNieuwVakantieNaam] = useState('')
   const [toonNieuw, setToonNieuw] = useState(false)
 
@@ -1139,9 +1150,16 @@ function ThemaBewerkenModal({ planning, onSave, onClose, vakanties, onVakantieTo
             <label className="form-label">Thema</label>
             <input className="form-input" value={thema} onChange={e => setThema(e.target.value)} placeholder="Bijv. Jungle, Ruimte..." autoFocus />
           </div>
+          <div style={{ background: 'var(--bg)', border: '1px solid var(--border-dark)', borderRadius: 9, padding: '12px 14px' }}>
+            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 10 }}>📍 Lisserbroek (Noord) — optioneel</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+              <div><label className="form-label">Startdatum Noord</label><input type="date" className="form-input" value={startNoord} onChange={e => setStartNoord(e.target.value)} /></div>
+              <div><label className="form-label">Einddatum Noord</label><input type="date" className="form-input" value={eindNoord} onChange={e => setEindNoord(e.target.value)} /></div>
+            </div>
+          </div>
           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
             <button className="btn" onClick={onClose}>Annuleren</button>
-            <button className="btn btn-primary" onClick={() => thema.trim() && onSave(thema.trim(), vakantie)} disabled={!thema.trim()}>
+            <button className="btn btn-primary" onClick={() => thema.trim() && onSave(thema.trim(), vakantie, startNoord || null, eindNoord || null)} disabled={!thema.trim()}>
               Opslaan
             </button>
           </div>
