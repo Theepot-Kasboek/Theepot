@@ -350,15 +350,29 @@ function ActiviteitenPage() {
   })
 
   async function slaOp(data: Omit<Activiteit, 'id' | 'created_at'>) {
-    const { error } = await getSupabase().from('activiteiten').insert([data])
-    if (!error) { await laadActiviteiten(); setToevoegen(false); setToast({ bericht: 'Activiteit opgeslagen!', type: 'success' }) }
-    else setToast({ bericht: `Fout: ${error.message}`, type: 'error' })
+    const supabase = getSupabase()
+    const { data: nieuw, error } = await supabase.from('activiteiten').insert([data]).select().single()
+    if (error) { setToast({ bericht: `Fout: ${error.message}`, type: 'error' }); return }
+    // Verplaats tijdelijke afbeelding naar definitief pad op basis van nieuw ID
+    if (nieuw && data.afbeelding_pad && data.afbeelding_pad.startsWith('nieuw-')) {
+      const ext = data.afbeelding_pad.split('.').pop()
+      const nieuwPad = `${nieuw.id}.${ext}`
+      const { error: moveErr } = await supabase.storage.from('activiteit-afbeeldingen').move(data.afbeelding_pad, nieuwPad)
+      if (!moveErr) await supabase.from('activiteiten').update({ afbeelding_pad: nieuwPad }).eq('id', nieuw.id)
+    }
+    await laadActiviteiten()
+    setToevoegen(false)
+    setToast({ bericht: 'Activiteit opgeslagen!', type: 'success' })
   }
 
   async function slaBewerking(data: Omit<Activiteit, 'id' | 'created_at'>) {
     if (!bewerkActiviteit) return
     const { error } = await getSupabase().from('activiteiten').update(data).eq('id', bewerkActiviteit.id)
-    if (!error) { await laadActiviteiten(); setBewerkActiviteit(null); setGeselecteerd(null); setToast({ bericht: 'Bijgewerkt!', type: 'success' }) }
+    if (error) { setToast({ bericht: `Fout: ${error.message}`, type: 'error' }); return }
+    await laadActiviteiten()
+    setBewerkActiviteit(null)
+    setGeselecteerd(null)
+    setToast({ bericht: 'Bijgewerkt!', type: 'success' })
   }
 
   async function verwijderActiviteit() {
