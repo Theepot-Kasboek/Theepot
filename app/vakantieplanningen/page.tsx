@@ -7,7 +7,7 @@ import Topbar from '@/components/Topbar'
 import Toast from '@/components/Toast'
 import {
   Plus, X, ChevronDown, ChevronRight, Trash2,
-  Calendar, Download, Eye, Upload, Pencil, GripVertical,
+  Calendar, Download, Eye, Upload, Pencil, GripVertical, Settings,
   BookOpen, ArrowLeft, Send
 } from 'lucide-react'
 
@@ -116,7 +116,7 @@ export default function VakantieplanningenPage() {
   const [nieuweWeekModal, setNieuweWeekModal] = useState(false)
   const [activiteitModal, setActiviteitModal] = useState<{ weekId: string; dag: Dag } | null>(null)
   const [jsonImportModal, setJsonImportModal] = useState<{ weekId: string; dag: Dag } | null>(null)
-  const [themaBewerkenModal, setThemaBewerkenModal] = useState(false)
+  const [instellingenModal, setInstellingenModal] = useState(false)
   const [bewerkActiviteit, setBewerkActiviteit] = useState<VakantieActiviteit | null>(null)
 
   // ── Data ophalen ────────────────────────────────────────────────────────────
@@ -401,8 +401,8 @@ export default function VakantieplanningenPage() {
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             {/* Thema bewerken */}
             {magBewerken && (
-              <button className="btn btn-sm" onClick={() => setThemaBewerkenModal(true)}>
-                <Pencil size={13} /> Thema wijzigen
+              <button className="btn btn-sm" onClick={() => setInstellingenModal(true)}>
+                <Settings size={13} /> Instellingen
               </button>
             )}
             {/* Tekstgrootte */}
@@ -526,19 +526,19 @@ export default function VakantieplanningenPage() {
       )}
 
       {/* Thema bewerken modal */}
-      {themaBewerkenModal && actievePlanning && (
-        <ThemaBewerkenModal
+      {instellingenModal && actievePlanning && (
+        <InstellingenModal
           vakanties={vakanties}
           onVakantieToevoegen={voegVakantieTypeToe}
           planning={actievePlanning}
           onSave={async (nieuwThema, nieuweVakantie, startNoord, eindNoord) => {
             await getSupabase().from('vakantie_planningen').update({ thema: nieuwThema, vakantie: nieuweVakantie, start_datum_noord: startNoord, eind_datum_noord: eindNoord }).eq('id', actievePlanning.id)
             setActievePlanning({ ...actievePlanning, thema: nieuwThema, vakantie: nieuweVakantie, start_datum_noord: startNoord, eind_datum_noord: eindNoord })
-            setThemaBewerkenModal(false)
+            setInstellingenModal(false)
             setToast({ bericht: 'Thema bijgewerkt!', type: 'success' })
             await haalPlanningenOp()
           }}
-          onClose={() => setThemaBewerkenModal(false)}
+          onClose={() => setInstellingenModal(false)}
         />
       )}
 
@@ -1106,7 +1106,7 @@ function JsonDagImportModal({ dag, onImport, onClose }: { dag: Dag; onImport: (j
 
 // ─── Thema Bewerken Modal ─────────────────────────────────────────────────────
 
-function ThemaBewerkenModal({ planning, onSave, onClose, vakanties, onVakantieToevoegen }: {
+function InstellingenModal({ planning, onSave, onClose, vakanties, onVakantieToevoegen }: {
   planning: Planning
   onSave: (thema: string, vakantie: string, startNoord: string | null, eindNoord: string | null) => void
   onClose: () => void
@@ -1122,41 +1122,77 @@ function ThemaBewerkenModal({ planning, onSave, onClose, vakanties, onVakantieTo
 
   return (
     <div className="modal-backdrop" onClick={e => { if (e.target === e.currentTarget) onClose() }}>
-      <div className="modal-box" style={{ maxWidth: 420 }} onClick={e => e.stopPropagation()}>
+      <div className="modal-box" style={{ maxWidth: 520 }} onClick={e => e.stopPropagation()}>
         <div className="card-header">
-          <span className="card-title">Thema & vakantie wijzigen</span>
+          <span className="card-title">⚙️ Instellingen planning</span>
           <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex' }}><X size={18} /></button>
         </div>
-        <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <div>
-            <label className="form-label">Vakantie</label>
-            <select className="form-select" value={vakantie} onChange={e => {
-              if (e.target.value === '__nieuw__') { setToonNieuw(true); return }
-              setVakantie(e.target.value)
-            }}>
-              {vakanties.map(v => <option key={v} value={v}>{v}</option>)}
-              <option value="__nieuw__">+ Nieuwe toevoegen...</option>
-            </select>
-            {toonNieuw && (
-              <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
-                <input className="form-input" style={{ flex: 1 }} value={nieuwVakantieNaam} onChange={e => setNieuwVakantieNaam(e.target.value)} placeholder="Bijv. Modderweekplanning" autoFocus
-                  onKeyDown={e => { if (e.key === 'Enter' && nieuwVakantieNaam.trim()) { onVakantieToevoegen(nieuwVakantieNaam.trim()); setVakantie(nieuwVakantieNaam.trim()); setNieuwVakantieNaam(''); setToonNieuw(false) } }} />
-                <button className="btn btn-primary btn-sm" onClick={() => { if (nieuwVakantieNaam.trim()) { onVakantieToevoegen(nieuwVakantieNaam.trim()); setVakantie(nieuwVakantieNaam.trim()); setNieuwVakantieNaam(''); setToonNieuw(false) } }} disabled={!nieuwVakantieNaam.trim()}>Toevoegen</button>
-                <button className="btn btn-sm" onClick={() => setToonNieuw(false)}>✕</button>
+        <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+          {/* Sectie 1: Vakantie & thema */}
+          <div style={{ background: 'var(--bg)', border: '1px solid var(--border-dark)', borderRadius: 10, padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--primary-text)', display: 'flex', alignItems: 'center', gap: 6 }}>
+              🎨 Vakantie & thema
+            </div>
+            <div>
+              <label className="form-label">Type vakantie</label>
+              <select className="form-select" value={vakantie} onChange={e => {
+                if (e.target.value === '__nieuw__') { setToonNieuw(true); return }
+                setVakantie(e.target.value)
+              }}>
+                {vakanties.map(v => <option key={v} value={v}>{v}</option>)}
+                <option value="__nieuw__">+ Nieuwe toevoegen...</option>
+              </select>
+              {toonNieuw && (
+                <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+                  <input className="form-input" style={{ flex: 1 }} value={nieuwVakantieNaam} onChange={e => setNieuwVakantieNaam(e.target.value)} placeholder="Bijv. Modderweekplanning" autoFocus
+                    onKeyDown={e => { if (e.key === 'Enter' && nieuwVakantieNaam.trim()) { onVakantieToevoegen(nieuwVakantieNaam.trim()); setVakantie(nieuwVakantieNaam.trim()); setNieuwVakantieNaam(''); setToonNieuw(false) } }} />
+                  <button className="btn btn-primary btn-sm" onClick={() => { if (nieuwVakantieNaam.trim()) { onVakantieToevoegen(nieuwVakantieNaam.trim()); setVakantie(nieuwVakantieNaam.trim()); setNieuwVakantieNaam(''); setToonNieuw(false) } }} disabled={!nieuwVakantieNaam.trim()}>Toevoegen</button>
+                  <button className="btn btn-sm" onClick={() => setToonNieuw(false)}>✕</button>
+                </div>
+              )}
+            </div>
+            <div>
+              <label className="form-label">Thema</label>
+              <input className="form-input" value={thema} onChange={e => setThema(e.target.value)} placeholder="Bijv. Jungle, Ruimte, Natuur..." autoFocus />
+            </div>
+          </div>
+
+          {/* Sectie 2: Regio Midden */}
+          <div style={{ background: 'var(--bg)', border: '1px solid var(--border-dark)', borderRadius: 10, padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--primary-text)', display: 'flex', alignItems: 'center', gap: 6 }}>
+              📍 Lisse / Hillegom (Midden)
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+              <div>
+                <label className="form-label">Startdatum</label>
+                <div style={{ fontSize: 13, color: 'var(--text)', padding: '7px 10px', background: 'var(--bg-card)', borderRadius: 8, border: '1px solid var(--border)' }}>
+                  {planning.start_datum ? new Date(planning.start_datum).toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric' }) : '—'}
+                </div>
               </div>
-            )}
+              <div>
+                <label className="form-label">Einddatum</label>
+                <div style={{ fontSize: 13, color: 'var(--text)', padding: '7px 10px', background: 'var(--bg-card)', borderRadius: 8, border: '1px solid var(--border)' }}>
+                  {planning.eind_datum ? new Date(planning.eind_datum).toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric' }) : '—'}
+                </div>
+              </div>
+            </div>
+            <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Datums zijn ingesteld bij het aanmaken van de planning.</div>
           </div>
-          <div>
-            <label className="form-label">Thema</label>
-            <input className="form-input" value={thema} onChange={e => setThema(e.target.value)} placeholder="Bijv. Jungle, Ruimte..." autoFocus />
-          </div>
-          <div style={{ background: 'var(--bg)', border: '1px solid var(--border-dark)', borderRadius: 9, padding: '12px 14px' }}>
-            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 10 }}>📍 Lisserbroek (Noord) — optioneel</div>
+
+          {/* Sectie 3: Regio Noord */}
+          <div style={{ background: 'var(--bg)', border: '1px solid var(--border-dark)', borderRadius: 10, padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--primary-text)', display: 'flex', alignItems: 'center', gap: 6 }}>
+              📍 Lisserbroek (Noord)
+              <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-muted)' }}>— optioneel, vul in als de vakantie op een andere week valt</span>
+            </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
               <div><label className="form-label">Startdatum Noord</label><input type="date" className="form-input" value={startNoord} onChange={e => setStartNoord(e.target.value)} /></div>
               <div><label className="form-label">Einddatum Noord</label><input type="date" className="form-input" value={eindNoord} onChange={e => setEindNoord(e.target.value)} /></div>
             </div>
+            {startNoord && <div style={{ fontSize: 11, color: 'var(--primary-text)', background: 'var(--primary-xlight)', padding: '6px 10px', borderRadius: 7 }}>✓ Regio-wisselaar wordt zichtbaar in de planning</div>}
           </div>
+
           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
             <button className="btn" onClick={onClose}>Annuleren</button>
             <button className="btn btn-primary" onClick={() => thema.trim() && onSave(thema.trim(), vakantie, startNoord || null, eindNoord || null)} disabled={!thema.trim()}>
