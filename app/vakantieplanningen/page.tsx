@@ -46,6 +46,7 @@ interface VakantieActiviteit {
   beschrijving: string | null
   benodigdheden: string[]
   activiteit_id: string | null
+  afbeelding_pad?: string | null
 }
 
 interface BibliotheekActiviteit {
@@ -136,7 +137,20 @@ export default function VakantieplanningenPage() {
     const weekIds = weken.map(w => w.id)
     if (weekIds.length === 0) return
     const { data } = await getSupabase().from('vakantie_activiteiten').select('*').in('week_id', weekIds).order('volgorde')
-    setActiviteiten((data ?? []) as VakantieActiviteit[])
+    const vakActs = (data ?? []) as VakantieActiviteit[]
+
+    // Haal afbeeldingen op van gekoppelde bibliotheekactiviteiten
+    const actIds = vakActs.filter(a => a.activiteit_id).map(a => a.activiteit_id as string)
+    if (actIds.length > 0) {
+      const { data: bibActs } = await getSupabase().from('activiteiten').select('id,afbeelding_pad').in('id', actIds)
+      const afbMap: Record<string, string> = {}
+      for (const b of bibActs ?? []) if (b.afbeelding_pad) afbMap[b.id] = b.afbeelding_pad
+      setActiviteiten(vakActs.map(a => a.activiteit_id && afbMap[a.activiteit_id]
+        ? { ...a, afbeelding_pad: afbMap[a.activiteit_id] }
+        : a))
+    } else {
+      setActiviteiten(vakActs)
+    }
   }, [weken])
 
   const haalBibliotheekOp = useCallback(async () => {
@@ -774,19 +788,28 @@ function DocumentWeergave({ planning, weken, activiteiten, dagDatumStr, tekstGro
                           key={act.id}
                           id={`act-${act.id}`}
                           style={{
-                            padding: '14px 18px',
                             borderBottom: i < dagActs.length - 1 ? '3px solid var(--border-dark)' : 'none',
                             background: i % 2 === 0 ? 'var(--bg-card)' : 'var(--bg)',
                             borderLeft: `4px solid ${i % 2 === 0 ? 'var(--primary)' : '#8B5CF6'}`,
+                            overflow: 'hidden',
                           }}
                         >
-                          <div style={{ marginBottom: 8 }}>
-                            <span style={{ fontFamily: 'Sora, sans-serif', fontWeight: 700, fontSize: tekstGrootte + 3, color: 'var(--text)' }}>{act.naam}</span>
-                          </div>
-                          {act.beschrijving && (
-                            <p style={{ fontSize: tekstGrootte, color: 'var(--text)', lineHeight: 1.75, margin: '0 0 10px 0' }}>{act.beschrijving}</p>
+                          {/* Afbeelding bovenaan als die beschikbaar is */}
+                          {act.afbeelding_pad && (
+                            <img
+                              src={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/activiteit-afbeeldingen/${act.afbeelding_pad}`}
+                              alt={act.naam}
+                              style={{ width: '100%', maxHeight: 220, objectFit: 'cover', display: 'block' }}
+                            />
                           )}
-                          {act.benodigdheden?.length > 0 && (
+                          <div style={{ padding: '14px 18px' }}>
+                            <div style={{ marginBottom: 8 }}>
+                              <span style={{ fontFamily: 'Sora, sans-serif', fontWeight: 700, fontSize: tekstGrootte + 3, color: 'var(--text)' }}>{act.naam}</span>
+                            </div>
+                            {act.beschrijving && (
+                              <p style={{ fontSize: tekstGrootte, color: 'var(--text)', lineHeight: 1.75, margin: '0 0 10px 0' }}>{act.beschrijving}</p>
+                            )}
+                            {act.benodigdheden?.length > 0 && (
                             <div style={{ marginTop: 6 }}>
                               <div style={{ fontSize: tekstGrootte - 2, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 5 }}>📦 Benodigdheden</div>
                               <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
@@ -799,6 +822,7 @@ function DocumentWeergave({ planning, weken, activiteiten, dagDatumStr, tekstGro
                               </div>
                             </div>
                           )}
+                          </div>{/* einde padding div */}
                         </div>
                       ))}
                     </div>
