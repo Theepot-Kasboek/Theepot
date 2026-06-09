@@ -8,7 +8,7 @@ import {
   BookOpen, Calendar, MessageSquare, Users, Scissors,
   ChevronRight, Settings, X, GripVertical, Plus,
   Wallet, Cloud, CheckSquare, FileText, Flame, Newspaper,
-  UtensilsCrossed, Map, Eye, EyeOff, Edit3, Pin, AlertTriangle, Info,
+  UtensilsCrossed, Map, Eye, EyeOff, Edit3, Pin, AlertTriangle, Info, Bell,
 } from 'lucide-react'
 import Link from 'next/link'
 
@@ -52,6 +52,7 @@ const WIDGET_CATALOGUS = [
   { id: 'weekplanning',   label: 'Weekplanning',       icon: '✂️', beschrijving: 'Huidige weekplanning per locatie' },
   { id: 'weer',           label: 'Weer',               icon: '🌤️', beschrijving: 'Actueel weer op ingestelde locatie' },
   { id: 'taken',          label: 'Mijn taken',         icon: '✅', beschrijving: 'Openstaande taken van vandaag' },
+  { id: 'agenda_herinneringen', label: 'Agenda herinneringen', icon: '🔔', beschrijving: 'Aankomende afspraken waarvoor je een herinnering hebt ingesteld' },
   { id: 'agenda_vandaag', label: 'Agenda vandaag',     icon: '🗓️', beschrijving: 'Afspraken van vandaag' },
   { id: 'snelkoppelingen', label: 'Snelkoppelingen',  icon: '🔗', beschrijving: 'Links naar pagina\'s' },
   { id: 'kasboek',        label: 'Kasboek',            icon: '💰', beschrijving: 'Snelkoppeling kasboek' },
@@ -192,6 +193,7 @@ export default function DashboardPage() {
                   {w.id === 'weekplanning' && user && <WeekplanningWidget profielId={user.id} isSuperadmin={isSuperadmin} profiel={profiel} />}
                   {w.id === 'weer' && <WeerWidget locatie={weerLocatie} bewerkmodus={bewerkmodus} locatieInput={weerLocatieInput} onLocatieInput={setWeerLocatieInput} onLocatieOpslaan={slaWeerLocatieOp} />}
                   {w.id === 'taken' && user && <TakenWidget profielId={user.id} />}
+                  {w.id === 'agenda_herinneringen' && user && <AgendaHerinneringenWidget profielId={user.id} isSuperadmin={isSuperadmin} />}
                   {w.id === 'agenda_vandaag' && user && <AgendaVandaagWidget profielId={user.id} />}
                   {w.id === 'snelkoppelingen' && <SnelkoppelingenWidget rechten={rechten as unknown as Record<string, string>} isSuperadmin={isSuperadmin} />}
                   {w.id === 'kasboek' && <LinkWidget href="/kasboek" label="Kasboek" icon={<Wallet size={24} />} kleur="#8CC63F" />}
@@ -755,6 +757,132 @@ function PrikbordWidget({ profiel, isSuperadmin }: { profiel: { naam: string; ro
                   {b.locatie_naam !== 'alle' && <span>📍 {b.locatie_naam}</span>}
                   <span>📅 {new Date(b.aangemaakt_op).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}</span>
                 </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── Agenda Herinneringen Widget ──────────────────────────────────────────────
+
+function AgendaHerinneringenWidget({ profielId, isSuperadmin }: { profielId: string; isSuperadmin: boolean }) {
+  const [herinneringen, setHerinneringen] = useState<{
+    id: string; titel: string; start_tijd: string
+    dagenOver: number; kalenderNaam: string; kalenderKleur: string
+  }[]>([])
+  const [laden, setLaden] = useState(true)
+
+  useEffect(() => {
+    async function laad() {
+      setLaden(true)
+      const supabase = getSupabase()
+
+      // Haal alle algemene kalenders op met herinnering_dagen ingesteld
+      const { data: kalenders } = await supabase
+        .from('agenda_kalenders')
+        .select('id, naam, kleur, herinnering_dagen')
+        .eq('type', 'algemeen')
+        .not('herinnering_dagen', 'is', null)
+        .gt('herinnering_dagen', 0)
+
+      if (!kalenders || kalenders.length === 0) { setLaden(false); return }
+
+      // Haal komende afspraken op voor die kalenders
+      const nu = new Date()
+      const over90 = new Date(nu.getTime() + 90 * 24 * 60 * 60 * 1000)
+      const { data: afspraken } = await supabase
+        .from('agenda_afspraken')
+        .select('id, titel, start_tijd, kalender_id')
+        .in('kalender_id', kalenders.map((k: { id: string }) => k.id))
+        .gte('start_tijd', nu.toISOString())
+        .lte('start_tijd', over90.toISOString())
+        .order('start_tijd')
+
+      const resultaat = (afspraken ?? []).flatMap((afs: { id: string; titel: string; start_tijd: string; kalender_id: string }) => {
+        const kal = kalenders.find((k: { id: string; herinnering_dagen: number }) => k.id === afs.kalender_id)
+        if (!kal) return []
+        const dagenOver = Math.ceil((new Date(afs.start_tijd).getTime() - nu.getTime()) / (1000 * 60 * 60 * 24))
+        if (dagenOver <= kal.herinnering_dagen) {
+          return [{ id: afs.id, titel: afs.titel, start_tijd: afs.start_tijd, dagenOver, kalenderNaam: kal.naam, kalenderKleur: kal.kleur }]
+        }
+        return []
+      })
+
+      setHerinneringen(resultaat)
+      setLaden(false)
+    }
+    laad()
+  }, [profielId])
+
+  function urgentieKleur(dagen: number) {
+    if (dagen <= 7) return '#EF4444'
+    if (dagen <= 14) return '#F59E0B'
+    return '#3B82F6'
+  }
+
+  function dagenLabel(dagen: number) {
+    if (dagen === 0) return 'vandaag'
+    if (dagen === 1) return 'morgen'
+    if (dagen < 7) return `over ${dagen} dagen`
+    if (dagen < 30) return `over ${Math.round(dagen / 7)} week${Math.round(dagen / 7) === 1 ? '' : 'en'}`
+    return `over ${Math.round(dagen / 30)} maand${Math.round(dagen / 30) === 1 ? '' : 'en'}`
+  }
+
+  return (
+    <div className="card">
+      <div className="card-header">
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <Bell size={15} color="#F59E0B" />
+          <span className="card-title">Agenda herinneringen</span>
+          {herinneringen.length > 0 && (
+            <span style={{ fontSize: 11, background: '#FEF3C7', color: '#92400E', padding: '1px 8px', borderRadius: 20, fontWeight: 600 }}>
+              {herinneringen.length}
+            </span>
+          )}
+        </div>
+        <Link href="/agenda" className="btn btn-sm" style={{ fontSize: 11, padding: '4px 10px', textDecoration: 'none' }}>
+          Agenda <ChevronRight size={12} />
+        </Link>
+      </div>
+
+      {laden ? (
+        <div style={{ padding: '16px 18px', color: 'var(--text-muted)', fontSize: 12 }}>Laden...</div>
+      ) : herinneringen.length === 0 ? (
+        <div style={{ padding: '20px 18px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 13 }}>
+          <Bell size={24} style={{ opacity: 0.15, marginBottom: 6, display: 'block', margin: '0 auto 8px' }} />
+          Geen aankomende herinneringen
+        </div>
+      ) : (
+        <div>
+          {herinneringen.map((h, i) => (
+            <div key={h.id} style={{
+              padding: '11px 18px',
+              borderBottom: i < herinneringen.length - 1 ? '1px solid var(--border)' : 'none',
+              display: 'flex', alignItems: 'center', gap: 12,
+              borderLeft: `3px solid ${urgentieKleur(h.dagenOver)}`
+            }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--text)', marginBottom: 3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {h.titel}
+                </div>
+                <div style={{ display: 'flex', gap: 8, fontSize: 11, color: 'var(--text-muted)', alignItems: 'center' }}>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                    <span style={{ width: 7, height: 7, borderRadius: '50%', background: h.kalenderKleur, display: 'inline-block' }} />
+                    {h.kalenderNaam}
+                  </span>
+                  <span>📅 {new Date(h.start_tijd).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                </div>
+              </div>
+              <div style={{
+                flexShrink: 0, padding: '3px 10px', borderRadius: 20,
+                background: urgentieKleur(h.dagenOver) + '18',
+                color: urgentieKleur(h.dagenOver),
+                fontSize: 11, fontWeight: 700
+              }}>
+                {dagenLabel(h.dagenOver)}
               </div>
             </div>
           ))}
