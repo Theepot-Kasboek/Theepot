@@ -7,7 +7,7 @@ import { useEffect, useState } from 'react'
 import {
   LayoutDashboard, Wallet, Map, BookOpen,
   Calendar, MessageSquare, ShieldCheck,
-  Users, LogOut, Sun, Moon, UtensilsCrossed, Scissors, MessageCircle, FileText, Newspaper, Flame, CheckSquare, Gauge,
+  Users, LogOut, Sun, Moon, UtensilsCrossed, Scissors, MessageCircle, FileText, Newspaper, Flame, CheckSquare, Gauge, Pin,
 } from 'lucide-react'
 import { useAuth } from './AuthProvider'
 import { useTheme } from './ThemeProvider'
@@ -109,6 +109,7 @@ export default function Sidebar({ isOpen, onClose }: { isOpen?: boolean; onClose
     {
       label: 'Administratie',
       items: [
+        { href: '/prikbord', label: 'Prikbord', icon: <Pin size={16} />, vereistRecht: 'pagina_prikbord' as const },
         { href: '/kasboek', label: 'Kasboek', icon: <Wallet size={16} />, vereistRecht: 'pagina_kasboek' as const },
         { href: '/maaltijdlijst', label: 'Maaltijdlijst', icon: <UtensilsCrossed size={16} />, vereistRecht: 'pagina_maaltijdlijst' as const },
         { href: '/beleid', label: 'Beleidsstukken', icon: <FileText size={16} />, vereistRecht: 'pagina_beleid' as const },

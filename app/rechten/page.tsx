@@ -26,7 +26,9 @@ interface Recht {
   pagina_beleid: Toegang
   pagina_brandoefening: Toegang
   pagina_nieuwsbrieven: Toegang
+  pagina_prikbord: Toegang
 
+  prikbord_toevoegen: boolean
   chat_starten: boolean
   kasboek_export: boolean
   kasboek_bonnetjes_inzien: boolean
@@ -142,6 +144,14 @@ const PAGINAS: PaginaDef[] = [
     functies: [],
   },
   {
+    key: 'pagina_prikbord',
+    label: 'Prikbord',
+    icon: '📌',
+    functies: [
+      { key: 'prikbord_toevoegen', label: 'Berichten plaatsen', beschrijving: 'Mededelingen plaatsen op het prikbord', vereist: 'lezen' },
+    ],
+  },
+  {
     key: 'pagina_medewerkers',
     label: 'Medewerkers',
     icon: '👥',
@@ -173,6 +183,8 @@ function leegRecht(): Omit<Recht, 'id' | 'rol' | 'profiel_id'> {
     pagina_beleid: 'geen',
     pagina_brandoefening: 'geen',
     pagina_nieuwsbrieven: 'geen',
+    pagina_prikbord: 'geen',
+    prikbord_toevoegen: false,
     kasboek_export: false,
     kasboek_bonnetjes_inzien: false,
     activiteiten_importeren: false,

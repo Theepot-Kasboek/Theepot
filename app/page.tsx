@@ -8,7 +8,7 @@ import {
   BookOpen, Calendar, MessageSquare, Users, Scissors,
   ChevronRight, Settings, X, GripVertical, Plus,
   Wallet, Cloud, CheckSquare, FileText, Flame, Newspaper,
-  UtensilsCrossed, Map, Eye, EyeOff, Edit3,
+  UtensilsCrossed, Map, Eye, EyeOff, Edit3, Pin, AlertTriangle, Info,
 } from 'lucide-react'
 import Link from 'next/link'
 
@@ -46,6 +46,7 @@ function fmtDagKort(d: Date) { return d.toLocaleDateString('nl-NL', { weekday: '
 // ─── Widget Catalogus ─────────────────────────────────────────────────────────
 
 const WIDGET_CATALOGUS = [
+  { id: 'prikbord',       label: 'Prikbord',           icon: '📌', beschrijving: 'Mededelingen en berichten per locatie' },
   { id: 'welkom',         label: 'Welkomstkaart',     icon: '👋', beschrijving: 'Naam, datum en begroeting' },
   { id: 'weekagenda',     label: 'Weekagenda',         icon: '📅', beschrijving: 'Afspraken van deze week' },
   { id: 'weekplanning',   label: 'Weekplanning',       icon: '✂️', beschrijving: 'Huidige weekplanning per locatie' },
@@ -61,11 +62,12 @@ const WIDGET_CATALOGUS = [
 const OPSLAG_KEY = (uid: string) => `dashboard_v2_${uid}`
 const LOCATIE_KEY = (uid: string) => `dashboard_weer_locatie_${uid}`
 const DEFAULT_WIDGETS: DashboardWidget[] = [
-  { id: 'welkom', size: '2x1', volgorde: 0 },
-  { id: 'weekagenda', size: '3x1', volgorde: 1 },
-  { id: 'weekplanning', size: '2x1', volgorde: 2 },
-  { id: 'weer', size: '1x1', volgorde: 3 },
-  { id: 'snelkoppelingen', size: '3x1', volgorde: 4 },
+  { id: 'prikbord', size: '3x1', volgorde: 0 },
+  { id: 'welkom', size: '2x1', volgorde: 1 },
+  { id: 'weekagenda', size: '3x1', volgorde: 2 },
+  { id: 'weekplanning', size: '2x1', volgorde: 3 },
+  { id: 'weer', size: '1x1', volgorde: 4 },
+  { id: 'snelkoppelingen', size: '3x1', volgorde: 5 },
 ]
 
 // ─── Hoofd Dashboard ──────────────────────────────────────────────────────────
@@ -184,6 +186,7 @@ export default function DashboardPage() {
 
                 {/* Widget inhoud */}
                 <div style={{ outline: bewerkmodus ? '2px dashed var(--border-dark)' : 'none', borderRadius: 14, overflow: 'hidden' }}>
+                  {w.id === 'prikbord' && user && profiel && <PrikbordWidget profiel={profiel} isSuperadmin={isSuperadmin} />}
                   {w.id === 'welkom' && user && profiel && <WelkomWidget profiel={profiel} />}
                   {w.id === 'weekagenda' && user && <WeekAgendaWidget profielId={user.id} />}
                   {w.id === 'weekplanning' && user && <WeekplanningWidget profielId={user.id} isSuperadmin={isSuperadmin} profiel={profiel} />}
@@ -679,5 +682,84 @@ function LinkWidget({ href, label, icon, kleur }: { href: string; label: string;
         <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{label}</div>
       </div>
     </Link>
+  )
+}
+
+// ─── Prikbord Widget ──────────────────────────────────────────────────────────
+
+interface PrikbordBericht {
+  id: string; locatie_naam: string; titel: string; inhoud: string
+  prioriteit: 'normaal' | 'belangrijk' | 'urgent'
+  aangemaakt_op: string; verloopdatum: string | null
+}
+
+function PrikbordWidget({ profiel, isSuperadmin }: { profiel: { naam: string; rol?: string } | null; isSuperadmin: boolean }) {
+  const [berichten, setBerichten] = useState<PrikbordBericht[]>([])
+  const [laden, setLaden] = useState(true)
+
+  useEffect(() => {
+    async function laad() {
+      setLaden(true)
+      const { data } = await getSupabase()
+        .from('prikbord_berichten')
+        .select('*')
+        .order('prioriteit', { ascending: false })
+        .order('aangemaakt_op', { ascending: false })
+        .limit(5)
+      const nu = new Date()
+      const actief = (data ?? []).filter((b: PrikbordBericht) => !b.verloopdatum || new Date(b.verloopdatum) >= nu)
+      setBerichten(actief)
+      setLaden(false)
+    }
+    laad()
+  }, [])
+
+  function prKleur(p: string) {
+    if (p === 'urgent') return '#EF4444'
+    if (p === 'belangrijk') return '#F59E0B'
+    return '#3B82F6'
+  }
+
+  function prIcoon(p: string) {
+    if (p === 'urgent') return <AlertTriangle size={13} color="#EF4444" />
+    if (p === 'belangrijk') return <AlertTriangle size={13} color="#F59E0B" />
+    return <Info size={13} color="#3B82F6" />
+  }
+
+  return (
+    <div className="card">
+      <div className="card-header">
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <Pin size={15} color="var(--primary)" />
+          <span className="card-title">Prikbord</span>
+          {berichten.length > 0 && <span style={{ fontSize: 11, background: 'var(--primary-light)', color: 'var(--primary-text)', padding: '1px 8px', borderRadius: 20 }}>{berichten.length}</span>}
+        </div>
+        <Link href="/prikbord" className="btn btn-sm" style={{ fontSize: 11, padding: '4px 10px', textDecoration: 'none' }}>Alle berichten <ChevronRight size={12} /></Link>
+      </div>
+
+      {laden ? (
+        <div style={{ padding: '16px 18px', color: 'var(--text-muted)', fontSize: 12 }}>Laden...</div>
+      ) : berichten.length === 0 ? (
+        <div style={{ padding: '20px 18px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 13 }}>
+          Geen mededelingen op het prikbord.
+        </div>
+      ) : (
+        <div>
+          {berichten.map((b, i) => (
+            <div key={b.id} style={{ padding: '12px 18px', borderBottom: i < berichten.length - 1 ? '1px solid var(--border)' : 'none', borderLeft: `3px solid ${prKleur(b.prioriteit)}`, display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+              <div style={{ marginTop: 2, flexShrink: 0 }}>{prIcoon(b.prioriteit)}</div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--text)', marginBottom: 3 }}>{b.titel}</div>
+                <div style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.5, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{b.inhoud}</div>
+                <div style={{ display: 'flex', gap: 8, marginTop: 4, fontSize: 11, color: 'var(--text-muted)' }}>
+                  {b.locatie_naam !== 'alle' && <span>📍 {b.locatie_naam}</span>}
+                  <span>📅 {new Date(b.aangemaakt_op).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}</span>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   )
 }
