@@ -129,6 +129,7 @@ export default function Sidebar({ isOpen, onClose }: { isOpen?: boolean; onClose
         { href: '/vakantieplanningen', label: 'Vakantieplanningen', icon: <Map size={16} /> },
         { href: '/weekplanningen', label: 'Weekplanningen', icon: <Scissors size={16} /> },
         { href: '/activiteiten', label: 'Activiteitenbeheer', icon: <BookOpen size={16} /> },
+        { href: '/ve-planning', label: 'VE Planning', icon: <Layers size={16} /> },
       ],
     },
     {
