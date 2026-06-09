@@ -353,13 +353,20 @@ function ActiviteitenPage() {
     const supabase = getSupabase()
     const ext = bestand.name.split('.').pop()?.toLowerCase() ?? 'jpg'
     const pad = `${activiteitId}.${ext}`
+    
+    console.log('📸 Upload start:', { activiteitId, bestandNaam: bestand.name, bestandGrootte: bestand.size, pad })
+    
     const { data, error } = await supabase.storage
       .from('activiteit-afbeeldingen')
       .upload(pad, bestand, { upsert: true, cacheControl: '3600' })
+    
     if (error) {
+      console.error('❌ Upload fout:', error)
       setToast({ bericht: `Foto upload mislukt: ${error.message}`, type: 'error' })
       return null
     }
+    
+    console.log('✅ Upload geslaagd:', data)
     return data?.path ?? pad
   }
 

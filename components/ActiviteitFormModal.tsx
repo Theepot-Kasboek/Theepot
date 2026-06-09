@@ -66,6 +66,7 @@ export default function ActiviteitFormModal({ activiteit, onSave, onClose }: Pro
     if (!categorie.trim()) { setError('Vul een categorie in.'); return }
     setLoading(true); setError('')
     try {
+      console.log('💾 Opslaan:', { naam: naam.trim(), heeftAfbeelding: !!afbeeldingBestand, bestandNaam: afbeeldingBestand?.name })
       // Geef het bestand mee — de parent handelt de upload af nadat het ID bekend is
       await onSave({
         naam: naam.trim(),
