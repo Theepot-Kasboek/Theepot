@@ -7,7 +7,7 @@ import ActiviteitBijlagen from './ActiviteitBijlagen'
 
 interface Props {
   activiteit?: Partial<Activiteit>
-  onSave: (data: Omit<Activiteit, 'id' | 'created_at'>) => Promise<void>
+  onSave: (data: Omit<Activiteit, 'id' | 'created_at'>, afbeeldingBestand: File | null) => Promise<void>
   onClose: () => void
 }
 
@@ -17,7 +17,7 @@ export default function ActiviteitFormModal({ activiteit, onSave, onClose }: Pro
   const [categorie, setCategorie] = useState(activiteit?.categorie || '')
   const [themas, setThemas] = useState<string[]>(
     Array.isArray(activiteit?.thema) ? activiteit.thema :
-    (activiteit?.thema ? activiteit.thema.split(',').map(t => t.trim()).filter(Boolean) : [])
+    (activiteit?.thema ? (activiteit.thema as unknown as string).split(',').map(t => t.trim()).filter(Boolean) : [])
   )
   const [themaInput, setThemaInput] = useState('')
   const [themaSuggesties, setThemaSuggesties] = useState<string[]>([])
@@ -34,16 +34,15 @@ export default function ActiviteitFormModal({ activiteit, onSave, onClose }: Pro
   const [error, setError] = useState('')
 
   useEffect(() => {
-    // Laad bestaande afbeelding preview
     if (activiteit?.afbeelding_pad) {
-      const supabase = getSupabase()
-      const { data } = supabase.storage.from('activiteit-afbeeldingen').getPublicUrl(activiteit.afbeelding_pad)
+      const { data } = getSupabase().storage.from('activiteit-afbeeldingen').getPublicUrl(activiteit.afbeelding_pad)
       setAfbeeldingPreview(data.publicUrl)
     }
-
     getSupabase().from('activiteiten').select('thema').then(({ data }) => {
       if (data) {
-        const uniek = Array.from(new Set(data.map((r: any) => r.thema).filter(Boolean))).sort() as string[]
+        const uniek = Array.from(new Set(data.flatMap((r: { thema: string[] | string }) =>
+          Array.isArray(r.thema) ? r.thema : [r.thema]
+        ).filter(Boolean))).sort() as string[]
         setThemaSuggesties(uniek)
       }
     })
@@ -66,42 +65,24 @@ export default function ActiviteitFormModal({ activiteit, onSave, onClose }: Pro
     if (!naam.trim() || !beschrijving.trim()) { setError('Vul naam en beschrijving in.'); return }
     if (!categorie.trim()) { setError('Vul een categorie in.'); return }
     setLoading(true); setError('')
-
     try {
-      let definitiefPad = afbeeldingPad
-
-      if (afbeeldingBestand) {
-        const supabase = getSupabase()
-        const ext = afbeeldingBestand.name.split('.').pop()?.toLowerCase() ?? 'jpg'
-        const bestandsNaam = activiteit?.id
-          ? `${activiteit.id}.${ext}`
-          : `nieuw-${Date.now()}.${ext}`
-
-        const { data: upData, error: uploadError } = await supabase.storage
-          .from('activiteit-afbeeldingen')
-          .upload(bestandsNaam, afbeeldingBestand, { upsert: true, cacheControl: '3600' })
-
-        if (uploadError) {
-          setError(`Afbeelding uploaden mislukt: ${uploadError.message}`)
-          setLoading(false)
-          return
-        }
-        definitiefPad = upData?.path ?? bestandsNaam
-      }
-
+      // Geef het bestand mee — de parent handelt de upload af nadat het ID bekend is
       await onSave({
-        naam: naam.trim(), beschrijving: beschrijving.trim(),
+        naam: naam.trim(),
+        beschrijving: beschrijving.trim(),
         categorie: categorie.trim(),
-        thema: themas.length > 0 ? themas : [],
-        leeftijd, tijdsduur: parseInt(tijdsduur) || 30, groepsgrootte,
+        thema: themas,
+        leeftijd,
+        tijdsduur: parseInt(tijdsduur) || 30,
+        groepsgrootte,
         materialen: materialenRaw.split(',').map(s => s.trim()).filter(Boolean),
         stappen: stappenRaw.split('\n').map(s => s.trim()).filter(Boolean),
         materiaal_aanwezig: materiaalAanwezig,
         ai_gegenereerd: false,
-        afbeelding_pad: definitiefPad,
-      })
+        afbeelding_pad: afbeeldingPad, // bestaand pad of null
+      }, afbeeldingBestand) // nieuw bestand apart
     } catch (e: unknown) {
-      setError(`Er is iets misgegaan: ${e instanceof Error ? e.message : String(e)}`)
+      setError(`Fout: ${e instanceof Error ? e.message : String(e)}`)
     }
     setLoading(false)
   }
@@ -128,43 +109,27 @@ export default function ActiviteitFormModal({ activiteit, onSave, onClose }: Pro
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <div>
-              <label className="form-label">Categorie * <span style={{ fontWeight: 400, textTransform: 'none', fontSize: 11 }}>(bijv. Natuur, Sport, Creatief)</span></label>
+              <label className="form-label">Categorie *</label>
               <input className="form-input" value={categorie} onChange={e => setCategorie(e.target.value)} placeholder="Bijv. Natuur, Creatief..." list="categorie-lijst" />
-              <datalist id="categorie-lijst">
-                {ALLE_CATEGORIEEN.map(c => <option key={c} value={c} />)}
-              </datalist>
+              <datalist id="categorie-lijst">{ALLE_CATEGORIEEN.map(c => <option key={c} value={c} />)}</datalist>
             </div>
             <div>
-              <label className="form-label">Thema&apos;s <span style={{ fontWeight: 400, textTransform: 'none', fontSize: 11 }}>(meerdere mogelijk)</span></label>
+              <label className="form-label">Thema&apos;s</label>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginBottom: 6 }}>
                 {themas.map((t, i) => (
                   <span key={i} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 10px', borderRadius: 20, background: 'var(--primary-light)', color: 'var(--primary-text)', fontSize: 12, fontWeight: 500 }}>
                     {t}
-                    <button type="button" onClick={() => setThemas(prev => prev.filter((_, j) => j !== i))} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--primary-text)', padding: 0, display: 'flex', lineHeight: 1, fontSize: 14 }}>×</button>
+                    <button type="button" onClick={() => setThemas(prev => prev.filter((_, j) => j !== i))} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--primary-text)', padding: 0, fontSize: 14 }}>×</button>
                   </span>
                 ))}
               </div>
               <div style={{ display: 'flex', gap: 6 }}>
-                <input className="form-input" value={themaInput} onChange={e => setThemaInput(e.target.value)} placeholder="Kerst, Zomer, Lente..." list="thema-lijst"
-                  onKeyDown={e => {
-                    if ((e.key === 'Enter' || e.key === ',') && themaInput.trim()) {
-                      e.preventDefault()
-                      const nieuw = themaInput.trim().replace(/,$/, '')
-                      if (nieuw && !themas.includes(nieuw)) setThemas(prev => [...prev, nieuw])
-                      setThemaInput('')
-                    }
-                  }}
-                  style={{ flex: 1 }}
-                />
-                <button type="button" className="btn btn-sm" onClick={() => {
-                  const nieuw = themaInput.trim()
-                  if (nieuw && !themas.includes(nieuw)) setThemas(prev => [...prev, nieuw])
-                  setThemaInput('')
-                }} disabled={!themaInput.trim()}>+ Voeg toe</button>
+                <input className="form-input" value={themaInput} onChange={e => setThemaInput(e.target.value)} placeholder="Kerst, Zomer..." list="thema-lijst"
+                  onKeyDown={e => { if ((e.key === 'Enter' || e.key === ',') && themaInput.trim()) { e.preventDefault(); const n = themaInput.trim().replace(/,$/, ''); if (n && !themas.includes(n)) setThemas(p => [...p, n]); setThemaInput('') } }}
+                  style={{ flex: 1 }} />
+                <button type="button" className="btn btn-sm" onClick={() => { const n = themaInput.trim(); if (n && !themas.includes(n)) setThemas(p => [...p, n]); setThemaInput('') }} disabled={!themaInput.trim()}>+ Voeg toe</button>
               </div>
-              <datalist id="thema-lijst">
-                {themaSuggesties.filter(t => !themas.includes(t)).map(t => <option key={t} value={t} />)}
-              </datalist>
+              <datalist id="thema-lijst">{themaSuggesties.filter(t => !themas.includes(t)).map(t => <option key={t} value={t} />)}</datalist>
             </div>
             <div>
               <label className="form-label">Leeftijd</label>
@@ -197,35 +162,30 @@ export default function ActiviteitFormModal({ activiteit, onSave, onClose }: Pro
                 <img src={afbeeldingPreview} alt="Preview" style={{ width: '100%', maxHeight: 180, objectFit: 'cover', display: 'block' }} />
                 <div style={{ position: 'absolute', top: 8, right: 8, display: 'flex', gap: 6 }}>
                   <label style={{ cursor: 'pointer' }}>
-                    <div className="btn btn-sm" style={{ background: 'rgba(0,0,0,0.6)', color: '#fff', border: 'none', backdropFilter: 'blur(4px)' }}>
-                      <ImageIcon size={12} /> Wijzigen
-                    </div>
-                    <input type="file" accept="image/*" style={{ display: 'none' }} onChange={e => e.target.files?.[0] && kiesAfbeelding(e.target.files[0])} />
+                    <div className="btn btn-sm" style={{ background: 'rgba(0,0,0,0.6)', color: '#fff', border: 'none' }}><ImageIcon size={12} /> Wijzigen</div>
+                    <input type="file" accept="image/*,.heic,.heif" style={{ display: 'none' }} onChange={e => e.target.files?.[0] && kiesAfbeelding(e.target.files[0])} />
                   </label>
-                  <button className="btn btn-sm" onClick={verwijderAfbeelding} style={{ background: 'rgba(220,38,38,0.8)', color: '#fff', border: 'none', backdropFilter: 'blur(4px)' }}>
-                    <X size={12} /> Verwijderen
-                  </button>
+                  <button className="btn btn-sm" onClick={verwijderAfbeelding} style={{ background: 'rgba(220,38,38,0.8)', color: '#fff', border: 'none' }}><X size={12} /> Verwijderen</button>
                 </div>
               </div>
             ) : (
               <label style={{ cursor: 'pointer', display: 'block' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px', borderRadius: 10, border: '2px dashed var(--border-dark)', background: 'var(--bg)', transition: 'all 0.12s' }}
-                  onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--primary)' }}
-                  onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--border-dark)' }}
-                >
-                  <Upload size={18} color="var(--text-muted)" style={{ flexShrink: 0, opacity: 0.6 }} />
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px', borderRadius: 10, border: '2px dashed var(--border-dark)', background: 'var(--bg)' }}
+                  onMouseEnter={e => ((e.currentTarget as HTMLDivElement).style.borderColor = 'var(--primary)')}
+                  onMouseLeave={e => ((e.currentTarget as HTMLDivElement).style.borderColor = 'var(--border-dark)')}>
+                  <Upload size={18} color="var(--text-muted)" style={{ opacity: 0.6 }} />
                   <div>
-                    <div style={{ fontSize: 13, color: 'var(--text)', fontWeight: 500 }}>Klik om een foto te kiezen</div>
+                    <div style={{ fontSize: 13, fontWeight: 500 }}>Klik om een foto te kiezen</div>
                     <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>JPG, PNG of WebP</div>
                   </div>
                 </div>
-                <input type="file" accept="image/*" style={{ display: 'none' }} onChange={e => e.target.files?.[0] && kiesAfbeelding(e.target.files[0])} />
+                <input type="file" accept="image/*,.heic,.heif" style={{ display: 'none' }} onChange={e => e.target.files?.[0] && kiesAfbeelding(e.target.files[0])} />
               </label>
             )}
           </div>
 
-          <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', fontSize: 14, color: 'var(--text)' }}>
-            <input type="checkbox" checked={materiaalAanwezig} onChange={e => setMateriaalAanwezig(e.target.checked)} style={{ width: 16, height: 16, accentColor: 'var(--primary)', cursor: 'pointer' }} />
+          <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', fontSize: 14 }}>
+            <input type="checkbox" checked={materiaalAanwezig} onChange={e => setMateriaalAanwezig(e.target.checked)} style={{ width: 16, height: 16, accentColor: 'var(--primary)' }} />
             Materiaal is aanwezig
           </label>
 
@@ -236,7 +196,7 @@ export default function ActiviteitFormModal({ activiteit, onSave, onClose }: Pro
             </div>
           )}
 
-          {error && <p style={{ color: '#DC2626', fontSize: 13 }}>{error}</p>}
+          {error && <p style={{ color: '#DC2626', fontSize: 13, margin: 0 }}>{error}</p>}
           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 4 }}>
             <button className="btn" onClick={onClose}>Annuleren</button>
             <button className="btn btn-primary" onClick={handleSave} disabled={loading}>{loading ? 'Opslaan...' : 'Opslaan'}</button>

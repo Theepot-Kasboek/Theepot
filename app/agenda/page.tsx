@@ -7,7 +7,7 @@ import Topbar from '@/components/Topbar'
 import Toast from '@/components/Toast'
 import {
   ChevronLeft, ChevronRight, Plus, X, Calendar,
-  Clock, AlignLeft, Users, Pencil, Trash2, Share2, Eye, Upload
+  Clock, AlignLeft, Users, Pencil, Trash2, Share2, Eye, Upload, Bell
 } from 'lucide-react'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -18,6 +18,7 @@ interface Kalender {
   type: 'persoonlijk' | 'algemeen'
   eigenaar_id: string | null
   kleur: string
+  herinnering_dagen: number | null  // aantal dagen van tevoren notificatie
 }
 
 interface Afspraak {
@@ -102,6 +103,8 @@ export default function AgendaPage() {
   const { profiel, isSuperadmin, rechten } = useAuth()
 
   const [weergave, setWeergave] = useState<Weergave>('maand')
+  const [notificaties, setNotificaties] = useState<{ afspraak: Afspraak; kalender: Kalender; dagenOver: number }[]>([])
+  const [notificatieBanner, setNotificatieBanner] = useState(true)
   const [huidigeDatum, setHuidigeDatum] = useState(new Date())
 
   // Kalenders
@@ -559,13 +562,40 @@ export default function AgendaPage() {
         }
       />
 
-      <div style={{ display: 'flex', flex: 1, overflow: 'hidden', height: 'calc(100vh - 56px)' }}>
+      <div style={{ display: 'flex', flex: 1, overflow: 'hidden', height: 'calc(100vh - 56px)', flexDirection: 'column' }}>
+
+        {/* Notificaties banner */}
+        {notificatieBanner && notificaties.length > 0 && (
+          <div style={{ background: '#FFFBEB', borderBottom: '1px solid #FDE68A', padding: '10px 20px', display: 'flex', alignItems: 'flex-start', gap: 12, flexShrink: 0 }}>
+            <span style={{ fontSize: 16, flexShrink: 0, marginTop: 1 }}>🔔</span>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontWeight: 600, fontSize: 13, color: '#92400E', marginBottom: 4 }}>
+                {notificaties.length === 1 ? '1 aankomende afspraak' : `${notificaties.length} aankomende afspraken`} waarvoor je een herinnering hebt ingesteld:
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {notificaties.slice(0, 5).map(n => (
+                  <span key={n.afspraak.id} style={{ fontSize: 12, padding: '2px 10px', borderRadius: 20, background: '#FEF3C7', border: '1px solid #FDE68A', color: '#92400E' }}>
+                    <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: n.kalender.kleur, marginRight: 5 }} />
+                    {n.afspraak.titel} — over {n.dagenOver === 0 ? 'vandaag' : `${n.dagenOver} dag${n.dagenOver === 1 ? '' : 'en'}`}
+                  </span>
+                ))}
+                {notificaties.length > 5 && <span style={{ fontSize: 12, color: '#92400E' }}>+{notificaties.length - 5} meer</span>}
+              </div>
+            </div>
+            <button onClick={() => setNotificatieBanner(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#92400E', opacity: 0.5, flexShrink: 0, display: 'flex' }}>
+              <X size={16} />
+            </button>
+          </div>
+        )}
+
         {/* Hoofd weergave */}
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--bg-card)' }}>
-          {weergave === 'maand' && <MaandWeergave />}
-          {weergave === 'week' && <WeekWeergave />}
-          {weergave === 'dag' && <DagWeergave />}
-          {weergave === 'lijst' && <div style={{ padding: 20, overflow: 'auto', flex: 1 }}><LijstWeergave /></div>}
+        <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--bg-card)' }}>
+            {weergave === 'maand' && <MaandWeergave />}
+            {weergave === 'week' && <WeekWeergave />}
+            {weergave === 'dag' && <DagWeergave />}
+            {weergave === 'lijst' && <div style={{ padding: 20, overflow: 'auto', flex: 1 }}><LijstWeergave /></div>}
+          </div>
         </div>
       </div>
 
@@ -611,15 +641,39 @@ export default function AgendaPage() {
                   <p style={{ fontSize: 13, color: 'var(--text-muted)', fontStyle: 'italic' }}>Geen algemene kalenders.</p>
                 )}
                 {algemeenKalenders.map(k => (
-                  <div key={k.id} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <div style={{ flex: 1 }}>
-                      <KalenderRij kalender={k} zichtbaar={zichtbareIds.has(k.id)} onToggle={() => toggleKalender(k.id)} />
+                  <div key={k.id} style={{ marginBottom: 4 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <div style={{ flex: 1 }}>
+                        <KalenderRij kalender={k} zichtbaar={zichtbareIds.has(k.id)} onToggle={() => toggleKalender(k.id)} />
+                      </div>
+                      {isSuperadmin && (
+                        <>
+                          <button onClick={() => { setKalenderPanelOpen(false); setDeelModal(k) }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 4, display: 'flex' }} title="Delen"><Share2 size={14} /></button>
+                          <button onClick={() => verwijderKalender(k.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#DC2626', padding: 4, display: 'flex' }} title="Verwijderen"><Trash2 size={14} /></button>
+                        </>
+                      )}
                     </div>
+                    {/* Herinnering instelling — superadmin */}
                     {isSuperadmin && (
-                      <>
-                        <button onClick={() => { setKalenderPanelOpen(false); setDeelModal(k) }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 4, display: 'flex' }} title="Delen"><Share2 size={14} /></button>
-                        <button onClick={() => verwijderKalender(k.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#DC2626', padding: 4, display: 'flex' }} title="Verwijderen"><Trash2 size={14} /></button>
-                      </>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, paddingLeft: 28, marginTop: 4, marginBottom: 6 }}>
+                        <Bell size={12} color="var(--text-muted)" />
+                        <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Herinnering</span>
+                        <select
+                          value={k.herinnering_dagen ?? 0}
+                          onChange={async e => {
+                            const dagen = parseInt(e.target.value)
+                            await getSupabase().from('agenda_kalenders').update({ herinnering_dagen: dagen || null }).eq('id', k.id)
+                            setAlleKalenders(prev => prev.map(kal => kal.id === k.id ? { ...kal, herinnering_dagen: dagen || null } : kal))
+                          }}
+                          style={{ fontSize: 11, padding: '2px 6px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)', cursor: 'pointer' }}>
+                          <option value={0}>Geen herinnering</option>
+                          <option value={7}>1 week van tevoren</option>
+                          <option value={14}>2 weken van tevoren</option>
+                          <option value={30}>1 maand van tevoren</option>
+                          <option value={60}>2 maanden van tevoren</option>
+                          <option value={90}>3 maanden van tevoren</option>
+                        </select>
+                      </div>
                     )}
                   </div>
                 ))}

@@ -349,31 +349,36 @@ function ActiviteitenPage() {
     return matchZoek && matchFilter
   })
 
-  async function slaOp(data: Omit<Activiteit, 'id' | 'created_at'>) {
+  async function uploadAfbeelding(activiteitId: string, bestand: File): Promise<string | null> {
     const supabase = getSupabase()
-    // Sla eerst op zonder afbeelding om het ID te krijgen
-    const dataZonderAfb = { ...data, afbeelding_pad: null }
-    const { data: nieuw, error } = await supabase.from('activiteiten').insert([dataZonderAfb]).select().single()
+    const ext = bestand.name.split('.').pop()?.toLowerCase() ?? 'jpg'
+    const pad = `${activiteitId}.${ext}`
+    const { data, error } = await supabase.storage
+      .from('activiteit-afbeeldingen')
+      .upload(pad, bestand, { upsert: true, cacheControl: '3600' })
+    if (error) {
+      setToast({ bericht: `Foto upload mislukt: ${error.message}`, type: 'error' })
+      return null
+    }
+    return data?.path ?? pad
+  }
+
+  async function slaOp(data: Omit<Activiteit, 'id' | 'created_at'>, afbeeldingBestand: File | null) {
+    const supabase = getSupabase()
+    // Sla eerst op zonder afbeelding
+    const { data: nieuw, error } = await supabase
+      .from('activiteiten')
+      .insert([{ ...data, afbeelding_pad: null }])
+      .select()
+      .single()
     if (error) { setToast({ bericht: `Fout: ${error.message}`, type: 'error' }); return }
 
-    // Als er een tijdelijk bestand is, hernoem het naar het echte ID
-    if (nieuw && data.afbeelding_pad && data.afbeelding_pad.startsWith('nieuw-')) {
-      const ext = data.afbeelding_pad.split('.').pop()
-      const nieuwPad = `${nieuw.id}.${ext}`
-      // Download tijdelijk bestand en herüpload met juiste naam
-      const { data: blob } = await supabase.storage.from('activiteit-afbeeldingen').download(data.afbeelding_pad)
-      if (blob) {
-        const { error: upErr } = await supabase.storage.from('activiteit-afbeeldingen').upload(nieuwPad, blob, { upsert: true })
-        if (!upErr) {
-          // Verwijder tijdelijk bestand
-          await supabase.storage.from('activiteit-afbeeldingen').remove([data.afbeelding_pad])
-          // Update activiteit met juist pad
-          await supabase.from('activiteiten').update({ afbeelding_pad: nieuwPad }).eq('id', nieuw.id)
-        }
+    // Upload foto nu het ID bekend is
+    if (nieuw && afbeeldingBestand) {
+      const pad = await uploadAfbeelding(nieuw.id, afbeeldingBestand)
+      if (pad) {
+        await supabase.from('activiteiten').update({ afbeelding_pad: pad }).eq('id', nieuw.id)
       }
-    } else if (nieuw && data.afbeelding_pad) {
-      // Bestaand pad (zou niet voorkomen bij nieuw, maar voor zekerheid)
-      await supabase.from('activiteiten').update({ afbeelding_pad: data.afbeelding_pad }).eq('id', nieuw.id)
     }
 
     await laadActiviteiten()
@@ -381,9 +386,24 @@ function ActiviteitenPage() {
     setToast({ bericht: 'Activiteit opgeslagen!', type: 'success' })
   }
 
-  async function slaBewerking(data: Omit<Activiteit, 'id' | 'created_at'>) {
+  async function slaBewerking(data: Omit<Activiteit, 'id' | 'created_at'>, afbeeldingBestand: File | null) {
     if (!bewerkActiviteit) return
-    const { error } = await getSupabase().from('activiteiten').update(data).eq('id', bewerkActiviteit.id)
+    const supabase = getSupabase()
+
+    let afbeeldingPad = data.afbeelding_pad
+
+    // Upload nieuwe foto als die gekozen is
+    if (afbeeldingBestand) {
+      const pad = await uploadAfbeelding(bewerkActiviteit.id, afbeeldingBestand)
+      if (pad) afbeeldingPad = pad
+      else return // upload mislukt, stop
+    }
+
+    const { error } = await supabase
+      .from('activiteiten')
+      .update({ ...data, afbeelding_pad: afbeeldingPad })
+      .eq('id', bewerkActiviteit.id)
+
     if (error) { setToast({ bericht: `Fout: ${error.message}`, type: 'error' }); return }
     await laadActiviteiten()
     setBewerkActiviteit(null)
