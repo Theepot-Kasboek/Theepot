@@ -20,6 +20,7 @@ interface Rechten {
   pagina_chat: Toegang
   pagina_medewerkers: Toegang
   pagina_prikbord: Toegang
+  pagina_ve_planning: Toegang
   prikbord_toevoegen: boolean
   pagina_maaltijdlijst: Toegang
   pagina_weekplanningen: Toegang
@@ -41,7 +42,7 @@ const SUPERADMIN_RECHTEN: Rechten = {
   pagina_kasboek: 'bewerken', pagina_vakantieplanningen: 'bewerken',
   pagina_activiteiten: 'bewerken', pagina_agenda: 'bewerken',
   pagina_chat: 'bewerken', pagina_medewerkers: 'bewerken',
-  pagina_prikbord: 'bewerken', prikbord_toevoegen: true,
+  pagina_prikbord: 'bewerken', pagina_ve_planning: 'bewerken', prikbord_toevoegen: true,
   pagina_maaltijdlijst: 'bewerken', pagina_weekplanningen: 'bewerken', pagina_gesprekken: 'bewerken',
   pagina_beleid: 'bewerken', pagina_brandoefening: 'bewerken', pagina_nieuwsbrieven: 'bewerken',
   kasboek_export: true, kasboek_bonnetjes_inzien: true,
@@ -54,7 +55,7 @@ const GEEN_RECHTEN: Rechten = {
   pagina_kasboek: 'geen', pagina_vakantieplanningen: 'geen',
   pagina_activiteiten: 'geen', pagina_agenda: 'geen',
   pagina_chat: 'geen', pagina_medewerkers: 'geen',
-  pagina_prikbord: 'geen', prikbord_toevoegen: false,
+  pagina_prikbord: 'geen', pagina_ve_planning: 'geen', prikbord_toevoegen: false,
   pagina_maaltijdlijst: 'geen', pagina_weekplanningen: 'geen', pagina_gesprekken: 'geen',
   pagina_beleid: 'geen', pagina_brandoefening: 'geen', pagina_nieuwsbrieven: 'geen',
   kasboek_export: false, kasboek_bonnetjes_inzien: false,
