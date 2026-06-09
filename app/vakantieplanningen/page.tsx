@@ -709,16 +709,43 @@ function DocumentWeergave({ planning, weken, activiteiten, dagDatumStr, tekstGro
   dagDatumStr: (week: Week, dag: Dag) => string
   tekstGrootte: number
 }) {
+  const [downloadenBezig, setDownloadenBezig] = useState(false)
+
   function activiteitenVan(weekId: string, dag: Dag) {
     return activiteiten.filter(a => a.week_id === weekId && a.dag === dag).sort((a, b) => a.volgorde - b.volgorde)
   }
 
+  async function downloadAlleBijlagen() {
+    const actIds = activiteiten.filter(a => a.activiteit_id).map(a => a.activiteit_id as string)
+    if (actIds.length === 0) { alert('Geen activiteiten met bijlagen in deze planning.'); return }
+    setDownloadenBezig(true)
+    const supabase = getSupabase()
+
+    // Haal alle bijlagen op
+    const { data: bijlagen } = await supabase.from('activiteit_bijlagen').select('*').in('activiteit_id', actIds)
+    if (!bijlagen || bijlagen.length === 0) { alert('Geen bijlagen gevonden in deze planning.'); setDownloadenBezig(false); return }
+
+    // Download elk bestand apart
+    for (const b of bijlagen) {
+      const { data: blob } = await supabase.storage.from('activiteit-bijlagen').download(b.bestand_pad)
+      if (!blob) continue
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a'); a.href = url; a.download = b.naam; a.click()
+      URL.revokeObjectURL(url)
+      await new Promise(r => setTimeout(r, 300)) // kleine pauze tussen downloads
+    }
+    setDownloadenBezig(false)
+  }
+
   return (
     <div style={{ maxWidth: 900, margin: '0 auto' }}>
-      {/* Titel */}
+      {/* Titel + bulk download knop */}
       <div style={{ textAlign: 'center', marginBottom: 32, padding: '24px 0' }}>
         <h1 style={{ fontFamily: 'Sora, sans-serif', fontSize: 24, fontWeight: 800, marginBottom: 6 }}>{planning.naam}</h1>
-        <div style={{ fontSize: 14, color: 'var(--text-muted)' }}>{planning.vakantie} · Thema: {planning.thema} · {fmtDatum(planning.start_datum)} – {fmtDatum(planning.eind_datum)}</div>
+        <div style={{ fontSize: 14, color: 'var(--text-muted)', marginBottom: 14 }}>{planning.vakantie} · Thema: {planning.thema} · {fmtDatum(planning.start_datum)} – {fmtDatum(planning.eind_datum)}</div>
+        <button className="btn btn-sm" onClick={downloadAlleBijlagen} disabled={downloadenBezig}>
+          <Download size={13} /> {downloadenBezig ? 'Downloaden...' : 'Alle bijlagen downloaden'}
+        </button>
       </div>
 
       {/* Per week */}
