@@ -7,7 +7,7 @@ import { useEffect, useState } from 'react'
 import {
   LayoutDashboard, Wallet, Map, BookOpen,
   Calendar, MessageSquare, ShieldCheck,
-  Users, LogOut, Sun, Moon, UtensilsCrossed, Scissors, MessageCircle, FileText, Newspaper, Flame, CheckSquare,
+  Users, LogOut, Sun, Moon, UtensilsCrossed, Scissors, MessageCircle, FileText, Newspaper, Flame, CheckSquare, Gauge,
 } from 'lucide-react'
 import { useAuth } from './AuthProvider'
 import { useTheme } from './ThemeProvider'
@@ -113,6 +113,7 @@ export default function Sidebar({ isOpen, onClose }: { isOpen?: boolean; onClose
         { href: '/maaltijdlijst', label: 'Maaltijdlijst', icon: <UtensilsCrossed size={16} />, vereistRecht: 'pagina_maaltijdlijst' as const },
         { href: '/beleid', label: 'Beleidsstukken', icon: <FileText size={16} />, vereistRecht: 'pagina_beleid' as const },
         { href: '/brandoefening', label: 'Brandoefening', icon: <Flame size={16} />, vereistRecht: 'pagina_brandoefening' as const },
+        { href: '/kilometerstanden', label: 'Kilometerstanden', icon: <Gauge size={16} /> },
       ],
     },
     {
