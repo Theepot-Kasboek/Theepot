@@ -27,6 +27,7 @@ interface Recht {
   pagina_brandoefening: Toegang
   pagina_nieuwsbrieven: Toegang
   pagina_prikbord: Toegang
+  pagina_ve_planning: Toegang
 
   prikbord_toevoegen: boolean
   chat_starten: boolean
@@ -152,6 +153,12 @@ const PAGINAS: PaginaDef[] = [
     ],
   },
   {
+    key: 'pagina_ve_planning',
+    label: 'VE Planning',
+    icon: '📋',
+    functies: [],
+  },
+  {
     key: 'pagina_medewerkers',
     label: 'Medewerkers',
     icon: '👥',
@@ -184,6 +191,7 @@ function leegRecht(): Omit<Recht, 'id' | 'rol' | 'profiel_id'> {
     pagina_brandoefening: 'geen',
     pagina_nieuwsbrieven: 'geen',
     pagina_prikbord: 'geen',
+    pagina_ve_planning: 'geen',
     prikbord_toevoegen: false,
     kasboek_export: false,
     kasboek_bonnetjes_inzien: false,
@@ -567,6 +575,7 @@ const LOCATIE_SECTIES = [
   { type: 'weekplanningen',  icon: '✂️', label: 'Weekplanningen' },
   { type: 'gesprekken',      icon: '💬', label: '10-minutengesprekken' },
   { type: 'brandoefening',   icon: '🔥', label: 'Brandoefening' },
+  { type: 've_planning',      icon: '📋', label: 'VE Planning' },
 ]
 
 function LocatieToegang({ profielen, kasboekLocaties, maaltijdLocaties, locatieToegang, onRefresh, onToast }: {
@@ -637,6 +646,7 @@ function LocatieToegang({ profielen, kasboekLocaties, maaltijdLocaties, locatieT
     if (type === 'weekplanningen') return kasboekLocaties
     if (type === 'gesprekken') return kasboekLocaties
     if (type === 'brandoefening') return kasboekLocaties
+    if (type === 've_planning') return kasboekLocaties
     return []
   }
 

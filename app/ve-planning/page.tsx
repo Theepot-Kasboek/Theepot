@@ -147,8 +147,21 @@ export default function VePlanningPage() {
   const [toast, setToast] = useState<{ bericht: string; type: 'success' | 'error' } | null>(null)
 
   useEffect(() => {
-    getSupabase().from('kasboek_locaties').select('naam').eq('actief', true).order('naam')
-      .then(({ data }) => setLocaties((data ?? []).map((l: { naam: string }) => l.naam)))
+    async function laadLocaties() {
+      const supabase = getSupabase()
+      const { data: alleData } = await supabase.from('kasboek_locaties').select('naam').eq('actief', true).order('naam')
+      const alle = (alleData ?? []).map((l: { naam: string }) => l.naam)
+      
+      // Filter op ve_planning locatietoegang (tenzij superadmin/directie/leidinggevende)
+      const magAlles = isSuperadmin || profiel?.rol === 'directie' || profiel?.rol === 'leidinggevende'
+      if (magAlles) { setLocaties(alle); return }
+      
+      const { data: toegang } = await supabase.from('locatie_toegang')
+        .select('locatie_naam').eq('profiel_id', profiel?.id ?? '').eq('locatie_type', 've_planning').neq('toegang', 'geen')
+      const toegankelijk = (toegang ?? []).map((t: { locatie_naam: string }) => t.locatie_naam)
+      setLocaties(alle.filter(l => toegankelijk.includes(l)))
+    }
+    laadLocaties()
     getSupabase().from('profielen').select('id,naam').eq('actief', true).order('naam')
       .then(({ data }) => setMedewerkers((data ?? []) as Profiel[]))
     getSupabase().from('ve_taken_template').select('*').order('volgorde')
