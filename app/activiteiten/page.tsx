@@ -351,15 +351,31 @@ function ActiviteitenPage() {
 
   async function slaOp(data: Omit<Activiteit, 'id' | 'created_at'>) {
     const supabase = getSupabase()
-    const { data: nieuw, error } = await supabase.from('activiteiten').insert([data]).select().single()
+    // Sla eerst op zonder afbeelding om het ID te krijgen
+    const dataZonderAfb = { ...data, afbeelding_pad: null }
+    const { data: nieuw, error } = await supabase.from('activiteiten').insert([dataZonderAfb]).select().single()
     if (error) { setToast({ bericht: `Fout: ${error.message}`, type: 'error' }); return }
-    // Verplaats tijdelijke afbeelding naar definitief pad op basis van nieuw ID
+
+    // Als er een tijdelijk bestand is, hernoem het naar het echte ID
     if (nieuw && data.afbeelding_pad && data.afbeelding_pad.startsWith('nieuw-')) {
       const ext = data.afbeelding_pad.split('.').pop()
       const nieuwPad = `${nieuw.id}.${ext}`
-      const { error: moveErr } = await supabase.storage.from('activiteit-afbeeldingen').move(data.afbeelding_pad, nieuwPad)
-      if (!moveErr) await supabase.from('activiteiten').update({ afbeelding_pad: nieuwPad }).eq('id', nieuw.id)
+      // Download tijdelijk bestand en herüpload met juiste naam
+      const { data: blob } = await supabase.storage.from('activiteit-afbeeldingen').download(data.afbeelding_pad)
+      if (blob) {
+        const { error: upErr } = await supabase.storage.from('activiteit-afbeeldingen').upload(nieuwPad, blob, { upsert: true })
+        if (!upErr) {
+          // Verwijder tijdelijk bestand
+          await supabase.storage.from('activiteit-afbeeldingen').remove([data.afbeelding_pad])
+          // Update activiteit met juist pad
+          await supabase.from('activiteiten').update({ afbeelding_pad: nieuwPad }).eq('id', nieuw.id)
+        }
+      }
+    } else if (nieuw && data.afbeelding_pad) {
+      // Bestaand pad (zou niet voorkomen bij nieuw, maar voor zekerheid)
+      await supabase.from('activiteiten').update({ afbeelding_pad: data.afbeelding_pad }).eq('id', nieuw.id)
     }
+
     await laadActiviteiten()
     setToevoegen(false)
     setToast({ bericht: 'Activiteit opgeslagen!', type: 'success' })

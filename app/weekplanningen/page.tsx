@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { getSupabase } from '@/lib/supabase'
 import { useAuth } from '@/components/AuthProvider'
+import ActiviteitBijlagen from '@/components/ActiviteitBijlagen'
 import Topbar from '@/components/Topbar'
 import Toast from '@/components/Toast'
 import {
@@ -810,6 +811,12 @@ function DetailModal({ activiteit, type, onClose }: {
             <p style={{ fontSize: 13, color: 'var(--text-muted)', fontStyle: 'italic', textAlign: 'center', padding: '16px 0' }}>
               Geen extra informatie beschikbaar.
             </p>
+          )}
+
+          {activiteit.activiteit_id && (
+            <div style={{ borderTop: '1px solid var(--border)', paddingTop: 14 }}>
+              <ActiviteitBijlagen activiteitId={activiteit.activiteit_id} magBewerken={false} />
+            </div>
           )}
         </div>
       </div>

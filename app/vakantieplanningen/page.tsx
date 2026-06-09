@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import ActiviteitBijlagen from '@/components/ActiviteitBijlagen'
 import { getSupabase } from '@/lib/supabase'
 import { useAuth } from '@/components/AuthProvider'
 import Topbar from '@/components/Topbar'
@@ -820,6 +821,11 @@ function DocumentWeergave({ planning, weken, activiteiten, dagDatumStr, tekstGro
                                   </div>
                                 ))}
                               </div>
+                            </div>
+                          )}
+                          {act.activiteit_id && (
+                            <div style={{ borderTop: '1px solid var(--border)', marginTop: 8, paddingTop: 10 }}>
+                              <ActiviteitBijlagen activiteitId={act.activiteit_id} magBewerken={false} />
                             </div>
                           )}
                           </div>{/* einde padding div */}

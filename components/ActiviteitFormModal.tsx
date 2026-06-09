@@ -67,28 +67,25 @@ export default function ActiviteitFormModal({ activiteit, onSave, onClose }: Pro
     setLoading(true); setError('')
 
     try {
-      let definitiefPad = afbeeldingPad  // behoud bestaande pad
+      let definitiefPad = afbeeldingPad
 
-      // Upload nieuwe afbeelding als die gekozen is
       if (afbeeldingBestand) {
         const supabase = getSupabase()
         const ext = afbeeldingBestand.name.split('.').pop()?.toLowerCase() ?? 'jpg'
-        // Gebruik altijd activiteit.id als die beschikbaar is, anders tijdelijke naam
         const bestandsNaam = activiteit?.id
           ? `${activiteit.id}.${ext}`
           : `nieuw-${Date.now()}.${ext}`
 
-        const { error: uploadError } = await supabase.storage
+        const { data: upData, error: uploadError } = await supabase.storage
           .from('activiteit-afbeeldingen')
-          .upload(bestandsNaam, afbeeldingBestand, { upsert: true })
+          .upload(bestandsNaam, afbeeldingBestand, { upsert: true, cacheControl: '3600' })
 
         if (uploadError) {
-          console.error('Upload fout:', uploadError)
-          setError('Afbeelding uploaden mislukt: ' + uploadError.message)
+          setError(`Afbeelding uploaden mislukt: ${uploadError.message}`)
           setLoading(false)
           return
         }
-        definitiefPad = bestandsNaam
+        definitiefPad = upData?.path ?? bestandsNaam
       }
 
       await onSave({
@@ -102,9 +99,8 @@ export default function ActiviteitFormModal({ activiteit, onSave, onClose }: Pro
         ai_gegenereerd: false,
         afbeelding_pad: definitiefPad,
       })
-    } catch (e) {
-      console.error('Opslaan fout:', e)
-      setError('Er is iets misgegaan.')
+    } catch (e: unknown) {
+      setError(`Er is iets misgegaan: ${e instanceof Error ? e.message : String(e)}`)
     }
     setLoading(false)
   }

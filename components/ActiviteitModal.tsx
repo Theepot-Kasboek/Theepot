@@ -3,6 +3,7 @@ import { X, Copy, Download, Edit2, Trash2, Image } from 'lucide-react'
 import { Activiteit } from '@/lib/supabase'
 import { getSupabase } from '@/lib/supabase'
 import { exportActiviteitAlsPDF } from '@/lib/pdf-export'
+import ActiviteitBijlagen from './ActiviteitBijlagen'
 import { getCategorieKleur, getCategorieEmoji } from '@/lib/categorieen'
 import { getThemaEmoji } from '@/lib/themas'
 import { useState, useEffect } from 'react'
@@ -218,6 +219,11 @@ export default function ActiviteitModal({ activiteit, onClose, onEdit, onDelete,
               </div>
             </div>
           )}
+
+          {/* Bijlagen */}
+          <div style={{ borderTop: '1px solid var(--border)', paddingTop: 16 }}>
+            <ActiviteitBijlagen activiteitId={activiteit.id} magBewerken={true} />
+          </div>
         </div>
       </div>
     </div>
