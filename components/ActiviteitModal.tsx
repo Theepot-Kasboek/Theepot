@@ -3,6 +3,7 @@ import { X, Copy, Download, Edit2, Trash2, Image } from 'lucide-react'
 import { Activiteit } from '@/lib/supabase'
 import { getSupabase } from '@/lib/supabase'
 import { exportActiviteitAlsPDF } from '@/lib/pdf-export'
+import { uploadActiviteitAfbeelding, UPLOAD_VERSIE } from '@/lib/afbeelding-upload'
 import ActiviteitBijlagen from './ActiviteitBijlagen'
 import { getCategorieKleur, getCategorieEmoji } from '@/lib/categorieen'
 import { getThemaEmoji } from '@/lib/themas'
@@ -30,6 +31,7 @@ export default function ActiviteitModal({ activiteit, onClose, onEdit, onDelete,
   const [bevestigVerwijder, setBevestigVerwijder] = useState(false)
   const [afbeeldingUrl, setAfbeeldingUrl] = useState<string | null>(null)
   const [uploadLaden, setUploadLaden] = useState(false)
+  const [uploadStatus, setUploadStatus] = useState<string[]>([])
 
   // Laad afbeelding URL
   useEffect(() => {
@@ -56,27 +58,26 @@ export default function ActiviteitModal({ activiteit, onClose, onEdit, onDelete,
 
   async function uploadAfbeelding(bestand: File) {
     setUploadLaden(true)
-    const supabase = getSupabase()
-    const ext = bestand.name.split('.').pop()
-    const pad = `${activiteit.id}.${ext}`
+    setUploadStatus([])
 
-    const { error: uploadError } = await supabase.storage
-      .from('activiteit-afbeeldingen')
-      .upload(pad, bestand, { upsert: true })
+    const resultaat = await uploadActiviteitAfbeelding(
+      activiteit.id,
+      bestand,
+      regel => setUploadStatus(prev => [...prev, regel])
+    )
 
-    if (uploadError) {
-      onToast('⚠️ Upload mislukt: ' + uploadError.message)
-      setUploadLaden(false)
-      return
+    if (resultaat.ok && resultaat.pad) {
+      const supabase = getSupabase()
+      const { data } = supabase.storage.from('activiteit-afbeeldingen').getPublicUrl(resultaat.pad)
+      setAfbeeldingUrl(data.publicUrl + '?t=' + Date.now())
+      activiteit.afbeelding_pad = resultaat.pad
+      onToast('✅ Afbeelding opgeslagen!')
+      onAfbeeldingGewijzigd?.()
+      // Status na succes weer verbergen na 4 sec
+      setTimeout(() => setUploadStatus([]), 4000)
     }
-
-    await supabase.from('activiteiten').update({ afbeelding_pad: pad }).eq('id', activiteit.id)
-    const { data } = supabase.storage.from('activiteit-afbeeldingen').getPublicUrl(pad)
-    setAfbeeldingUrl(data.publicUrl + '?t=' + Date.now())
-    activiteit.afbeelding_pad = pad
-    onToast('✅ Afbeelding opgeslagen!')
+    // Bij een fout blijft het statuspaneel staan zodat de fout leesbaar is
     setUploadLaden(false)
-    onAfbeeldingGewijzigd?.()
   }
 
   async function verwijderAfbeelding() {
@@ -148,9 +149,19 @@ export default function ActiviteitModal({ activiteit, onClose, onEdit, onDelete,
 
           {/* Afbeelding sectie */}
           <div>
-            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>
+            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
               Voorbeeldafbeelding
+              <span style={{ fontSize: 9, fontWeight: 400, opacity: 0.4 }}>{UPLOAD_VERSIE}</span>
             </div>
+
+            {/* Diagnostiek paneel */}
+            {uploadStatus.length > 0 && (
+              <div style={{ marginBottom: 10, padding: '10px 12px', background: '#0F172A', borderRadius: 8, fontFamily: 'monospace' }}>
+                {uploadStatus.map((s, i) => (
+                  <div key={i} style={{ fontSize: 11, color: s.startsWith('❌') ? '#F87171' : s.startsWith('✅') ? '#4ADE80' : '#94A3B8', lineHeight: 1.8 }}>{s}</div>
+                ))}
+              </div>
+            )}
             {afbeeldingUrl ? (
               <div style={{ position: 'relative', borderRadius: 10, overflow: 'hidden', border: '1px solid var(--border)' }}>
                 <img
