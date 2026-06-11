@@ -99,22 +99,36 @@ async function exportWeekmemoPDF(brief: Nieuwsbrief) {
   }
 
   function berekenHoogte(tekst: string, maxBreedte: number): number {
-    return verwerkTekst(tekst, maxBreedte).reduce((h, { regel }) => h + (regel ? regelHoogte : regelHoogte * 0.5), 0)
+    let h = 0
+    for (const rij of tekst.split('\n')) {
+      const r = rij.trim()
+      if (!r) { h += regelHoogte * 0.5; continue }
+      const isBullet = /^[●•*\-–]\s/.test(r)
+      const schoon = isBullet ? r.replace(/^[●•*\-–]\s*/, '').trim() : r
+      const w = isBullet ? maxBreedte - 6 : maxBreedte
+      const regels: string[] = doc.splitTextToSize(schoon, w)
+      h += regels.length * regelHoogte
+    }
+    return Math.max(h, 4)
   }
 
   function tekenInhoud(tekst: string, x: number, startY: number, maxBreedte: number): number {
     let curY = startY
-    doc.setCharSpace(0)
-    for (const { regel, isBullet } of verwerkTekst(tekst, maxBreedte)) {
-      if (!regel) { curY += regelHoogte * 0.5; continue }
+    for (const rij of tekst.split('\n')) {
+      const r = rij.trim()
+      if (!r) { curY += regelHoogte * 0.5; continue }
+      const isBullet = /^[●•*\-–]\s/.test(r)
+      const schoon = isBullet ? r.replace(/^[●•*\-–]\s*/, '').trim() : r
+      const w = isBullet ? maxBreedte - 6 : maxBreedte
+      const regels: string[] = doc.splitTextToSize(schoon, w)
       if (isBullet) {
         doc.setFillColor(...groen)
         doc.circle(x + 2, curY - 1.2, 1.2, 'F')
-        doc.text(String(regel), x + 6, curY)
+        doc.text(regels, x + 6, curY)
       } else {
-        doc.text(String(regel), x, curY)
+        doc.text(regels, x, curY)
       }
-      curY += regelHoogte
+      curY += regels.length * regelHoogte
     }
     return curY
   }
@@ -224,26 +238,42 @@ async function exportTheepraatjePDF(brief: Nieuwsbrief) {
 
   // Bereken benodigde hoogte voor tekst
   function tekstHoogte(tekst: string): number {
-    return splitRegel(tekst, TEKST_W).reduce((h, r) => h + (r.t ? RH : RH * 0.35), 0)
+    let h = 0
+    for (const rij of tekst.split('\n')) {
+      const r = rij.trim()
+      if (!r) { h += RH * 0.35; continue }
+      const isBullet = /^[●•*\-–]\s/.test(r)
+      const schoon = isBullet ? r.replace(/^[●•*\-–]\s*/, '').trim() : r
+      const w = isBullet ? TEKST_W - 5 : TEKST_W
+      const regels: string[] = doc.splitTextToSize(schoon, w)
+      h += regels.length * RH
+    }
+    return h
   }
 
-  // Teken tekst, return eindY
+  // Teken tekst als array-aanroepen om viewer-justify te voorkomen
   function tekenTekst(tekst: string, x: number, y: number, kleur: [number,number,number]): number {
     doc.setTextColor(...ZWART)
     doc.setFont('helvetica', 'normal')
     doc.setFontSize(FS)
-    // Zet character spacing op 0 om uitsparen te voorkomen
-    doc.setCharSpace(0)
-    for (const { t, bullet } of splitRegel(tekst, TEKST_W)) {
-      if (!t) { y += RH * 0.35; continue }
-      if (bullet) {
+
+    // Verwerk per invoeregel afzonderlijk zodat bullets correct werken
+    for (const rij of tekst.split('\n')) {
+      const r = rij.trim()
+      if (!r) { y += RH * 0.35; continue }
+      const isBullet = /^[●•*\-–]\s/.test(r)
+      const schoon = isBullet ? r.replace(/^[●•*\-–]\s*/, '').trim() : r
+      const w = isBullet ? TEKST_W - 5 : TEKST_W
+      // Splits in regels en geef als array door aan doc.text — dit voorkomt justify
+      const regels: string[] = doc.splitTextToSize(schoon, w)
+      if (isBullet) {
         doc.setFillColor(...kleur)
         doc.circle(x + 1.5, y - 1.0, 1.0, 'F')
-        doc.text(String(t), x + 4.5, y)
+        doc.text(regels, x + 4.5, y)
       } else {
-        doc.text(String(t), x, y)
+        doc.text(regels, x, y)
       }
-      y += RH
+      y += regels.length * RH
     }
     return y
   }
