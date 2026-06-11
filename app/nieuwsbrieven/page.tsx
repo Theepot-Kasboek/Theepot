@@ -109,9 +109,9 @@ async function exportWeekmemoPDF(brief: Nieuwsbrief) {
       if (isBullet) {
         doc.setFillColor(...groen)
         doc.circle(x + 2, curY - 1.2, 1.2, 'F')
-        doc.text(regel, x + 6, curY, { align: 'left' })
+        doc.text(regel, x + 6, curY, { maxWidth: maxBreedte - 6 })
       } else {
-        doc.text(regel, x, curY, { align: 'left' })
+        doc.text(regel, x, curY, { maxWidth: maxBreedte })
       }
       curY += regelHoogte
     }
@@ -236,9 +236,9 @@ async function exportTheepraatjePDF(brief: Nieuwsbrief) {
       if (bullet) {
         doc.setFillColor(...kleur)
         doc.circle(x + 1.5, y - 1.0, 1.0, 'F')
-        doc.text(t, x + 4.5, y, { align: 'left' })
+        doc.text(t, x + 4.5, y, { maxWidth: TEKST_W - 5 })
       } else {
-        doc.text(t, x, y, { align: 'left' })
+        doc.text(t, x, y, { maxWidth: TEKST_W })
       }
       y += RH
     }
