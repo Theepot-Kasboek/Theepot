@@ -109,9 +109,9 @@ async function exportWeekmemoPDF(brief: Nieuwsbrief) {
       if (isBullet) {
         doc.setFillColor(...groen)
         doc.circle(x + 2, curY - 1.2, 1.2, 'F')
-        doc.text(regel, x + 6, curY)
+        doc.text(regel, x + 6, curY, { align: 'left' })
       } else {
-        doc.text(regel, x, curY)
+        doc.text(regel, x, curY, { align: 'left' })
       }
       curY += regelHoogte
     }
@@ -177,148 +177,232 @@ async function exportTheepraatjePDF(brief: Nieuwsbrief) {
   const { jsPDF } = await import('jspdf')
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
 
-  const groen: [number, number, number] = [140, 198, 63]
-  const donkerGroen: [number, number, number] = [61, 107, 26]
-  const wit: [number, number, number] = [255, 255, 255]
-  const zwart: [number, number, number] = [30, 30, 30]
-  const grijs: [number, number, number] = [130, 130, 130]
-  const lichtGroen: [number, number, number] = [235, 245, 214]
-  const accentOranje: [number, number, number] = [255, 165, 0]
-  const marge = 14
-  const breedte = 210 - marge * 2
-  let y = 0
+  const GROEN:      [number,number,number] = [140, 198,  63]
+  const DK_GROEN:   [number,number,number] = [ 61, 107,  26]
+  const LT_GROEN:   [number,number,number] = [235, 245, 214]
+  const WIT:        [number,number,number] = [255, 255, 255]
+  const ZWART:      [number,number,number] = [ 30,  30,  30]
+  const GRIJS:      [number,number,number] = [160, 160, 160]
+  const ORANJE:     [number,number,number] = [255, 140,   0]
+  const PAARS:      [number,number,number] = [138,  43, 226]
+  const ROZE:       [number,number,number] = [255,  99, 132]
 
-  // Helper: verwerk tekst met bullets correct
-  function verwerkTekst(tekst: string, maxBreedte: number): { regel: string; isBullet: boolean }[] {
-    const resultaat: { regel: string; isBullet: boolean }[] = []
-    const invoerRegels = tekst.split('\n')
+  const PAGE_W = 210
+  const PAGE_H = 297
+  const MARGE = 12
+  const KOLOM_GAP = 5
+  const KOLOM_W = (PAGE_W - MARGE * 2 - KOLOM_GAP) / 2   // ~86.5 mm
+  const RH = 5.0   // regelHoogte
 
-    for (const invoer of invoerRegels) {
-      const getrimd = invoer.trim()
-      // Detecteer bullet tekens: ●, •, *, -, –
-      const isBullet = /^[●•\*\-–]\s/.test(getrimd)
-      const schoneTekst = isBullet
-        ? getrimd.replace(/^[●•\*\-–]\s*/, '').trim()
-        : getrimd
-
-      if (!schoneTekst) { resultaat.push({ regel: '', isBullet: false }); continue }
-
-      const regelBreedte = isBullet ? maxBreedte - 6 : maxBreedte
-      const gesplitst = doc.splitTextToSize(schoneTekst, regelBreedte)
-      gesplitst.forEach((r: string, i: number) => {
-        resultaat.push({ regel: r, isBullet: isBullet && i === 0 })
-      })
+  // ── Bullet-bewuste tekstverwerking ──────────────────────────────────────────
+  function verwerkTekst(tekst: string, breedte: number) {
+    const uit: { tekst: string; isBullet: boolean }[] = []
+    for (const rij of tekst.split('\n')) {
+      const r = rij.trim()
+      const isBullet = /^[●•*\-–]\s/.test(r)
+      const schoon = isBullet ? r.replace(/^[●•*\-–]\s*/, '') : r
+      if (!schoon) { uit.push({ tekst: '', isBullet: false }); continue }
+      const regels: string[] = doc.splitTextToSize(schoon, isBullet ? breedte - 5 : breedte)
+      regels.forEach((s: string, i: number) => uit.push({ tekst: s, isBullet: isBullet && i === 0 }))
     }
-    return resultaat
+    return uit
   }
 
-  // Helper: teken sectie inhoud met bullet support
-  function tekenInhoud(tekst: string, x: number, startY: number, maxBreedte: number, regelHoogte: number): number {
-    const regels = verwerkTekst(tekst, maxBreedte)
-    let curY = startY
-    for (const { regel, isBullet } of regels) {
-      if (!regel) { curY += regelHoogte * 0.5; continue }
+  function berekenHoogte(tekst: string, breedte: number): number {
+    return verwerkTekst(tekst, breedte).reduce((h, r) => h + (r.tekst ? RH : RH * 0.4), 0)
+  }
+
+  function tekenInhoud(tekst: string, x: number, y: number, breedte: number, kleur: [number,number,number] = GROEN): number {
+    doc.setTextColor(...ZWART)
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(9)
+    for (const { tekst: t, isBullet } of verwerkTekst(tekst, breedte)) {
+      if (!t) { y += RH * 0.4; continue }
       if (isBullet) {
-        // Groene bullet stip
-        doc.setFillColor(...groen)
-        doc.circle(x + 2, curY - 1.2, 1.2, 'F')
-        doc.text(regel, x + 6, curY, { align: 'left' })
+        doc.setFillColor(...kleur)
+        doc.circle(x + 1.8, y - 1.0, 1.1, 'F')
+        doc.text(t, x + 5, y)
       } else {
-        doc.text(regel, x, curY, { align: 'left' })
+        doc.text(t, x, y)
       }
-      curY += regelHoogte
+      y += RH
     }
-    return curY
+    return y
   }
 
-  // Bereken hoogte van een sectie inhoud
-  function berekenHoogte(tekst: string, maxBreedte: number, regelHoogte: number): number {
-    const regels = verwerkTekst(tekst, maxBreedte)
-    let hoogte = 0
-    for (const { regel } of regels) {
-      hoogte += regel ? regelHoogte : regelHoogte * 0.5
-    }
-    return Math.max(hoogte, 8)
+  // ── Decoratieve confetti stipjes ─────────────────────────────────────────────
+  function tekenConfetti(yStart: number, yEnd: number) {
+    const kleuren: [number,number,number][] = [GROEN, ORANJE, ROZE, PAARS, [255,220,0]]
+    const posities = [
+      [4,  yStart + 8],  [206, yStart + 14], [5,  yStart + 22],
+      [205,yStart + 30], [4,  yStart + 38],  [207,yStart + 5],
+      [5,  yEnd - 10],   [206,yEnd - 18],
+    ]
+    posities.forEach(([px, py], i) => {
+      doc.setFillColor(...kleuren[i % kleuren.length])
+      doc.circle(px, py, 1.5, 'F')
+    })
   }
 
-  // ── Header ──────────────────────────────────────────────────────────────────
-  // Grote vrolijke groene header
-  doc.setFillColor(...groen)
-  doc.rect(0, 0, 210, 46, 'F')
+  // ── Decoratieve sterren / bloemetjes ────────────────────────────────────────
+  function tekenSter(cx: number, cy: number, r: number, kleur: [number,number,number]) {
+    doc.setFillColor(...kleur)
+    doc.circle(cx, cy, r, 'F')
+    // Kleine punten eromheen
+    for (let a = 0; a < 360; a += 60) {
+      const rad = (a * Math.PI) / 180
+      doc.circle(cx + Math.cos(rad) * r * 1.7, cy + Math.sin(rad) * r * 1.7, r * 0.5, 'F')
+    }
+  }
 
-  // Golvend wit accent rechtsonder in header (gesimuleerd met ronde rechthoek)
-  doc.setFillColor(255, 255, 255, 0.1)
+  // ── Sectie teken functie ─────────────────────────────────────────────────────
+  function tekenSectie(
+    sectie: Sectie,
+    x: number, y: number, breedte: number,
+    accentKleur: [number,number,number]
+  ): number {
+    const inh = sectie.inhoud.trim()
+    const inhH = berekenHoogte(inh, breedte - 6)
+    const totH = inhH + 18
 
-  // Logo links in header
-  try { doc.addImage(LOGO_B64, 'JPEG', marge, 7, 30, 30) } catch {}
+    // Achtergrond sectiekaart
+    doc.setFillColor(252, 254, 252)
+    doc.roundedRect(x, y, breedte, totH, 3, 3, 'F')
+    // Gekleurde linkerbalk
+    doc.setFillColor(...accentKleur)
+    doc.roundedRect(x, y, 3.5, totH, 1.5, 1.5, 'F')
+    // Subtiele rand
+    doc.setDrawColor(220, 235, 210)
+    doc.setLineWidth(0.3)
+    doc.roundedRect(x, y, breedte, totH, 3, 3, 'S')
 
-  // Naam rechts
-  doc.setTextColor(...wit)
-  doc.setFontSize(30)
+    // Sectie titel balk
+    doc.setFillColor(...accentKleur)
+    doc.roundedRect(x + 5, y + 3, breedte - 10, 7.5, 2, 2, 'F')
+    doc.setTextColor(...WIT)
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(8.5)
+    doc.text(sectie.titel.toUpperCase(), x + 8, y + 8)
+
+    // Inhoud
+    tekenInhoud(inh, x + 5, y + 14, breedte - 8, accentKleur)
+
+    return y + totH + 4
+  }
+
+  // ── PAGINA 1: Header ────────────────────────────────────────────────────────
+  // Grote groene header golf-vorm (gesimuleerd)
+  doc.setFillColor(...GROEN)
+  doc.rect(0, 0, PAGE_W, 50, 'F')
+
+  // Decoratieve golven onderin header
+  doc.setFillColor(...DK_GROEN)
+  doc.rect(0, 46, PAGE_W, 4, 'F')
+  doc.setFillColor(255, 255, 255, 0.15)
+
+  // Kleurige stipjes in header als decoratie
+  const headerStipjes: [number, number, [number,number,number]][] = [
+    [170, 8,  ORANJE], [180, 20, [255,220,0]], [190, 10, ROZE],
+    [160, 28, PAARS],  [175, 38, WIT],         [185, 30, ORANJE],
+    [155, 15, [255,220,0]], [165, 35, ROZE],
+  ]
+  headerStipjes.forEach(([hx, hy, hk]) => {
+    doc.setFillColor(...hk)
+    doc.circle(hx, hy, 2.2, 'F')
+  })
+
+  // Logo
+  try { doc.addImage(LOGO_B64, 'JPEG', MARGE, 8, 28, 28) } catch {}
+
+  // Titel
+  doc.setTextColor(...WIT)
   doc.setFont('helvetica', 'bold')
-  doc.text('Theepraatje', marge + 36, 24)
+  doc.setFontSize(28)
+  doc.text('Theepraatje', MARGE + 34, 26)
 
-  doc.setFontSize(9)
+  // Ondertitel
   doc.setFont('helvetica', 'normal')
-  const subTekst = [
+  doc.setFontSize(8.5)
+  const sub = [
     brief.nummer ? `Nr. ${brief.nummer}` : null,
     fmtDatum(brief.datum),
     brief.locatie_naam,
   ].filter(Boolean).join('  •  ')
-  doc.text(subTekst, marge + 36, 33)
+  doc.text(sub, MARGE + 34, 35)
 
-  // Decoratieve gekleurde balk onder header
-  doc.setFillColor(...donkerGroen)
-  doc.rect(0, 46, 210, 3, 'F')
+  // Kleine bloemetje-sterren in header
+  tekenSter(200, 12, 2.5, ORANJE)
+  tekenSter(152, 40, 1.8, [255,220,0])
 
-  y = 56
+  let y = 58
 
-  // ── Secties — één kolom breed, lekker leesbaar ───────────────────────────────
-  const regelHoogte = 5.2
-  const inhoudbreedte = breedte - 8
+  // ── Twee-koloms layout ───────────────────────────────────────────────────────
+  const ACCENT_KLEUREN: [number,number,number][] = [
+    GROEN, ORANJE, PAARS, ROZE, DK_GROEN, [0,150,136]
+  ]
 
-  for (const sectie of brief.secties.filter(s => s.inhoud.trim())) {
-    const sectieHoogte = berekenHoogte(sectie.inhoud.trim(), inhoudbreedte, regelHoogte)
-    const totaalHoogte = sectieHoogte + 22
+  const secties = brief.secties.filter(s => s.inhoud.trim())
+  const linkerSecties = secties.filter((_, i) => i % 2 === 0)
+  const rechterSecties = secties.filter((_, i) => i % 2 === 1)
 
-    if (y + totaalHoogte > 272) { doc.addPage(); y = 16 }
+  const xLinks = MARGE
+  const xRechts = MARGE + KOLOM_W + KOLOM_GAP
 
-    // Sectietitel — vrolijke groene afgeronde balk
-    doc.setFillColor(...lichtGroen)
-    doc.roundedRect(marge, y, breedte, 9, 2, 2, 'F')
-    doc.setFillColor(...groen)
-    doc.roundedRect(marge, y, 4, 9, 1, 1, 'F')
-    doc.setTextColor(...donkerGroen)
-    doc.setFontSize(10)
-    doc.setFont('helvetica', 'bold')
-    doc.text(sectie.titel, marge + 7, y + 6.2)
-    y += 12
+  let yL = y
+  let yR = y
 
-    // Inhoud
-    doc.setTextColor(...zwart)
-    doc.setFont('helvetica', 'normal')
-    doc.setFontSize(9.5)
-    const eindY = tekenInhoud(sectie.inhoud.trim(), marge + 4, y + 4.5, inhoudbreedte, regelHoogte)
-    y = eindY + 7
+  // Teken confetti-stipjes in de marges
+  tekenConfetti(58, 280)
 
-    // Subtiele scheidingslijn
-    doc.setDrawColor(220, 220, 220)
-    doc.setLineWidth(0.3)
-    doc.line(marge, y - 3, marge + breedte, y - 3)
+  // Linkerkolom
+  for (let i = 0; i < linkerSecties.length; i++) {
+    const s = linkerSecties[i]
+    const accentKleur = ACCENT_KLEUREN[secties.indexOf(s) % ACCENT_KLEUREN.length]
+    const inh = s.inhoud.trim()
+    const sH = berekenHoogte(inh, KOLOM_W - 6) + 22
+
+    if (yL + sH > PAGE_H - 20) {
+      doc.addPage()
+      yL = 20; yR = 20
+      tekenConfetti(20, 280)
+    }
+    yL = tekenSectie(s, xLinks, yL, KOLOM_W, accentKleur)
   }
 
-  // ── Footer ───────────────────────────────────────────────────────────────────
-  const aantalPaginas = doc.getNumberOfPages()
-  for (let p = 1; p <= aantalPaginas; p++) {
+  // Rechterkolom
+  for (let i = 0; i < rechterSecties.length; i++) {
+    const s = rechterSecties[i]
+    const accentKleur = ACCENT_KLEUREN[secties.indexOf(s) % ACCENT_KLEUREN.length]
+    const inh = s.inhoud.trim()
+    const sH = berekenHoogte(inh, KOLOM_W - 6) + 22
+
+    // Zorg dat we op dezelfde pagina zijn als de linkerkolom zover al is
+    if (yR + sH > PAGE_H - 20) {
+      yR = 20
+    }
+    yR = tekenSectie(s, xRechts, yR, KOLOM_W, accentKleur)
+  }
+
+  // ── Footer ────────────────────────────────────────────────────────────────────
+  const n = doc.getNumberOfPages()
+  for (let p = 1; p <= n; p++) {
     doc.setPage(p)
-    doc.setFillColor(...groen)
-    doc.rect(0, 284, 210, 13, 'F')
-    doc.setFontSize(7.5)
+    doc.setFillColor(...GROEN)
+    doc.rect(0, PAGE_H - 13, PAGE_W, 13, 'F')
+    // Kleine stipjes in footer
+    const footerStips: [number, number, [number,number,number]][] = [
+      [20, PAGE_H-7, ORANJE], [100, PAGE_H-9, [255,220,0]], [190, PAGE_H-6, ROZE]
+    ]
+    footerStips.forEach(([fx, fy, fk]) => {
+      doc.setFillColor(...fk)
+      doc.circle(fx, fy, 1.5, 'F')
+    })
     doc.setFont('helvetica', 'normal')
-    doc.setTextColor(...wit)
-    doc.text('De Theepot — Kinderopvang', marge, 291)
-    if (brief.locatie_naam) doc.text(brief.locatie_naam, 210 / 2, 291, { align: 'center' })
-    doc.text(`${p} / ${aantalPaginas}`, 210 - marge, 291, { align: 'right' })
+    doc.setFontSize(7.5)
+    doc.setTextColor(...WIT)
+    doc.text('De Theepot — Kinderopvang', MARGE, PAGE_H - 5)
+    if (brief.locatie_naam) doc.text(brief.locatie_naam, PAGE_W / 2, PAGE_H - 5, { align: 'center' })
+    doc.text(`${p} / ${n}`, PAGE_W - MARGE, PAGE_H - 5, { align: 'right' })
   }
 
   doc.save(`Theepraatje_Nr${brief.nummer ?? ''}_${brief.datum}.pdf`)
