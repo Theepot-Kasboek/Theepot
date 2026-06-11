@@ -230,40 +230,16 @@ async function exportTheepraatjePDF(brief: Nieuwsbrief) {
     return y
   }
 
-  // ── Decoratieve confetti stipjes ─────────────────────────────────────────────
-  function tekenConfetti(yStart: number, yEnd: number) {
-    const kleuren: [number,number,number][] = [GROEN, ORANJE, ROZE, PAARS, [255,220,0]]
-    const posities = [
-      [4,  yStart + 8],  [206, yStart + 14], [5,  yStart + 22],
-      [205,yStart + 30], [4,  yStart + 38],  [207,yStart + 5],
-      [5,  yEnd - 10],   [206,yEnd - 18],
-    ]
-    posities.forEach(([px, py], i) => {
-      doc.setFillColor(...kleuren[i % kleuren.length])
-      doc.circle(px, py, 1.5, 'F')
-    })
-  }
-
-  // ── Decoratieve sterren / bloemetjes ────────────────────────────────────────
-  function tekenSter(cx: number, cy: number, r: number, kleur: [number,number,number]) {
-    doc.setFillColor(...kleur)
-    doc.circle(cx, cy, r, 'F')
-    // Kleine punten eromheen
-    for (let a = 0; a < 360; a += 60) {
-      const rad = (a * Math.PI) / 180
-      doc.circle(cx + Math.cos(rad) * r * 1.7, cy + Math.sin(rad) * r * 1.7, r * 0.5, 'F')
-    }
-  }
-
   // ── Sectie teken functie ─────────────────────────────────────────────────────
   function tekenSectie(
     sectie: Sectie,
     x: number, y: number, breedte: number,
-    accentKleur: [number,number,number]
+    accentKleur: [number,number,number],
+    emojiMap: Record<string, string> = {}
   ): number {
     const inh = sectie.inhoud.trim()
-    const inhH = berekenHoogte(inh, breedte - 6)
-    const totH = inhH + 18
+    const inhH = berekenHoogte(inh, breedte - 8)
+    const totH = inhH + 22
 
     // Achtergrond sectiekaart
     doc.setFillColor(252, 254, 252)
@@ -282,34 +258,20 @@ async function exportTheepraatjePDF(brief: Nieuwsbrief) {
     doc.setTextColor(...WIT)
     doc.setFont('helvetica', 'bold')
     doc.setFontSize(8.5)
-    doc.text(sectie.titel.toUpperCase(), x + 8, y + 8)
+    const emoji = emojiMap[sectie.titel] ?? ''
+    doc.text(emoji + sectie.titel.toUpperCase(), x + 8, y + 8)
 
     // Inhoud
-    tekenInhoud(inh, x + 5, y + 14, breedte - 8, accentKleur)
+    tekenInhoud(inh, x + 5, y + 15, breedte - 10, accentKleur)
 
     return y + totH + 4
   }
 
   // ── PAGINA 1: Header ────────────────────────────────────────────────────────
-  // Grote groene header golf-vorm (gesimuleerd)
   doc.setFillColor(...GROEN)
   doc.rect(0, 0, PAGE_W, 50, 'F')
-
-  // Decoratieve golven onderin header
   doc.setFillColor(...DK_GROEN)
   doc.rect(0, 46, PAGE_W, 4, 'F')
-  doc.setFillColor(255, 255, 255, 0.15)
-
-  // Kleurige stipjes in header als decoratie
-  const headerStipjes: [number, number, [number,number,number]][] = [
-    [170, 8,  ORANJE], [180, 20, [255,220,0]], [190, 10, ROZE],
-    [160, 28, PAARS],  [175, 38, WIT],         [185, 30, ORANJE],
-    [155, 15, [255,220,0]], [165, 35, ROZE],
-  ]
-  headerStipjes.forEach(([hx, hy, hk]) => {
-    doc.setFillColor(...hk)
-    doc.circle(hx, hy, 2.2, 'F')
-  })
 
   // Logo
   try { doc.addImage(LOGO_B64, 'JPEG', MARGE, 8, 28, 28) } catch {}
@@ -330,57 +292,50 @@ async function exportTheepraatjePDF(brief: Nieuwsbrief) {
   ].filter(Boolean).join('  •  ')
   doc.text(sub, MARGE + 34, 35)
 
-  // Kleine bloemetje-sterren in header
-  tekenSter(200, 12, 2.5, ORANJE)
-  tekenSter(152, 40, 1.8, [255,220,0])
-
   let y = 58
 
-  // ── Twee-koloms layout ───────────────────────────────────────────────────────
+  // ── Emoji mapping per sectietitel ───────────────────────────────────────────
+  const SECTIE_EMOJI: Record<string, string> = {
+    'Redactioneel':            '✏️ ',
+    'Organisatie nieuws':      '📢 ',
+    'Activiteiten & programma':'🎨 ',
+    'Ouderinformatie':         '👨‍👩‍👧 ',
+    'Medewerkers':             '👩‍🏫 ',
+    'Agenda & data':           '📅 ',
+  }
+
   const ACCENT_KLEUREN: [number,number,number][] = [
     GROEN, ORANJE, PAARS, ROZE, DK_GROEN, [0,150,136]
   ]
 
   const secties = brief.secties.filter(s => s.inhoud.trim())
-  const linkerSecties = secties.filter((_, i) => i % 2 === 0)
-  const rechterSecties = secties.filter((_, i) => i % 2 === 1)
-
-  const xLinks = MARGE
+  const xLinks  = MARGE
   const xRechts = MARGE + KOLOM_W + KOLOM_GAP
 
-  let yL = y
-  let yR = y
+  // ── Render secties paarsgewijs naast elkaar ──────────────────────────────────
+  for (let i = 0; i < secties.length; i += 2) {
+    const sLinks  = secties[i]
+    const sRechts = secties[i + 1] ?? null
 
-  // Teken confetti-stipjes in de marges
-  tekenConfetti(58, 280)
+    const hoogtL = berekenHoogte(sLinks.inhoud.trim(), KOLOM_W - 8) + 22
+    const hoogtR = sRechts ? berekenHoogte(sRechts.inhoud.trim(), KOLOM_W - 8) + 22 : 0
+    const rijHoogte = Math.max(hoogtL, hoogtR)
 
-  // Linkerkolom
-  for (let i = 0; i < linkerSecties.length; i++) {
-    const s = linkerSecties[i]
-    const accentKleur = ACCENT_KLEUREN[secties.indexOf(s) % ACCENT_KLEUREN.length]
-    const inh = s.inhoud.trim()
-    const sH = berekenHoogte(inh, KOLOM_W - 6) + 22
-
-    if (yL + sH > PAGE_H - 20) {
+    // Nieuwe pagina indien nodig
+    if (y + rijHoogte > PAGE_H - 18) {
       doc.addPage()
-      yL = 20; yR = 20
-      tekenConfetti(20, 280)
+      y = 20
     }
-    yL = tekenSectie(s, xLinks, yL, KOLOM_W, accentKleur)
-  }
 
-  // Rechterkolom
-  for (let i = 0; i < rechterSecties.length; i++) {
-    const s = rechterSecties[i]
-    const accentKleur = ACCENT_KLEUREN[secties.indexOf(s) % ACCENT_KLEUREN.length]
-    const inh = s.inhoud.trim()
-    const sH = berekenHoogte(inh, KOLOM_W - 6) + 22
+    // Teken linker sectie
+    tekenSectie(sLinks, xLinks, y, KOLOM_W, ACCENT_KLEUREN[i % ACCENT_KLEUREN.length], SECTIE_EMOJI)
 
-    // Zorg dat we op dezelfde pagina zijn als de linkerkolom zover al is
-    if (yR + sH > PAGE_H - 20) {
-      yR = 20
+    // Teken rechter sectie
+    if (sRechts) {
+      tekenSectie(sRechts, xRechts, y, KOLOM_W, ACCENT_KLEUREN[(i + 1) % ACCENT_KLEUREN.length], SECTIE_EMOJI)
     }
-    yR = tekenSectie(s, xRechts, yR, KOLOM_W, accentKleur)
+
+    y += rijHoogte + 4
   }
 
   // ── Footer ────────────────────────────────────────────────────────────────────
@@ -389,14 +344,6 @@ async function exportTheepraatjePDF(brief: Nieuwsbrief) {
     doc.setPage(p)
     doc.setFillColor(...GROEN)
     doc.rect(0, PAGE_H - 13, PAGE_W, 13, 'F')
-    // Kleine stipjes in footer
-    const footerStips: [number, number, [number,number,number]][] = [
-      [20, PAGE_H-7, ORANJE], [100, PAGE_H-9, [255,220,0]], [190, PAGE_H-6, ROZE]
-    ]
-    footerStips.forEach(([fx, fy, fk]) => {
-      doc.setFillColor(...fk)
-      doc.circle(fx, fy, 1.5, 'F')
-    })
     doc.setFont('helvetica', 'normal')
     doc.setFontSize(7.5)
     doc.setTextColor(...WIT)
