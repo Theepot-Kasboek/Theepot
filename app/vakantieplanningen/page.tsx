@@ -212,17 +212,31 @@ export default function VakantieplanningenPage() {
     await haalWekenOp(actievePlanning.id)
   }
 
-  async function voegActiviteitToe(data: Omit<VakantieActiviteit, 'id'>) {
+  async function voegActiviteitToe(data: Omit<VakantieActiviteit, 'id'>, bestand?: File | null) {
     const insertData = { ...data, benodigdheden: data.benodigdheden ?? [] }
     const { error } = await getSupabase().from('vakantie_activiteiten').insert(insertData)
     if (error) { setToast({ bericht: 'Mislukt: ' + error.message, type: 'error' }); return }
+
+    // Upload foto naar gekoppelde bibliotheekactiviteit
+    if (bestand && data.activiteit_id) {
+      const resultaat = await uploadActiviteitAfbeelding(data.activiteit_id, bestand)
+      if (!resultaat.ok) setToast({ bericht: 'Activiteit opgeslagen maar foto mislukt: ' + resultaat.stappen[resultaat.stappen.length - 1], type: 'error' })
+    }
+
     setActiviteitModal(null)
     setToast({ bericht: 'Activiteit toegevoegd!', type: 'success' })
     await haalActiviteitenOp(actievePlanning!.id)
   }
 
-  async function bewerkActiviteitOp(id: string, data: Partial<VakantieActiviteit>) {
+  async function bewerkActiviteitOp(id: string, data: Partial<VakantieActiviteit>, bestand?: File | null) {
     await getSupabase().from('vakantie_activiteiten').update(data).eq('id', id)
+
+    // Upload foto naar gekoppelde bibliotheekactiviteit
+    if (bestand && data.activiteit_id) {
+      const resultaat = await uploadActiviteitAfbeelding(data.activiteit_id, bestand)
+      if (!resultaat.ok) setToast({ bericht: 'Opgeslagen maar foto mislukt: ' + resultaat.stappen[resultaat.stappen.length - 1], type: 'error' })
+    }
+
     setBewerkActiviteit(null)
     setActiviteitModal(null)
     await haalActiviteitenOp(actievePlanning!.id)
@@ -549,7 +563,7 @@ export default function VakantieplanningenPage() {
           bibliotheek={bibliotheek}
           volgorde={activiteiten.filter(a => a.week_id === activiteitModal.weekId && a.dag === activiteitModal.dag).length}
           onSave={voegActiviteitToe}
-          onBewerk={(id, data) => bewerkActiviteitOp(id, data)}
+          onBewerk={(id, data, bestand) => bewerkActiviteitOp(id, data, bestand)}
           onClose={() => { setActiviteitModal(null); setBewerkActiviteit(null) }}
         />
       )}
@@ -974,8 +988,8 @@ function ActiviteitToevoegenModal({ weekId, dag, activiteit, bibliotheek, volgor
   activiteit: VakantieActiviteit | null
   bibliotheek: BibliotheekActiviteit[]
   volgorde: number
-  onSave: (data: Omit<VakantieActiviteit, 'id'>) => void
-  onBewerk: (id: string, data: Partial<VakantieActiviteit>) => void
+  onSave: (data: Omit<VakantieActiviteit, 'id'>, bestand?: File | null) => void
+  onBewerk: (id: string, data: Partial<VakantieActiviteit>, bestand?: File | null) => void
   onClose: () => void
 }) {
   const [tab, setTab] = useState<'handmatig' | 'bibliotheek'>('handmatig')
@@ -991,11 +1005,14 @@ function ActiviteitToevoegenModal({ weekId, dag, activiteit, bibliotheek, volgor
   const [afbeeldingPreview, setAfbeeldingPreview] = useState<string | null>(null)
   const [uploading, setUploading] = useState(false)
   const [uploadFout, setUploadFout] = useState('')
+  // ID van de gekoppelde bibliotheekactiviteit (voor foto upload)
+  const [gekozenBibliotheekId, setGekozenBibliotheekId] = useState<string | null>(activiteit?.activiteit_id ?? null)
 
   // Laad bestaande afbeelding van gekoppelde bibliotheekactiviteit
   useEffect(() => {
-    if (activiteit?.activiteit_id) {
-      getSupabase().from('activiteiten').select('afbeelding_pad').eq('id', activiteit.activiteit_id).single()
+    const id = gekozenBibliotheekId ?? activiteit?.activiteit_id
+    if (id) {
+      getSupabase().from('activiteiten').select('afbeelding_pad').eq('id', id).single()
         .then(({ data }) => {
           if (data?.afbeelding_pad) {
             const url = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/activiteit-afbeeldingen/${data.afbeelding_pad}`
@@ -1003,7 +1020,7 @@ function ActiviteitToevoegenModal({ weekId, dag, activiteit, bibliotheek, volgor
           }
         })
     }
-  }, [activiteit?.activiteit_id])
+  }, [gekozenBibliotheekId])
 
   function kiesAfbeelding(bestand: File) {
     setAfbeeldingBestand(bestand)
@@ -1040,21 +1057,18 @@ function ActiviteitToevoegenModal({ weekId, dag, activiteit, bibliotheek, volgor
     setUploading(true)
     setUploadFout('')
 
+    const actId = gekozenBibliotheekId ?? activiteit?.activiteit_id ?? null
     const benodigdheden = benodigdhedenRaw.split(',').map(s => s.trim()).filter(Boolean)
-    const data = { week_id: weekId, dag, volgorde, categorie, naam: naam.trim(), beschrijving: beschrijving.trim() || null, benodigdheden, activiteit_id: activiteit?.activiteit_id ?? null }
-
-    // Upload foto naar gekoppelde bibliotheekactiviteit
-    if (afbeeldingBestand && activiteit?.activiteit_id) {
-      const resultaat = await uploadActiviteitAfbeelding(activiteit.activiteit_id, afbeeldingBestand)
-      if (!resultaat.ok) {
-        setUploadFout('Foto uploaden mislukt: ' + resultaat.stappen[resultaat.stappen.length - 1])
-        setUploading(false)
-        return
-      }
+    const data = {
+      week_id: weekId, dag, volgorde, categorie,
+      naam: naam.trim(),
+      beschrijving: beschrijving.trim() || null,
+      benodigdheden,
+      activiteit_id: actId,
     }
 
-    if (activiteit) onBewerk(activiteit.id, data)
-    else onSave(data)
+    if (activiteit) onBewerk(activiteit.id, data, afbeeldingBestand)
+    else onSave(data, afbeeldingBestand)
     setUploading(false)
   }
 
@@ -1063,6 +1077,7 @@ function ActiviteitToevoegenModal({ weekId, dag, activiteit, bibliotheek, volgor
     setCategorie(a.categorie)
     if (a.beschrijving) setBeschrijving(a.beschrijving)
     if (a.materialen?.length > 0) setBenodigdhedenRaw(a.materialen.join(', '))
+    setGekozenBibliotheekId(a.id) // sla het ID op voor foto-koppeling
     setTab('handmatig')
   }
 
@@ -1127,22 +1142,22 @@ function ActiviteitToevoegenModal({ weekId, dag, activiteit, bibliotheek, volgor
               </div>
               <div>
                 <label className="form-label">Voorbeeldafbeelding (optioneel)</label>
-                {!activiteit?.activiteit_id && !afbeeldingPreview && (
+                {!(gekozenBibliotheekId ?? activiteit?.activiteit_id) && !afbeeldingPreview && (
                   <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 6, background: 'var(--bg)', padding: '6px 10px', borderRadius: 7, border: '1px solid var(--border)' }}>
-                    💡 Koppel deze activiteit eerst aan de bibliotheek om een foto toe te voegen, of voeg de foto toe via de Activiteiten pagina.
+                    💡 Kies eerst een activiteit uit de bibliotheek om een foto toe te voegen.
                   </div>
                 )}
                 {afbeeldingPreview ? (
                   <div style={{ position: 'relative', borderRadius: 10, overflow: 'hidden', border: '1px solid var(--border)' }}>
                     <img src={afbeeldingPreview} alt="Preview" style={{ width: '100%', maxHeight: 160, objectFit: 'cover', display: 'block' }} />
-                    {activiteit?.activiteit_id && (
+                    {(gekozenBibliotheekId ?? activiteit?.activiteit_id) && (
                       <label style={{ position: 'absolute', top: 6, right: 6, cursor: 'pointer' }}>
                         <div className="btn btn-sm" style={{ background: 'rgba(0,0,0,0.6)', color: '#fff', border: 'none' }}>Wijzigen</div>
                         <input type="file" accept="image/jpeg,image/png,image/webp" style={{ display: 'none' }} onChange={e => e.target.files?.[0] && kiesAfbeelding(e.target.files[0])} />
                       </label>
                     )}
                   </div>
-                ) : activiteit?.activiteit_id ? (
+                ) : (gekozenBibliotheekId ?? activiteit?.activiteit_id) ? (
                   <label style={{ cursor: 'pointer', display: 'block' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', borderRadius: 9, border: '2px dashed var(--border-dark)', background: 'var(--bg)' }}
                       onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--primary)')}
