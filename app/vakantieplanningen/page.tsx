@@ -837,40 +837,46 @@ function DocumentWeergave({ planning, weken, activiteiten, dagDatumStr, tekstGro
                             overflow: 'hidden',
                           }}
                         >
-                          {/* Afbeelding bovenaan als die beschikbaar is */}
-                          {act.afbeelding_pad && (
-                            <img
-                              src={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/activiteit-afbeeldingen/${act.afbeelding_pad}`}
-                              alt={act.naam}
-                              style={{ width: '100%', maxHeight: 220, objectFit: 'cover', display: 'block' }}
-                            />
-                          )}
-                          <div style={{ padding: '14px 18px' }}>
-                            <div style={{ marginBottom: 8 }}>
-                              <span style={{ fontFamily: 'Sora, sans-serif', fontWeight: 700, fontSize: tekstGrootte + 3, color: 'var(--text)' }}>{act.naam}</span>
-                            </div>
-                            {act.beschrijving && (
-                              <p style={{ fontSize: tekstGrootte, color: 'var(--text)', lineHeight: 1.75, margin: '0 0 10px 0' }}>{act.beschrijving}</p>
-                            )}
-                            {act.benodigdheden?.length > 0 && (
-                            <div style={{ marginTop: 6 }}>
-                              <div style={{ fontSize: tekstGrootte - 2, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 5 }}>📦 Benodigdheden</div>
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                                {act.benodigdheden.map((b, bi) => (
-                                  <div key={bi} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: tekstGrootte - 1 }}>
-                                    <div style={{ width: 6, height: 6, borderRadius: '50%', background: i % 2 === 0 ? 'var(--primary)' : '#8B5CF6', flexShrink: 0 }} />
-                                    <span style={{ color: 'var(--text)' }}>{b}</span>
-                                  </div>
-                                ))}
+                          <div style={{ display: 'flex', gap: 0 }}>
+                            {/* Tekst links */}
+                            <div style={{ flex: 1, padding: '14px 18px', minWidth: 0 }}>
+                              <div style={{ marginBottom: 8 }}>
+                                <span style={{ fontFamily: 'Sora, sans-serif', fontWeight: 700, fontSize: tekstGrootte + 3, color: 'var(--text)' }}>{act.naam}</span>
                               </div>
+                              {act.beschrijving && (
+                                <p style={{ fontSize: tekstGrootte, color: 'var(--text)', lineHeight: 1.75, margin: '0 0 10px 0' }}>{act.beschrijving}</p>
+                              )}
+                              {act.benodigdheden?.length > 0 && (
+                                <div style={{ marginTop: 6 }}>
+                                  <div style={{ fontSize: tekstGrootte - 2, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 5 }}>📦 Benodigdheden</div>
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                                    {act.benodigdheden.map((b, bi) => (
+                                      <div key={bi} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: tekstGrootte - 1 }}>
+                                        <div style={{ width: 6, height: 6, borderRadius: '50%', background: i % 2 === 0 ? 'var(--primary)' : '#8B5CF6', flexShrink: 0 }} />
+                                        <span style={{ color: 'var(--text)' }}>{b}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                              {act.activiteit_id && (
+                                <div style={{ borderTop: '1px solid var(--border)', marginTop: 8, paddingTop: 10 }}>
+                                  <ActiviteitBijlagen activiteitId={act.activiteit_id} magBewerken={false} />
+                                </div>
+                              )}
                             </div>
-                          )}
-                          {act.activiteit_id && (
-                            <div style={{ borderTop: '1px solid var(--border)', marginTop: 8, paddingTop: 10 }}>
-                              <ActiviteitBijlagen activiteitId={act.activiteit_id} magBewerken={false} />
-                            </div>
-                          )}
-                          </div>{/* einde padding div */}
+
+                            {/* Foto rechts — automatisch geschaald */}
+                            {act.afbeelding_pad && (
+                              <div style={{ flexShrink: 0, width: 200, alignSelf: 'stretch', position: 'relative', borderLeft: '1px solid var(--border)' }}>
+                                <img
+                                  src={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/activiteit-afbeeldingen/${act.afbeelding_pad}`}
+                                  alt={act.naam}
+                                  style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                                />
+                              </div>
+                            )}
+                          </div>
                         </div>
                       ))}
                     </div>
