@@ -141,15 +141,17 @@ export default function VakantieplanningenPage() {
     const { data } = await getSupabase().from('vakantie_activiteiten').select('*').in('week_id', weekIds).order('volgorde')
     const vakActs = (data ?? []) as VakantieActiviteit[]
 
-    // Haal afbeeldingen op van gekoppelde bibliotheekactiviteiten
+    // Haal afbeeldingen op: bibliotheek heeft voorrang, anders eigen afbeelding_pad
     const actIds = vakActs.filter(a => a.activiteit_id).map(a => a.activiteit_id as string)
     if (actIds.length > 0) {
       const { data: bibActs } = await getSupabase().from('activiteiten').select('id,afbeelding_pad').in('id', actIds)
       const afbMap: Record<string, string> = {}
       for (const b of bibActs ?? []) if (b.afbeelding_pad) afbMap[b.id] = b.afbeelding_pad
-      setActiviteiten(vakActs.map(a => a.activiteit_id && afbMap[a.activiteit_id]
-        ? { ...a, afbeelding_pad: afbMap[a.activiteit_id] }
-        : a))
+      setActiviteiten(vakActs.map(a => ({
+        ...a,
+        // Gebruik bibliotheekfoto als die er is, anders eigen afbeelding_pad
+        afbeelding_pad: (a.activiteit_id && afbMap[a.activiteit_id]) || a.afbeelding_pad || null
+      })))
     } else {
       setActiviteiten(vakActs)
     }
@@ -213,14 +215,22 @@ export default function VakantieplanningenPage() {
   }
 
   async function voegActiviteitToe(data: Omit<VakantieActiviteit, 'id'>, bestand?: File | null) {
+    const supabase = getSupabase()
     const insertData = { ...data, benodigdheden: data.benodigdheden ?? [] }
-    const { error } = await getSupabase().from('vakantie_activiteiten').insert(insertData)
+    const { data: nieuw, error } = await supabase.from('vakantie_activiteiten').insert(insertData).select().single()
     if (error) { setToast({ bericht: 'Mislukt: ' + error.message, type: 'error' }); return }
 
-    // Upload foto naar gekoppelde bibliotheekactiviteit
-    if (bestand && data.activiteit_id) {
-      const resultaat = await uploadActiviteitAfbeelding(data.activiteit_id, bestand)
-      if (!resultaat.ok) setToast({ bericht: 'Activiteit opgeslagen maar foto mislukt: ' + resultaat.stappen[resultaat.stappen.length - 1], type: 'error' })
+    if (bestand && nieuw) {
+      if (data.activiteit_id) {
+        // Bibliotheekactiviteit: upload naar activiteiten bucket
+        await uploadActiviteitAfbeelding(data.activiteit_id, bestand)
+      } else {
+        // Handmatige activiteit: upload naar vakantie_activiteiten bucket
+        const ext = bestand.name.split('.').pop()?.toLowerCase() || 'jpg'
+        const pad = `vakantie/${nieuw.id}.${ext}`
+        const { data: upData } = await supabase.storage.from('activiteit-afbeeldingen').upload(pad, bestand, { upsert: true })
+        if (upData) await supabase.from('vakantie_activiteiten').update({ afbeelding_pad: upData.path }).eq('id', nieuw.id)
+      }
     }
 
     setActiviteitModal(null)
@@ -229,12 +239,20 @@ export default function VakantieplanningenPage() {
   }
 
   async function bewerkActiviteitOp(id: string, data: Partial<VakantieActiviteit>, bestand?: File | null) {
-    await getSupabase().from('vakantie_activiteiten').update(data).eq('id', id)
+    const supabase = getSupabase()
+    await supabase.from('vakantie_activiteiten').update(data).eq('id', id)
 
-    // Upload foto naar gekoppelde bibliotheekactiviteit
-    if (bestand && data.activiteit_id) {
-      const resultaat = await uploadActiviteitAfbeelding(data.activiteit_id, bestand)
-      if (!resultaat.ok) setToast({ bericht: 'Opgeslagen maar foto mislukt: ' + resultaat.stappen[resultaat.stappen.length - 1], type: 'error' })
+    if (bestand) {
+      if (data.activiteit_id) {
+        // Bibliotheekactiviteit: upload naar activiteiten bucket
+        await uploadActiviteitAfbeelding(data.activiteit_id, bestand)
+      } else {
+        // Handmatige activiteit: upload naar vakantie_activiteiten bucket
+        const ext = bestand.name.split('.').pop()?.toLowerCase() || 'jpg'
+        const pad = `vakantie/${id}.${ext}`
+        const { data: upData } = await supabase.storage.from('activiteit-afbeeldingen').upload(pad, bestand, { upsert: true })
+        if (upData) await supabase.from('vakantie_activiteiten').update({ afbeelding_pad: upData.path }).eq('id', id)
+      }
     }
 
     setBewerkActiviteit(null)
@@ -873,6 +891,7 @@ function DocumentWeergave({ planning, weken, activiteiten, dagDatumStr, tekstGro
                                   src={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/activiteit-afbeeldingen/${act.afbeelding_pad}`}
                                   alt={act.naam}
                                   style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                                  onError={e => { (e.target as HTMLImageElement).parentElement!.style.display = 'none' }}
                                 />
                               </div>
                             )}
@@ -1014,7 +1033,7 @@ function ActiviteitToevoegenModal({ weekId, dag, activiteit, bibliotheek, volgor
   // ID van de gekoppelde bibliotheekactiviteit (voor foto upload)
   const [gekozenBibliotheekId, setGekozenBibliotheekId] = useState<string | null>(activiteit?.activiteit_id ?? null)
 
-  // Laad bestaande afbeelding van gekoppelde bibliotheekactiviteit
+  // Laad bestaande afbeelding — bibliotheek heeft voorrang, anders eigen pad
   useEffect(() => {
     const id = gekozenBibliotheekId ?? activiteit?.activiteit_id
     if (id) {
@@ -1023,8 +1042,16 @@ function ActiviteitToevoegenModal({ weekId, dag, activiteit, bibliotheek, volgor
           if (data?.afbeelding_pad) {
             const url = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/activiteit-afbeeldingen/${data.afbeelding_pad}`
             setAfbeeldingPreview(url)
+          } else if (activiteit?.afbeelding_pad) {
+            // Eigen foto van handmatige activiteit
+            const url = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/activiteit-afbeeldingen/${activiteit.afbeelding_pad}`
+            setAfbeeldingPreview(url)
           }
         })
+    } else if (activiteit?.afbeelding_pad) {
+      // Handmatige activiteit zonder bibliotheeklink
+      const url = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/activiteit-afbeeldingen/${activiteit.afbeelding_pad}`
+      setAfbeeldingPreview(url)
     }
   }, [gekozenBibliotheekId])
 
@@ -1148,22 +1175,15 @@ function ActiviteitToevoegenModal({ weekId, dag, activiteit, bibliotheek, volgor
               </div>
               <div>
                 <label className="form-label">Voorbeeldafbeelding (optioneel)</label>
-                {!(gekozenBibliotheekId ?? activiteit?.activiteit_id) && !afbeeldingPreview && (
-                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 6, background: 'var(--bg)', padding: '6px 10px', borderRadius: 7, border: '1px solid var(--border)' }}>
-                    💡 Kies eerst een activiteit uit de bibliotheek om een foto toe te voegen.
-                  </div>
-                )}
                 {afbeeldingPreview ? (
                   <div style={{ position: 'relative', borderRadius: 10, overflow: 'hidden', border: '1px solid var(--border)' }}>
                     <img src={afbeeldingPreview} alt="Preview" style={{ width: '100%', maxHeight: 160, objectFit: 'cover', display: 'block' }} />
-                    {(gekozenBibliotheekId ?? activiteit?.activiteit_id) && (
-                      <label style={{ position: 'absolute', top: 6, right: 6, cursor: 'pointer' }}>
-                        <div className="btn btn-sm" style={{ background: 'rgba(0,0,0,0.6)', color: '#fff', border: 'none' }}>Wijzigen</div>
-                        <input type="file" accept="image/jpeg,image/png,image/webp" style={{ display: 'none' }} onChange={e => e.target.files?.[0] && kiesAfbeelding(e.target.files[0])} />
-                      </label>
-                    )}
+                    <label style={{ position: 'absolute', top: 6, right: 6, cursor: 'pointer' }}>
+                      <div className="btn btn-sm" style={{ background: 'rgba(0,0,0,0.6)', color: '#fff', border: 'none' }}>Wijzigen</div>
+                      <input type="file" accept="image/jpeg,image/png,image/webp" style={{ display: 'none' }} onChange={e => e.target.files?.[0] && kiesAfbeelding(e.target.files[0])} />
+                    </label>
                   </div>
-                ) : (gekozenBibliotheekId ?? activiteit?.activiteit_id) ? (
+                ) : (
                   <label style={{ cursor: 'pointer', display: 'block' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', borderRadius: 9, border: '2px dashed var(--border-dark)', background: 'var(--bg)' }}
                       onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--primary)')}
@@ -1174,7 +1194,7 @@ function ActiviteitToevoegenModal({ weekId, dag, activiteit, bibliotheek, volgor
                     </div>
                     <input type="file" accept="image/jpeg,image/png,image/webp" style={{ display: 'none' }} onChange={e => e.target.files?.[0] && kiesAfbeelding(e.target.files[0])} />
                   </label>
-                ) : null}
+                )}
                 {uploadFout && (
                   <div style={{ marginTop: 6, fontSize: 12, color: '#DC2626', background: '#FEF2F2', padding: '6px 10px', borderRadius: 7 }}>{uploadFout}</div>
                 )}
