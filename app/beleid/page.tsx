@@ -5,6 +5,7 @@ import { getSupabase } from '@/lib/supabase'
 import { useAuth } from '@/components/AuthProvider'
 import Topbar from '@/components/Topbar'
 import Toast from '@/components/Toast'
+import PreviewModal from '@/components/PreviewModal'
 import {
   Plus, X, Search, Download, Trash2,
   FileText, File, FileImage, Upload,
@@ -62,6 +63,7 @@ export default function BeleidPage() {
   const [actieveCategorie, setActieveCategorie] = useState('Alle')
   const [laden, setLaden] = useState(true)
   const [uploadModal, setUploadModal] = useState(false)
+  const [previewStuk, setPreviewStuk] = useState<{ url: string; naam: string } | null>(null)
   const [toast, setToast] = useState<{ bericht: string; type: 'success' | 'error' } | null>(null)
 
   // ── Data ophalen ────────────────────────────────────────────────────────────
@@ -76,6 +78,14 @@ export default function BeleidPage() {
   }, [])
 
   useEffect(() => { haalOp() }, [haalOp])
+
+  // ── Preview ──────────────────────────────────────────────────────────────────
+  async function preview(stuk: Beleidsstuk) {
+    const supabase = getSupabase()
+    const { data, error } = await supabase.storage.from('beleid-documenten').createSignedUrl(stuk.bestandspad, 300)
+    if (error || !data) { setToast({ bericht: 'Preview mislukt', type: 'error' }); return }
+    setPreviewStuk({ url: data.signedUrl, naam: stuk.bestandsnaam })
+  }
 
   // ── Downloaden ──────────────────────────────────────────────────────────────
   async function download(stuk: Beleidsstuk) {
@@ -243,6 +253,9 @@ export default function BeleidPage() {
                     <button className="btn btn-sm" onClick={() => bekijk(stuk)} title="Openen in nieuw tabblad">
                       <Eye size={13} /> Bekijken
                     </button>
+                    <button className="btn btn-sm" onClick={() => preview(stuk)} title="Bekijken">
+                      <Eye size={13} /> Bekijken
+                    </button>
                     <button className="btn btn-sm" onClick={() => download(stuk)} title="Downloaden">
                       <Download size={13} /> Download
                     </button>
@@ -274,6 +287,18 @@ export default function BeleidPage() {
         />
       )}
 
+      {previewStuk && (
+        <PreviewModal
+          titel={previewStuk.naam}
+          url={previewStuk.url}
+          bestandsNaam={previewStuk.naam}
+          onClose={() => setPreviewStuk(null)}
+          onDownload={async () => {
+            const stuk = (stukken as Beleidsstuk[]).find(s => s.bestandsnaam === previewStuk.naam)
+            if (stuk) await download(stuk)
+          }}
+        />
+      )}
       {toast && <Toast bericht={toast.bericht} type={toast.type} onClose={() => setToast(null)} />}
     </>
   )
