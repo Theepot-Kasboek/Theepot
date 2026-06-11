@@ -177,112 +177,120 @@ async function exportTheepraatjePDF(brief: Nieuwsbrief) {
   const { jsPDF } = await import('jspdf')
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
 
-  const GROEN:      [number,number,number] = [140, 198,  63]
-  const DK_GROEN:   [number,number,number] = [ 61, 107,  26]
-  const LT_GROEN:   [number,number,number] = [235, 245, 214]
-  const WIT:        [number,number,number] = [255, 255, 255]
-  const ZWART:      [number,number,number] = [ 30,  30,  30]
-  const GRIJS:      [number,number,number] = [160, 160, 160]
-  const ORANJE:     [number,number,number] = [255, 140,   0]
-  const PAARS:      [number,number,number] = [138,  43, 226]
-  const ROZE:       [number,number,number] = [255,  99, 132]
+  // Kleuren
+  const GROEN:    [number,number,number] = [140, 198,  63]
+  const DK_GROEN: [number,number,number] = [ 61, 107,  26]
+  const WIT:      [number,number,number] = [255, 255, 255]
+  const ZWART:    [number,number,number] = [ 30,  30,  30]
+  const ORANJE:   [number,number,number] = [255, 140,   0]
+  const PAARS:    [number,number,number] = [138,  43, 226]
+  const ROZE:     [number,number,number] = [220,  53,  69]
+  const TEAL:     [number,number,number] = [  0, 150, 136]
 
-  const PAGE_W = 210
-  const PAGE_H = 297
-  const MARGE = 12
-  const KOLOM_GAP = 5
-  const KOLOM_W = (PAGE_W - MARGE * 2 - KOLOM_GAP) / 2   // ~86.5 mm
-  const RH = 5.0   // regelHoogte
+  const ACCENTEN: [number,number,number][] = [GROEN, ORANJE, PAARS, ROZE, DK_GROEN, TEAL]
 
-  // ── Bullet-bewuste tekstverwerking ──────────────────────────────────────────
-  function verwerkTekst(tekst: string, breedte: number) {
-    const uit: { tekst: string; isBullet: boolean }[] = []
+  const PW = 210
+  const PH = 297
+  const M  = 12          // pagina marge
+  const GAP = 5          // gap tussen kolommen
+  const KW = (PW - M * 2 - GAP) / 2   // kolombreedte ~86.5mm
+  const FOOTER_H = 14
+  const HEADER_H = 52    // hoogte van de header op pagina 1
+  const RH = 5.0         // regelHoogte in mm
+  const FS = 9           // fontsize inhoud
+  const TITEL_H = 10     // hoogte titelblok per sectie
+  const PADDING = 5      // interne padding sectie
+
+  // Bereken hoe breed de tekst in een sectie mag zijn
+  const TEKST_W = KW - PADDING * 2 - 4  // ruimte voor bullet offset
+
+  // ── Helpers ──────────────────────────────────────────────────────────────────
+
+  // Splits tekst in regels, bullet-bewust
+  function splitRegel(tekst: string, breedte: number): { t: string; bullet: boolean }[] {
+    const uit: { t: string; bullet: boolean }[] = []
     for (const rij of tekst.split('\n')) {
       const r = rij.trim()
       const isBullet = /^[●•*\-–]\s/.test(r)
-      const schoon = isBullet ? r.replace(/^[●•*\-–]\s*/, '') : r
-      if (!schoon) { uit.push({ tekst: '', isBullet: false }); continue }
-      const regels: string[] = doc.splitTextToSize(schoon, isBullet ? breedte - 5 : breedte)
-      regels.forEach((s: string, i: number) => uit.push({ tekst: s, isBullet: isBullet && i === 0 }))
+      const schoon = isBullet ? r.replace(/^[●•*\-–]\s*/, '').trim() : r
+      if (!schoon) { uit.push({ t: '', bullet: false }); continue }
+      const w = isBullet ? breedte - 5 : breedte
+      const gesplitst: string[] = doc.splitTextToSize(schoon, w)
+      gesplitst.forEach((s: string, i: number) => uit.push({ t: s, bullet: isBullet && i === 0 }))
     }
     return uit
   }
 
-  function berekenHoogte(tekst: string, breedte: number): number {
-    return verwerkTekst(tekst, breedte).reduce((h, r) => h + (r.tekst ? RH : RH * 0.4), 0)
+  // Bereken benodigde hoogte voor tekst
+  function tekstHoogte(tekst: string): number {
+    return splitRegel(tekst, TEKST_W).reduce((h, r) => h + (r.t ? RH : RH * 0.35), 0)
   }
 
-  function tekenInhoud(tekst: string, x: number, y: number, breedte: number, kleur: [number,number,number] = GROEN): number {
+  // Teken tekst, return eindY
+  function tekenTekst(tekst: string, x: number, y: number, kleur: [number,number,number]): number {
     doc.setTextColor(...ZWART)
     doc.setFont('helvetica', 'normal')
-    doc.setFontSize(9)
-    for (const { tekst: t, isBullet } of verwerkTekst(tekst, breedte)) {
-      if (!t) { y += RH * 0.4; continue }
-      if (isBullet) {
+    doc.setFontSize(FS)
+    for (const { t, bullet } of splitRegel(tekst, TEKST_W)) {
+      if (!t) { y += RH * 0.35; continue }
+      if (bullet) {
         doc.setFillColor(...kleur)
-        doc.circle(x + 1.8, y - 1.0, 1.1, 'F')
-        doc.text(t, x + 5, y)
+        doc.circle(x + 1.5, y - 1.0, 1.0, 'F')
+        doc.text(t, x + 4.5, y, { align: 'left' })
       } else {
-        doc.text(t, x, y)
+        doc.text(t, x, y, { align: 'left' })
       }
       y += RH
     }
     return y
   }
 
-  // ── Sectie teken functie ─────────────────────────────────────────────────────
-  function tekenSectie(
-    sectie: Sectie,
-    x: number, y: number, breedte: number,
-    accentKleur: [number,number,number],
-    emojiMap: Record<string, string> = {}
-  ): number {
-    const inh = sectie.inhoud.trim()
-    const inhH = berekenHoogte(inh, breedte - 8)
-    const totH = inhH + 22
+  // Teken één sectiekaart — hoogte is exact berekend
+  function tekenSectie(s: Sectie, x: number, y: number, kleur: [number,number,number]): number {
+    const inh = s.inhoud.trim()
+    const inhH = tekstHoogte(inh)
+    const totH = TITEL_H + PADDING + inhH + PADDING
 
-    // Achtergrond sectiekaart
-    doc.setFillColor(252, 254, 252)
-    doc.roundedRect(x, y, breedte, totH, 3, 3, 'F')
-    // Gekleurde linkerbalk
-    doc.setFillColor(...accentKleur)
-    doc.roundedRect(x, y, 3.5, totH, 1.5, 1.5, 'F')
-    // Subtiele rand
-    doc.setDrawColor(220, 235, 210)
-    doc.setLineWidth(0.3)
-    doc.roundedRect(x, y, breedte, totH, 3, 3, 'S')
+    // Kaart achtergrond
+    doc.setFillColor(251, 253, 251)
+    doc.roundedRect(x, y, KW, totH, 2.5, 2.5, 'F')
 
-    // Sectie titel balk
-    doc.setFillColor(...accentKleur)
-    doc.roundedRect(x + 5, y + 3, breedte - 10, 7.5, 2, 2, 'F')
+    // Linkerbalk accent
+    doc.setFillColor(...kleur)
+    doc.roundedRect(x, y, 3, totH, 1.5, 1.5, 'F')
+
+    // Rand
+    doc.setDrawColor(218, 232, 208)
+    doc.setLineWidth(0.25)
+    doc.roundedRect(x, y, KW, totH, 2.5, 2.5, 'S')
+
+    // Titelblok
+    doc.setFillColor(...kleur)
+    doc.roundedRect(x + 4, y + 2, KW - 8, TITEL_H - 2, 2, 2, 'F')
     doc.setTextColor(...WIT)
     doc.setFont('helvetica', 'bold')
     doc.setFontSize(8.5)
-    const emoji = emojiMap[sectie.titel] ?? ''
-    doc.text(emoji + sectie.titel.toUpperCase(), x + 8, y + 8)
+    doc.text(s.titel.toUpperCase(), x + 7, y + TITEL_H - 2.5, { align: 'left' })
 
-    // Inhoud
-    tekenInhoud(inh, x + 5, y + 15, breedte - 10, accentKleur)
+    // Inhoud tekst
+    tekenTekst(inh, x + PADDING + 2, y + TITEL_H + PADDING, kleur)
 
-    return y + totH + 4
+    return totH  // return hoogte, niet eindY
   }
 
-  // ── PAGINA 1: Header ────────────────────────────────────────────────────────
+  // ── Header pagina 1 ───────────────────────────────────────────────────────────
   doc.setFillColor(...GROEN)
-  doc.rect(0, 0, PAGE_W, 50, 'F')
+  doc.rect(0, 0, PW, HEADER_H - 4, 'F')
   doc.setFillColor(...DK_GROEN)
-  doc.rect(0, 46, PAGE_W, 4, 'F')
+  doc.rect(0, HEADER_H - 4, PW, 4, 'F')
 
-  // Logo
-  try { doc.addImage(LOGO_B64, 'JPEG', MARGE, 8, 28, 28) } catch {}
+  try { doc.addImage(LOGO_B64, 'JPEG', M, 8, 28, 28) } catch {}
 
-  // Titel
   doc.setTextColor(...WIT)
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(28)
-  doc.text('Theepraatje', MARGE + 34, 26)
+  doc.text('Theepraatje', M + 34, 25)
 
-  // Ondertitel
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(8.5)
   const sub = [
@@ -290,66 +298,89 @@ async function exportTheepraatjePDF(brief: Nieuwsbrief) {
     fmtDatum(brief.datum),
     brief.locatie_naam,
   ].filter(Boolean).join('  •  ')
-  doc.text(sub, MARGE + 34, 35)
+  doc.text(sub, M + 34, 35)
 
-  let y = 58
-
-  // ── Emoji mapping per sectietitel ───────────────────────────────────────────
-  const SECTIE_EMOJI: Record<string, string> = {
-    'Redactioneel':            '✏️ ',
-    'Organisatie nieuws':      '📢 ',
-    'Activiteiten & programma':'🎨 ',
-    'Ouderinformatie':         '👨‍👩‍👧 ',
-    'Medewerkers':             '👩‍🏫 ',
-    'Agenda & data':           '📅 ',
-  }
-
-  const ACCENT_KLEUREN: [number,number,number][] = [
-    GROEN, ORANJE, PAARS, ROZE, DK_GROEN, [0,150,136]
-  ]
-
+  // ── Twee-koloms layout — vul pagina vol voor nieuwe pagina ────────────────────
   const secties = brief.secties.filter(s => s.inhoud.trim())
-  const xLinks  = MARGE
-  const xRechts = MARGE + KOLOM_W + KOLOM_GAP
+  const xL = M
+  const xR = M + KW + GAP
 
-  // ── Render secties paarsgewijs naast elkaar ──────────────────────────────────
-  for (let i = 0; i < secties.length; i += 2) {
-    const sLinks  = secties[i]
-    const sRechts = secties[i + 1] ?? null
+  let yL = HEADER_H + 4   // linker kolomhoogte
+  let yR = HEADER_H + 4   // rechter kolomhoogte
+  let huidigePagina = 1
 
-    const hoogtL = berekenHoogte(sLinks.inhoud.trim(), KOLOM_W - 8) + 22
-    const hoogtR = sRechts ? berekenHoogte(sRechts.inhoud.trim(), KOLOM_W - 8) + 22 : 0
-    const rijHoogte = Math.max(hoogtL, hoogtR)
+  const BESCHIKBAAR_P1 = PH - HEADER_H - 4 - FOOTER_H - 6
+  const BESCHIKBAAR    = PH - 16 - FOOTER_H - 6  // pagina 2+
 
-    // Nieuwe pagina indien nodig
-    if (y + rijHoogte > PAGE_H - 18) {
-      doc.addPage()
-      y = 20
+  for (let i = 0; i < secties.length; i++) {
+    const s = secties[i]
+    const kleur = ACCENTEN[i % ACCENTEN.length]
+    const inh = s.inhoud.trim()
+    const sH = tekstHoogte(inh) + TITEL_H + PADDING * 2 + 4  // totale hoogte + gap
+
+    // Bepaal welke kolom als volgende gebruikt wordt
+    // Vul linker kolom tot hij vol is, dan rechter, dan nieuwe pagina
+    const beschikbaar = huidigePagina === 1 ? BESCHIKBAAR_P1 : BESCHIKBAAR
+    const topVanPagina = huidigePagina === 1 ? HEADER_H + 4 : 14
+
+    if (yL <= yR) {
+      // Linker kolom is minder hoog (of gelijk) — probeer links
+      const gebruiktL = yL - topVanPagina
+      if (gebruiktL + sH <= beschikbaar) {
+        // Pas in linker kolom
+        tekenSectie(s, xL, yL, kleur)
+        yL += sH
+      } else {
+        // Past niet links — probeer rechts op zelfde pagina
+        const gebruiktR = yR - topVanPagina
+        if (gebruiktR + sH <= beschikbaar) {
+          tekenSectie(s, xR, yR, kleur)
+          yR += sH
+        } else {
+          // Nieuwe pagina
+          doc.addPage()
+          huidigePagina++
+          yL = 14; yR = 14
+          tekenSectie(s, xL, yL, kleur)
+          yL += sH
+        }
+      }
+    } else {
+      // Rechter kolom is lager — probeer rechts
+      const gebruiktR = yR - topVanPagina
+      if (gebruiktR + sH <= beschikbaar) {
+        tekenSectie(s, xR, yR, kleur)
+        yR += sH
+      } else {
+        // Past niet rechts — probeer links
+        const gebruiktL = yL - topVanPagina
+        if (gebruiktL + sH <= beschikbaar) {
+          tekenSectie(s, xL, yL, kleur)
+          yL += sH
+        } else {
+          // Nieuwe pagina
+          doc.addPage()
+          huidigePagina++
+          yL = 14; yR = 14
+          tekenSectie(s, xL, yL, kleur)
+          yL += sH
+        }
+      }
     }
-
-    // Teken linker sectie
-    tekenSectie(sLinks, xLinks, y, KOLOM_W, ACCENT_KLEUREN[i % ACCENT_KLEUREN.length], SECTIE_EMOJI)
-
-    // Teken rechter sectie
-    if (sRechts) {
-      tekenSectie(sRechts, xRechts, y, KOLOM_W, ACCENT_KLEUREN[(i + 1) % ACCENT_KLEUREN.length], SECTIE_EMOJI)
-    }
-
-    y += rijHoogte + 4
   }
 
-  // ── Footer ────────────────────────────────────────────────────────────────────
+  // ── Footer op alle pagina's ───────────────────────────────────────────────────
   const n = doc.getNumberOfPages()
   for (let p = 1; p <= n; p++) {
     doc.setPage(p)
     doc.setFillColor(...GROEN)
-    doc.rect(0, PAGE_H - 13, PAGE_W, 13, 'F')
+    doc.rect(0, PH - FOOTER_H, PW, FOOTER_H, 'F')
     doc.setFont('helvetica', 'normal')
     doc.setFontSize(7.5)
     doc.setTextColor(...WIT)
-    doc.text('De Theepot — Kinderopvang', MARGE, PAGE_H - 5)
-    if (brief.locatie_naam) doc.text(brief.locatie_naam, PAGE_W / 2, PAGE_H - 5, { align: 'center' })
-    doc.text(`${p} / ${n}`, PAGE_W - MARGE, PAGE_H - 5, { align: 'right' })
+    doc.text('De Theepot — Kinderopvang', M, PH - 5)
+    if (brief.locatie_naam) doc.text(brief.locatie_naam, PW / 2, PH - 5, { align: 'center' })
+    doc.text(`${p} / ${n}`, PW - M, PH - 5, { align: 'right' })
   }
 
   doc.save(`Theepraatje_Nr${brief.nummer ?? ''}_${brief.datum}.pdf`)
