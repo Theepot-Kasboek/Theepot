@@ -104,6 +104,7 @@ async function exportWeekmemoPDF(brief: Nieuwsbrief) {
 
   function tekenInhoud(tekst: string, x: number, startY: number, maxBreedte: number): number {
     let curY = startY
+    doc.setCharSpace(0)
     for (const { regel, isBullet } of verwerkTekst(tekst, maxBreedte)) {
       if (!regel) { curY += regelHoogte * 0.5; continue }
       if (isBullet) {
@@ -231,12 +232,13 @@ async function exportTheepraatjePDF(brief: Nieuwsbrief) {
     doc.setTextColor(...ZWART)
     doc.setFont('helvetica', 'normal')
     doc.setFontSize(FS)
+    // Zet character spacing op 0 om uitsparen te voorkomen
+    doc.setCharSpace(0)
     for (const { t, bullet } of splitRegel(tekst, TEKST_W)) {
       if (!t) { y += RH * 0.35; continue }
       if (bullet) {
         doc.setFillColor(...kleur)
         doc.circle(x + 1.5, y - 1.0, 1.0, 'F')
-        // Elke regel apart, zonder maxWidth, zodat nooit justify
         doc.text(String(t), x + 4.5, y)
       } else {
         doc.text(String(t), x, y)
