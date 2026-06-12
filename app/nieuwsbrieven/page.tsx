@@ -70,102 +70,143 @@ function fmtDatum(d: string) {
 const LOGO_B64 = "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wCEAAkGBxMQEBUREBIWFRUXDw8QEBAPDw8VGBUPFRUWFxURFRUYHSggGBslGxUVITEhJSktLi4uFx8zODMsNygtLisBCgoKDg0OGhAQGy0hHiUtLS0tLy0tLS0tLS0tLS0tLS0tLS0tLSsuLSsuLS0tLS0tLS4tLS0tLi0tLS0tLS0tNf/AABEIALQAtAMBIgACEQEDEQH/xAAbAAEAAgMBAQAAAAAAAAAAAAAABQYBAwQCB//EAEEQAAIBAgMEBQgHBwQDAAAAAAECAAMRBBIhBTFBUQYTImFxFjJSYoGRkqEjM0Jzk7HRFDRygsHC8BVTY6JDg+H/xAAaAQEAAgMBAAAAAAAAAAAAAAAAAQQCAwUG/8QAMxEAAgIBAQQHCAEFAQAAAAAAAAECEQMEEiExUQUTQXGBkaEUFSJSYbHB4fAkMkLR8SP/2gAMAwEAAhEDEQA/APuMREAREQBERAEREAREQBERAEREAREQBERAEREAREQBERAEREAREQBERAEREAxMzjxOOVCF85joEXU+3lOlCba7+IBvaYKabaXYD1NdanmFgSp4FTqJz43EmmA2Uso8/LqwHpAcbcZyV+kWHRcwqBuSobkzDJmxwtSdA2bP2jmzLUIDo5RuAPFXHcRJIG+73iVjYtS9V1xCFWrnrqYO6y6ZeasJ2YzDNRGdCxUat1fnr35d1Qd1r95lbFqJOG1Vr18fAE5acxxIz5F1ItmtuUd5/pIirth1pFhZ7i1OvT8y50BqDenPlJXZ+GFKmFBv9pnO93PnOfGboZlN1HvZJ1zU7jdmAPDdf3SCxGOq4qoaWFOVFNqle3H0Um6n0YoW7QZ24u7tmvMOvnNvqo2ubdLw3OyDupYyz9U4sxBKEbnA325Ecp3StVcM9MmhnLdk1sJUfVlenvRjx3+4mT+ErCpTVx9pFYe0TPDlcm4y4oG+IiWQIiIAiIgCIiAYiZnJjkBQ3YrbtZlO7Lr4e+YydJsGuttOmlizAKWKF76K4+y3KceL2uCv0TA5r2YG9l5+J4CedkYAOBiKyh6jqGuVFlQ+aAN17WuZHbRejUrGnQXLWBZQQoVajLvpH9e6c3NnyqCdpXwXb/36A37LxFOm5aq6rpcF2tcsdd+8yQp7cpNmynNZlRQpuzE8hvt39xnrZ2ykormazPa71GFz7OQ7pXcbtunVfWlZb9msjZaq+uP0mt5Z6aEVOSTfZ+wWKviHWo3VjrB2S9MMA6E7iL6EG26cz4+mDnGEql+B/ZrG/wDFN+wDZXQgZ1qEVSPtsQCKvtFpKy2oSyRUk68LoEDgsHVrVxiK4CBQwpUgbkX+0xk/EjNq7VWiMo7VQjs0wdfE8hM4xhgg7f1bfaySv02NKtWVNAKpAG9SG1YEcRPWIqvToMKJtTNldSb9RfeyH/bPymqkhA1N2LF2PN23yf2HQvTYsNGa1iN62t+s5WnjLI3FOrvw/nAg69m4VKVJUTzQo1HH1vbN9SqFsDvJsBITZuJGFd8PUb6MKalFyd1Mecn8s6cPWuGxVbsjL9Ejb1p8yPSbTTwE6ePNHYUYqq4rlXH9cwj3tBwKyEnzKdeo55JYD/PCe+j62w1K/wDtqde/WROJDVCKW6pXIat/xYUbk8eHizSyooAsNwFgOQkYLlklL+b6/CQPcREugREQBERAMREg9tVGqoKdMkA11pVmUdpU5+B01mrLk2I3Vg3VtrrmZUcEg65KVWrb+IpumDWrsl8lOqjL/wCJyjEHkH0+ckMLhkpIEpqFUCwAnqjSCiw4XPvN5pWOcv7peX7u/IERsPHgItGr2KijIEqaFkXcy89OU1Yp8LRr9YFzVCy58rXCKxsar8F3yZxWDSquWooYcmG7w5SCq0P2MZWGfDOcr3XtU76akb0+YmjLCcIxTppf5NcO9fkFjK3Fu60qvkj2/rPo77svat6PL2yToCvRAVV6+nbsMHVXC8Ab6P4z1Uq4mqMqU+pBH1lVlZh4IvHxMnPHFmS6yLbXZT+/CgRr45kxFY0sts1NDmDEXRbHcfZNx23W9Gn73M1/6LUQZVAI5h9T45pj/Ta3of8AZZT/AKiN1a3t+bsGuvtCs++plHEUly/M3M5kQDcN+rEm5PiftSRp7HqnflXxa/5Tvw+xVHnnN3bhC02bK7kn4gisDgjVOmi37Tf2jvlmRAi2GgA07hPSIALDQcABIrbWMyjq1PaI7VuCf/Zfhjhpsbk+IIPaDZ0apYE06orqrC4KMe2p7txkhjtoghazAlLj9mo/aq1eDleQ4e/lOPDLmLJ6VKqh+E/pN/RTBB1XEO2YgdXSB3Ii/wBZzsLnKdL/AC/Hb9dz4AlNjYBqYNSqb1ahzVG5ckHcJKzETt44KEUkDMRE2AREQBERAMTixOzkqNm7Sta2em7ISORI3zumJhKEZKmrBF/6ZUTWliHHdVtUB9/a+c97OxxcslRctRLZgDcMDudDyPykjeRWN+jxNGpwcPQY+PbT5qffNEorFTjwveu/7EkrNWIoiopVhcEEEGbpiWJJNUyCvdHscEQ0Kp7VOo1MFtxUHs6ywA3lMr/vNceup+U3UMS6eaxHq3uPdORg1rgtmStK15OiEW6JXU21UG8Ke+zCYr9I2QdpV7lDG5lt6/ClcnRJY55ZgNT75TcHt2s1RrsO0LquW4W3Kba1dn89ie4nT4ZpXSeOcbimRZL47bAHZpani53Dw5yEJvqdTe5J3lom7C4dqjZV/mPACU8mXJnkvsDq2XR0qVDuVHUHvt2ps6F/u3/sf+k37ZZaGEZV9Hq15ktp+s9dGKWXC0+8FveZbw49jUQh2qLb8Wv9DtJeIidUkREQBERAEREAREQDEj9tUC9Fsnnraon8aHMPytJGYmvJBSi1zBoweIFWmtRdzKGHtm+Quzm6ms2GbRSWq4c8Ch1dPYfkZK16oRSzaAKWJ7hMMeW4W+K4964gp7KTVxD/AGeuyEkqLTU+LQfa9i6zp2Xs9cVQfMwDtWeqvNW8ORkNXwjUqgSsCvaW5G4pftFDxnms7ywipxXwy333v0INtfaXo6d7b5yFr6k35kmXXD1sEqdk0gBzyk/PWQG0qy4moKeGpDf5yplJ7zyTxmGp0b2U+sUm+CX4BybMTtE8lt7Wkl/lhJrAbAp00Aa7HexuwBPhJOhhkTzFA8BOjpejJxglJ0KIHB7Jd9W7C9/nH2fZk5QorSWw0AFyf6mMTilpi7m3IcT4CQO1drkLmYWB1o0zvY/7r+qOXGXm8Omi32kmjpJWNetTwyekC/cT+i3PtlppUwoCjcAAB3CV7ots4i+Iqas98ubfY738T+UssjRQk9rNLjL0XYEZiInRAiIgCIiAYi85cfi1o0zUbcBew3k8BKLjtq1qxJZyAdyIzAAezzpz9b0hj01J72+whs+iXi8+YdY3pN8bR1jek3xtOd7+j8nr+hZ9PvF58w6xvSb42jrG9JvjaPfy+T1/Qs+g7T2etdbNcEHMjroyv6Qle2rg8Z1ZV3FRBa+QWcr3i2sr/WN6TfG0Cq3Bm+NpVz9J48yfwtN8n9928FjwtBKqhsM18oF6bGzrPT4trdXWUOPRrJrK0jlTmUkMNQVNiPbJah0ge2Wsi1RzIyt790jBrsbVS+F+afgRZ1Lh8KTc0WHctRiPzkphMdh6S2poVHEKm/xPGRI2phW306ifwm4Hzg47Cc6x7gqy3jz44fFCUPt+EZEy+3V4IT4lROVtp1qpyoLfwC5953SLfa9FfMoM3I1XsPcJx4va9WoLXCL6FIZR7TvMxy9JJLfO/ov97vyRZIYvFJRN3Iq1fQzXVT/yPx8J72Tsd8Q/X4m9r3CsLFuWn2V7pXQLbp6NRvSb42nOjroue1ONxXBX283zB9OEzefMOsb0m+No6xvSb42nT9/R+T1/Qs+n3i8+YdY3pN8bR1jek3xtHv6Pyev6Fn0+8zPmuHxtSmbpUYfzXB8VaXTYO1P2incizqcrgbu5h3GXdH0nj1MtmqYsloiJ1CSv9Mz9Av3q39xlNlx6afUL96v5NK9sXBLWdhUJyrTLnKbE2nkulMcsus2Y8WkQyPiSrYGjVps+GZrot2p1RqV5ic2F2VWqrnppdeBLKL+F98oT0mVNJLavfu3g6NivhgG/ahrcZSQxFv5eMn8RgMFTQVXpqFOWxs5vfdKW43jxBBGolt6Q/uNLxoflOnoMq6macIvZVrd9wRKdS2Np9SPo86aENYt2r2B4ebOrpThWfEDq0Zj1Slsi3+02+Rmxf3il94P7pP8ASTbNShUVKeXzM5LC99fN7t0jB1eTSzlk3Jy7F9gVWpTZTlZSp4qwsYRCxsoJPBVFyfZLR0rVXoU6trNmQDwcXtNmwMIaeF62mgaq65lDG2l+yublxmn3Zed409yV3213cyKKvWw1Sn9YjLyLKwBmmXjZ613DJi6aFSuhUjX1SP6yA2TstWxbUm1WmSxB+1Y9m/vkZujacNi6k63qmu8URtPB1WXMtJyN9wjWmiXbG1cZ1v0VNOrBUAM63YcfCRfTDBqpWqoALHI45m11PjMtR0aoQcot/DxtVf1QogepawYK1i2VSEaxPojnPVbDVE89GXkWRgDLcmN6jApUy3Ip0go7zYCa9i7R/bFelWUXA1y7ijfkRM10biuMNv45K1u3CinzfTwdVlzLTcjfdUaxnbsXZ4fFGk+oQuSDxyNlWSm0+kbUqxRVBRCA973PO3KV8GjhsPJmlsq63cySr/4bye2ZsQVMM7urB+2U0YWsNMo43m3pdhFBSsuhY5WtxNrqfGSmydpvUwzVWAzL1lrAgHIJb0uixw1E8eTfS3buzn3gpLKRowIPFWFiPZJ/oWfpn+7U/OQ2MxbV36x7XIAsBYACTHQz65/uv7pU0GytYlB7rIRc4iJ7QyK900+oX71fyaQnRpwKrhmC5qDqCxsL3Es/SHBGtQKr5wIdBzI4e68oRHAjcbEEbjPMdJuWDVRy1aIZOUaS4OnUJqq7vT6tFpG/tM66dRKqUGpikTTQKetqupQi2oA37pWAPZMEDleUodIbO5R+Hl43dg6dqVM9Wowsbk9pPNOnnCTu3cSjYOkFYE3o2sddBrK1Fppx6yUFPd/cDr2U4WvTZjYCoLknQTt6XVQ9fskG1IKbG9jmaQ8ATGOpccLw1xdgsu38UjYSkFYE3pkAG50XWZ2DtBHoHDVXyGxCsHykjfoeBErNolj3jPrusrsprmiLLYNnU6ParYp2W2gNVlv8JufZITZWPFCv1gvkJdTfVshbsse/dI0LMzHLrrlFwjs7LvmSXHE7OSu3W08UyqdWyVbr7NezIPb3UgqtJ2cgMHLVGce88fCROUTMyz69ZYtKCTfF2/TkQXajSpvgUWqcqtSpLcm1m0tr4zTh0o4CmzZ87NuvlzH0VUDhIrF7TR8ElEXzgIpGXQZeN90gwJd1HSGPHsOEU5KK38hZ37K2gaVfrX1zFustybVmHgZYMVsnD4h+vFXsmxcKy5Wt+XfKjMZR/glDT67Yg4TipK738wTnSXaa1mVKZuqEksNxfdp3CdWxMUi4KqrMAR11wTrqNJWotIj0jNZpZWrbVCzC7vZLB0M+uf7r+6QEtvQ/AFVaqwtmyqgPoD7XtmfRWOU9TFrs3hFliIntDIwJG47YtGsczprxZTlJ8bb5JRNc8cJqpq19QQfktQ9f4zHktQ9f8RpORNHsOm+ReRFEH5LUPX+Mx5LUPX/EMnIj2HT/ACLyJogW6M4cby41sL1N5jyYw97du++3WG829JGISmVF2GJpFFJtd9bC8jamPYKKgKlxhMQ2c07MtRaiApbha9rd0qZMemhJxeNbt/Abjv8AJah6/wCIZ4XoxhzuL6GxtUOhmnEY+tT61DUvlfD3rFF7CVL5jbdpl/7Tkw+OZAxFTsvi6geuvVjdTW2/si/OYS9li1/5+i519/AbiT8lqHr/AIhmfJah6/4hnNS2hXYrZgbYZqxRFUio6sQoDcL6bvZNA2vV6tytUVLUqblwi2p1C4Bp28L6HXSS/ZEr6v0XKxuJDyWoev8AGY8lqHr/ABmcq7TqKruKgq06dWmXqBV7VMjtquX0TYzXjdp1kUZ6oRv2c1hdB9JUJb6L2DLu14xWkq+r9F3c65jcdvktQ9f4zM+S1D1/jM5qu0K12YVLBDg7rkUg9Zlz3O/jwmBtKoa4XrBriTSNDItxTF7Pffrob9+kVpLrq+2uC51z5objq8laHr/GY8laHr/iGTkS77DpvkXkKIPyVoev+IY8lqHr/iGTkR7Dp/kXkCIw3R6ghvkLHeM7FgPZukuImZux4ceNfBFLuAiIm0CIiAIiIAiIgGCJjKOXynqJFIHkqP10mCgItYW5W0nuJGyDzac+Lwa1EKMNCVJtobgg/wBJ0zMhxTVNA8BRut7LQVB3jwuJ7iTsoHnKOXynANmJ1nWEsSGLqrOxUMeIH+WkhMzF44yq1wAiImwCIiAIiIAiIgCIiAIiIAiIgCIiAIiIAiIgCIiAIiIAiIgCIiAIiIAiIgH/2Q=="
 
 
+// ─── HTML Export helpers ──────────────────────────────────────────────────────
+
+function verwerkInhoudNaarHTML(tekst: string, accentKleur: string): string {
+  const regels = tekst.split('\n')
+  let html = ''
+  let inLijst = false
+
+  for (const rij of regels) {
+    const r = rij.trim()
+    const isBullet = /^[●•*\-–]\s/.test(r)
+
+    if (!r) {
+      // Lege regel: sluit lijst af indien open, voeg spatie toe
+      if (inLijst) { html += `</ul>`; inLijst = false }
+      html += `<div style="height:6px"></div>`
+      continue
+    }
+
+    if (isBullet) {
+      const inhoud = r.replace(/^[●•*\-–]\s*/, '')
+      if (!inLijst) { html += `<ul style="margin:4px 0 4px 16px;padding:0">`; inLijst = true }
+      html += `<li style="margin:2px 0;line-height:1.55;color:#1e1e1e">${inhoud}</li>`
+    } else {
+      if (inLijst) { html += `</ul>`; inLijst = false }
+      html += `<p style="margin:0 0 5px;line-height:1.55">${r}</p>`
+    }
+  }
+
+  if (inLijst) html += `</ul>`
+  return html
+}
+
 // ─── HTML Export Weekmemo ─────────────────────────────────────────────────────
 
 function genereerWeekMemoHTML(brief: Nieuwsbrief): string {
   const secties = brief.secties.filter(s => s.inhoud.trim())
-  const verwerkBullets = (tekst: string) => tekst.split('\n').map(r => {
-    const t = r.trim()
-    if (!t) return '<br>'
-    if (/^[●•*\-–]\s/.test(t)) return `<li>${t.replace(/^[●•*\-–]\s*/, '')}</li>`
-    return `<p>${t}</p>`
-  }).join('')
-
-  return `<!DOCTYPE html><html lang="nl"><head><meta charset="UTF-8">
-<title>Weekmemo ${brief.nummer ? 'Nr. ' + brief.nummer : ''} - ${fmtDatum(brief.datum)}</title>
+  return `<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<title>Weekmemo ${brief.nummer ? 'Nr. ' + brief.nummer : ''}</title>
 <style>
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: Arial, sans-serif; font-size: 11pt; color: #1e1e1e; background: #f5f5f5; }
-  .pagina { max-width: 210mm; margin: 0 auto; background: #fff; padding: 16mm; }
-  .header { background: #8CC63F; color: white; padding: 14px 20px; display: flex; align-items: center; gap: 16px; margin-bottom: 6px; }
-  .header-dk { background: #3D7010; height: 4px; margin-bottom: 20px; }
-  .header h1 { font-size: 22pt; font-weight: bold; }
-  .header .sub { font-size: 9pt; opacity: 0.85; margin-top: 3px; }
-  .logo { width: 50px; height: 50px; object-fit: contain; }
-  .sectie { margin-bottom: 14px; border-left: 4px solid #8CC63F; padding: 12px 16px; background: #f9fdf4; }
-  .sectie h2 { font-size: 10pt; font-weight: bold; text-transform: uppercase; color: #3D7010; margin-bottom: 8px; letter-spacing: 0.05em; }
-  .sectie p { margin-bottom: 6px; line-height: 1.6; }
-  .sectie li { margin: 3px 0 3px 18px; line-height: 1.6; }
-  .sectie li::marker { color: #8CC63F; }
-  br { line-height: 0.5; }
-  .footer { margin-top: 20px; border-top: 3px solid #8CC63F; padding-top: 8px; font-size: 8pt; color: #666; display: flex; justify-content: space-between; }
-  @media print { body { background: white; } .pagina { padding: 10mm; } }
-</style></head><body><div class="pagina">
-<div class="header">
-  <img class="logo" src="${LOGO_B64}" alt="Logo" />
-  <div><h1>Weekmemo</h1><div class="sub">${[brief.locatie_naam, brief.nummer ? 'Week ' + brief.nummer : null, fmtDatum(brief.datum)].filter(Boolean).join('  •  ')}</div></div>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+  body { font-family: Arial, sans-serif; font-size: 10.5pt; color: #1e1e1e; background: white; }
+  .pagina { max-width: 180mm; margin: 0 auto; padding: 12mm; }
+  .header { background: #8CC63F !important; color: white !important; padding: 12px 18px; display: flex; align-items: center; gap: 14px; }
+  .header h1 { font-size: 20pt; font-weight: bold; color: white !important; }
+  .header .sub { font-size: 8.5pt; color: rgba(255,255,255,0.88); margin-top: 3px; }
+  .logo { width: 44px; height: 44px; object-fit: contain; }
+  .streep { background: #3D7010 !important; height: 4px; margin-bottom: 16px; }
+  .sectie { margin-bottom: 10px; border-left: 4px solid #8CC63F; padding: 9px 12px; background: #f9fdf4 !important; page-break-inside: avoid; break-inside: avoid; }
+  .sectie h2 { font-size: 9pt; font-weight: bold; text-transform: uppercase; color: #3D7010 !important; margin-bottom: 7px; letter-spacing: 0.05em; }
+  .sectie p { margin-bottom: 5px; line-height: 1.55; }
+  .sectie ul { margin: 4px 0 4px 18px; }
+  .sectie li { margin-bottom: 3px; line-height: 1.55; }
+  .footer { margin-top: 16px; border-top: 3px solid #8CC63F; padding-top: 7px; font-size: 7.5pt; color: #666; display: flex; justify-content: space-between; }
+</style>
+</head>
+<body>
+<div class="pagina">
+  <div class="header">
+    <img class="logo" src="${LOGO_B64}" alt="" />
+    <div><h1>Weekmemo</h1><div class="sub">${[brief.locatie_naam, brief.nummer ? 'Week ' + brief.nummer : null, fmtDatum(brief.datum)].filter(Boolean).join('  •  ')}</div></div>
+  </div>
+  <div class="streep"></div>
+  ${secties.map(s => `<div class="sectie"><h2>${s.titel}</h2>${verwerkInhoudNaarHTML(s.inhoud.trim(), '#8CC63F')}</div>`).join('')}
+  <div class="footer">
+    <span>De Theepot — Kinderopvang</span>
+    <span>${brief.locatie_naam ?? ''}</span>
+    <span>${fmtDatum(brief.datum)}</span>
+  </div>
 </div>
-<div class="header-dk"></div>
-${secties.map(s => `<div class="sectie"><h2>${s.titel}</h2>${verwerkBullets(s.inhoud.trim())}</div>`).join('')}
-<div class="footer"><span>De Theepot — Kinderopvang</span><span>${brief.locatie_naam ?? ''}</span><span>${fmtDatum(brief.datum)}</span></div>
-</div></body></html>`
+</body>
+</html>`
 }
 
 // ─── HTML Export Theepraatje ──────────────────────────────────────────────────
 
 function genereerTheepraatjeHTML(brief: Nieuwsbrief): string {
   const secties = brief.secties.filter(s => s.inhoud.trim())
-  const kleuren = ['#8CC63F','#FF8C00','#8B2BE2','#DC3545','#3D7010','#009688']
-  const verwerkBullets = (tekst: string, kleur: string) => tekst.split('\n').map(r => {
-    const t = r.trim()
-    if (!t) return '<br>'
-    if (/^[●•*\-–]\s/.test(t)) return `<li style="--kleur:${kleur}">${t.replace(/^[●•*\-–]\s*/, '')}</li>`
-    return `<p>${t}</p>`
-  }).join('')
+  const kleuren = ['#8CC63F', '#FF8C00', '#8B2BE2', '#DC3545', '#3D7010', '#009688']
 
   const linker = secties.filter((_, i) => i % 2 === 0)
   const rechter = secties.filter((_, i) => i % 2 === 1)
   const maxRijen = Math.max(linker.length, rechter.length)
-  let rijen = ''
-  for (let i = 0; i < maxRijen; i++) {
-    const sL = linker[i]; const sR = rechter[i]
-    const kL = kleuren[(i * 2) % kleuren.length]; const kR = kleuren[(i * 2 + 1) % kleuren.length]
-    rijen += `<div class="rij">
-      ${sL ? `<div class="sectie" style="border-color:${kL}"><div class="sectie-titel" style="background:${kL}">${sL.titel.toUpperCase()}</div>${verwerkBullets(sL.inhoud.trim(), kL)}</div>` : '<div></div>'}
-      ${sR ? `<div class="sectie" style="border-color:${kR}"><div class="sectie-titel" style="background:${kR}">${sR.titel.toUpperCase()}</div>${verwerkBullets(sR.inhoud.trim(), kR)}</div>` : '<div></div>'}
+
+  const sectieHTML = (s: Sectie | undefined, k: string) => {
+    if (!s) return '<div></div>'
+    return `<div style="border-left:4px solid ${k};background:#fbfdfb;border-radius:3px;overflow:hidden;page-break-inside:avoid;break-inside:avoid">
+      <div style="background:${k};color:white;font-size:8pt;font-weight:bold;padding:5px 9px;letter-spacing:0.05em;text-transform:uppercase">${s.titel}</div>
+      <div style="padding:7px 9px;font-size:9pt;line-height:1.55">${verwerkInhoudNaarHTML(s.inhoud.trim(), k)}</div>
     </div>`
   }
 
-  return `<!DOCTYPE html><html lang="nl"><head><meta charset="UTF-8">
+  let rijen = ''
+  for (let i = 0; i < maxRijen; i++) {
+    const kL = kleuren[(i * 2) % kleuren.length]
+    const kR = kleuren[(i * 2 + 1) % kleuren.length]
+    rijen += `<div style="display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:9px;page-break-inside:avoid">
+      ${sectieHTML(linker[i], kL)}
+      ${sectieHTML(rechter[i], kR)}
+    </div>`
+  }
+
+  return `<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
 <title>Theepraatje ${brief.nummer ? 'Nr. ' + brief.nummer : ''}</title>
 <style>
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: Arial, sans-serif; font-size: 10pt; color: #1e1e1e; background: #f5f5f5; }
-  .pagina { max-width: 210mm; margin: 0 auto; background: #fff; }
-  .header { background: #8CC63F; color: white; padding: 14px 20px; display: flex; align-items: center; gap: 16px; }
-  .header-dk { background: #3D7010; height: 4px; margin-bottom: 16px; }
-  .header h1 { font-size: 24pt; font-weight: bold; }
-  .header .sub { font-size: 9pt; opacity: 0.85; margin-top: 4px; }
-  .logo { width: 50px; height: 50px; object-fit: contain; }
-  .inhoud { padding: 0 14px 14px; }
-  .rij { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
-  .sectie { border-left: 4px solid #8CC63F; background: #fbfdfb; border-radius: 4px; overflow: hidden; }
-  .sectie-titel { color: white; font-size: 8.5pt; font-weight: bold; padding: 5px 10px; letter-spacing: 0.05em; }
-  .sectie p { margin: 6px 10px 4px; line-height: 1.6; }
-  .sectie li { margin: 3px 10px 3px 26px; line-height: 1.6; }
-  .sectie li::marker { color: var(--kleur, #8CC63F); }
-  br { display: block; margin: 2px 0; }
-  .footer { background: #8CC63F; color: white; padding: 8px 16px; display: flex; justify-content: space-between; font-size: 8pt; margin-top: 8px; }
-  @media print { body { background: white; } }
-</style></head><body><div class="pagina">
-<div class="header">
-  <img class="logo" src="${LOGO_B64}" alt="Logo" />
-  <div><h1>Theepraatje</h1><div class="sub">${[brief.nummer ? 'Nr. ' + brief.nummer : null, fmtDatum(brief.datum), brief.locatie_naam].filter(Boolean).join('  •  ')}</div></div>
-</div>
-<div class="header-dk"></div>
-<div class="inhoud">${rijen}</div>
-<div class="footer"><span>De Theepot — Kinderopvang</span><span>${brief.locatie_naam ?? ''}</span><span>${brief.nummer ? '1 / 1' : fmtDatum(brief.datum)}</span></div>
-</div></body></html>`
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }
+  body { font-family: Arial, sans-serif; font-size: 9.5pt; color: #1e1e1e; background: white; }
+  ul { margin: 4px 0 4px 16px; }
+  li { margin-bottom: 3px; }
+  p { margin-bottom: 5px; }
+  @page { margin: 12mm 14mm; }
+</style>
+</head>
+<body>
+  <div style="background:#8CC63F;color:white;padding:12px 18px;display:flex;align-items:center;gap:14px;margin-bottom:0">
+    <img style="width:44px;height:44px;object-fit:contain;flex-shrink:0" src="${LOGO_B64}" alt="" />
+    <div>
+      <div style="font-size:24pt;font-weight:bold;line-height:1.1;color:white">Theepraatje</div>
+      <div style="font-size:8.5pt;color:rgba(255,255,255,0.88);margin-top:3px">${[brief.nummer ? 'Nr. ' + brief.nummer : null, fmtDatum(brief.datum), brief.locatie_naam].filter(Boolean).join('  •  ')}</div>
+    </div>
+  </div>
+  <div style="background:#3D7010;height:4px;margin-bottom:12px"></div>
+  <div style="padding:0 2px 12px">
+    ${rijen}
+  </div>
+  <div style="background:#8CC63F;color:white;padding:7px 16px;display:flex;justify-content:space-between;font-size:7.5pt;position:fixed;bottom:0;left:0;right:0">
+    <span>De Theepot — Kinderopvang</span>
+    <span>${brief.locatie_naam ?? ''}</span>
+    <span>${fmtDatum(brief.datum)}</span>
+  </div>
+</body>
+</html>`
 }
 
 function genereerHTML(brief: Nieuwsbrief): string {
@@ -525,17 +566,24 @@ async function exportTheepraatjePDF(brief: Nieuwsbrief) {
 }
 
 async function exportPDF(brief: Nieuwsbrief) {
-  // Genereer HTML en open in nieuw venster voor afdrukken
   const html = genereerHTML(brief)
-  const win = window.open('', '_blank')
-  if (!win) { alert('Sta pop-ups toe om de PDF te genereren.'); return }
-  win.document.write(html)
-  win.document.close()
-  // Wacht tot de afbeeldingen geladen zijn, dan print
+  const blob = new Blob([html], { type: 'text/html;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const win = window.open(url, '_blank')
+  if (!win) {
+    // Fallback: schrijf direct
+    const win2 = window.open('', '_blank')
+    if (!win2) { alert('Sta pop-ups toe om af te drukken.'); return }
+    win2.document.write(html)
+    win2.document.close()
+    setTimeout(() => win2.print(), 800)
+    return
+  }
   win.onload = () => {
     setTimeout(() => {
       win.print()
-    }, 500)
+      URL.revokeObjectURL(url)
+    }, 600)
   }
 }
 
