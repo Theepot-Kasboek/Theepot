@@ -191,6 +191,7 @@ function genereerTheepraatjeHTML(brief: Nieuwsbrief): string {
   li { margin-bottom: 3px; }
   p { margin-bottom: 5px; }
   @page { margin: 12mm 14mm; }
+  @media print { @page { margin: 12mm 14mm; } html { -webkit-print-color-adjust: exact; } }
 </style>
 </head>
 <body>
@@ -572,14 +573,22 @@ async function exportTheepraatjePDF(brief: Nieuwsbrief) {
 
 async function exportPDF(brief: Nieuwsbrief) {
   const html = genereerHTML(brief)
-  const blob = new Blob([html], { type: 'text/html;charset=utf-8' })
+  // Voeg print-specifieke CSS toe om browser header/footer te verwijderen
+  const printHTML = html.replace('</style>', `
+  @page { margin: 10mm 12mm; size: A4; }
+  @media print {
+    /* Verberg browser header en footer */
+    html { margin: 0 !important; }
+    body { margin: 0 !important; }
+  }
+</style>`)
+  const blob = new Blob([printHTML], { type: 'text/html;charset=utf-8' })
   const url = URL.createObjectURL(blob)
   const win = window.open(url, '_blank')
   if (!win) {
-    // Fallback: schrijf direct
     const win2 = window.open('', '_blank')
     if (!win2) { alert('Sta pop-ups toe om af te drukken.'); return }
-    win2.document.write(html)
+    win2.document.write(printHTML)
     win2.document.close()
     setTimeout(() => win2.print(), 800)
     return
