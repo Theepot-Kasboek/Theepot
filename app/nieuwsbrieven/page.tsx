@@ -73,6 +73,12 @@ const LOGO_B64 = "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wCEAAkGBxM
 // ─── HTML Export helpers ──────────────────────────────────────────────────────
 
 function verwerkInhoudNaarHTML(tekst: string, accentKleur: string): string {
+  // Verwerk [tekst](url) naar <a href> links
+  function verwerkLinks(t: string): string {
+    return t.replace(/\[([^\]]+)\]\((https?:\/\/[^\)]+)\)/g,
+      (_, linkTekst, url) => `<a href="${url}" style="color:${accentKleur};text-decoration:underline" target="_blank">${linkTekst}</a>`)
+  }
+
   const regels = tekst.split('\n')
   let html = ''
   let inLijst = false
@@ -82,19 +88,18 @@ function verwerkInhoudNaarHTML(tekst: string, accentKleur: string): string {
     const isBullet = /^[●•*\-–]\s/.test(r)
 
     if (!r) {
-      // Lege regel: sluit lijst af indien open, voeg spatie toe
       if (inLijst) { html += `</ul>`; inLijst = false }
       html += `<div style="height:6px"></div>`
       continue
     }
 
     if (isBullet) {
-      const inhoud = r.replace(/^[●•*\-–]\s*/, '')
+      const inhoud = verwerkLinks(r.replace(/^[●•*\-–]\s*/, ''))
       if (!inLijst) { html += `<ul style="margin:4px 0 4px 16px;padding:0">`; inLijst = true }
       html += `<li style="margin:2px 0;line-height:1.55;color:#1e1e1e">${inhoud}</li>`
     } else {
       if (inLijst) { html += `</ul>`; inLijst = false }
-      html += `<p style="margin:0 0 5px;line-height:1.55">${r}</p>`
+      html += `<p style="margin:0 0 5px;line-height:1.55">${verwerkLinks(r)}</p>`
     }
   }
 
@@ -115,11 +120,11 @@ function genereerWeekMemoHTML(brief: Nieuwsbrief): string {
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
   body { font-family: Arial, sans-serif; font-size: 10.5pt; color: #1e1e1e; background: white; }
   .pagina { max-width: 180mm; margin: 0 auto; padding: 12mm; }
-  .header { background: #8CC63F !important; color: white !important; padding: 12px 18px; display: flex; align-items: center; gap: 14px; }
+  .header { background: #8CC63F !important; color: white !important; padding: 13px 18px; display: flex; align-items: center; gap: 14px; border-radius: 12px 12px 0 0; margin: 8px 8px 0; }
   .header h1 { font-size: 20pt; font-weight: bold; color: white !important; }
   .header .sub { font-size: 8.5pt; color: rgba(255,255,255,0.88); margin-top: 3px; }
   .logo { width: 44px; height: 44px; object-fit: contain; }
-  .streep { background: #3D7010 !important; height: 4px; margin-bottom: 16px; }
+  .streep { background: #3D7010 !important; height: 4px; margin: 0 8px 16px; }
   .sectie { margin-bottom: 10px; border-left: 4px solid #8CC63F; padding: 9px 12px; background: #f9fdf4 !important; page-break-inside: avoid; break-inside: avoid; }
   .sectie h2 { font-size: 9pt; font-weight: bold; text-transform: uppercase; color: #3D7010 !important; margin-bottom: 7px; letter-spacing: 0.05em; }
   .sectie p { margin-bottom: 5px; line-height: 1.55; }
@@ -189,14 +194,14 @@ function genereerTheepraatjeHTML(brief: Nieuwsbrief): string {
 </style>
 </head>
 <body>
-  <div style="background:#8CC63F;color:white;padding:12px 18px;display:flex;align-items:center;gap:14px;margin-bottom:0">
-    <img style="width:44px;height:44px;object-fit:contain;flex-shrink:0" src="${LOGO_B64}" alt="" />
+  <div style="background:#8CC63F;color:white;padding:14px 18px;display:flex;align-items:center;gap:14px;border-radius:14px 14px 0 0;margin:8px 8px 0">
+    <img style="width:46px;height:46px;object-fit:contain;flex-shrink:0;border-radius:8px" src="${LOGO_B64}" alt="" />
     <div>
       <div style="font-size:24pt;font-weight:bold;line-height:1.1;color:white">Theepraatje</div>
       <div style="font-size:8.5pt;color:rgba(255,255,255,0.88);margin-top:3px">${[brief.nummer ? 'Nr. ' + brief.nummer : null, fmtDatum(brief.datum), brief.locatie_naam].filter(Boolean).join('  •  ')}</div>
     </div>
   </div>
-  <div style="background:#3D7010;height:4px;margin-bottom:12px"></div>
+  <div style="background:#3D7010;height:4px;margin:0 8px 12px"></div>
   <div style="padding:0 2px 12px">
     ${rijen}
   </div>
@@ -801,6 +806,23 @@ export default function NieuwsbrievenPage() {
                       style={{ fontFamily: 'Sora, sans-serif', fontWeight: 600, fontSize: 14, border: 'none', background: 'none', color: 'var(--text)', flex: 1, outline: 'none', padding: '4px 0' }} />
                   </div>
                   <div className="card-body">
+                    {/* Toolbar */}
+                    <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
+                      <button className="btn btn-sm" title="Hyperlink invoegen"
+                        onClick={() => {
+                          const tekst = prompt('Tekst voor de link:')
+                          if (!tekst) return
+                          const url = prompt('URL (bijv. https://www.detheepot.nl):')
+                          if (!url) return
+                          const link = `[${tekst}](${url})`
+                          updateSectie(sectie.id, 'inhoud', sectie.inhoud + (sectie.inhoud && !sectie.inhoud.endsWith('\n') ? '\n' : '') + link)
+                        }}>
+                        🔗 Link invoegen
+                      </button>
+                      <span style={{ fontSize: 11, color: 'var(--text-muted)', alignSelf: 'center' }}>
+                        Of typ: [tekst](https://url.nl) • Bullets: begin regel met •
+                      </span>
+                    </div>
                     <textarea value={sectie.inhoud} onChange={e => updateSectie(sectie.id, 'inhoud', e.target.value)}
                       placeholder={`Inhoud voor "${sectie.titel}"...`} autoFocus
                       style={{ width: '100%', minHeight: 380, border: '1px solid var(--border-dark)', borderRadius: 9, padding: '12px 14px', fontSize: 13, fontFamily: 'DM Sans, sans-serif', lineHeight: 1.8, background: 'var(--bg)', color: 'var(--text)', resize: 'vertical', outline: 'none' }}
