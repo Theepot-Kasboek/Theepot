@@ -525,8 +525,18 @@ async function exportTheepraatjePDF(brief: Nieuwsbrief) {
 }
 
 async function exportPDF(brief: Nieuwsbrief) {
-  if (brief.format === 'weekmemo') await exportWeekmemoPDF(brief)
-  else await exportTheepraatjePDF(brief)
+  // Genereer HTML en open in nieuw venster voor afdrukken
+  const html = genereerHTML(brief)
+  const win = window.open('', '_blank')
+  if (!win) { alert('Sta pop-ups toe om de PDF te genereren.'); return }
+  win.document.write(html)
+  win.document.close()
+  // Wacht tot de afbeeldingen geladen zijn, dan print
+  win.onload = () => {
+    setTimeout(() => {
+      win.print()
+    }, 500)
+  }
 }
 
 // ─── Hoofd pagina ─────────────────────────────────────────────────────────────
