@@ -573,32 +573,17 @@ async function exportTheepraatjePDF(brief: Nieuwsbrief) {
 
 async function exportPDF(brief: Nieuwsbrief) {
   const html = genereerHTML(brief)
-  // Voeg print-specifieke CSS toe om browser header/footer te verwijderen
-  const printHTML = html.replace('</style>', `
-  @page { margin: 10mm 12mm; size: A4; }
-  @media print {
-    /* Verberg browser header en footer */
-    html { margin: 0 !important; }
-    body { margin: 0 !important; }
-  }
-</style>`)
-  const blob = new Blob([printHTML], { type: 'text/html;charset=utf-8' })
+  // Download als HTML bestand — open in Preview of Adobe voor correcte PDF zonder browser-balk
+  const blob = new Blob([html], { type: 'text/html;charset=utf-8' })
   const url = URL.createObjectURL(blob)
-  const win = window.open(url, '_blank')
-  if (!win) {
-    const win2 = window.open('', '_blank')
-    if (!win2) { alert('Sta pop-ups toe om af te drukken.'); return }
-    win2.document.write(printHTML)
-    win2.document.close()
-    setTimeout(() => win2.print(), 800)
-    return
-  }
-  win.onload = () => {
-    setTimeout(() => {
-      win.print()
-      URL.revokeObjectURL(url)
-    }, 600)
-  }
+  const a = document.createElement('a')
+  a.href = url
+  const naam = brief.format === 'weekmemo'
+    ? `Weekmemo_${brief.nummer ?? ''}_${brief.datum}.html`
+    : `Theepraatje_Nr${brief.nummer ?? ''}_${brief.datum}.html`
+  a.download = naam
+  a.click()
+  URL.revokeObjectURL(url)
 }
 
 // ─── Hoofd pagina ─────────────────────────────────────────────────────────────
@@ -734,7 +719,7 @@ export default function NieuwsbrievenPage() {
             <div style={{ display: 'flex', gap: 8 }}>
               {actieve && <>
                 <button className="btn" onClick={() => setPreviewHTML(genereerHTML({ ...actieve, titel: editorTitel, nummer: editorNummer || null, locatie_naam: editorLocatie || null, datum: editorDatum, format: editorFormat, secties: editorSecties }))}><Eye size={14} /> Preview</button>
-                <button className="btn" onClick={() => exportPDF({ ...actieve, titel: editorTitel, nummer: editorNummer || null, locatie_naam: editorLocatie || null, datum: editorDatum, format: editorFormat, secties: editorSecties })}><Download size={14} /> PDF</button>
+                <button className="btn" onClick={() => exportPDF({ ...actieve, titel: editorTitel, nummer: editorNummer || null, locatie_naam: editorLocatie || null, datum: editorDatum, format: editorFormat, secties: editorSecties })}><Download size={14} /> Exporteren</button>
               </>}
               <button className="btn btn-primary" onClick={slaOp} disabled={opslaan || !editorTitel.trim()}>{opslaan ? 'Opslaan...' : 'Opslaan'}</button>
               <button className="btn" onClick={() => { setBewerkModus(false); setActieve(null) }}><ArrowLeft size={14} /> Terug</button>
@@ -905,7 +890,7 @@ export default function NieuwsbrievenPage() {
                   </div>
                   <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
                     <button className="btn btn-sm" onClick={() => setPreviewHTML(genereerHTML(brief))}><Eye size={13} /> Preview</button>
-                    <button className="btn btn-sm" onClick={() => exportPDF(brief)}><Download size={13} /> PDF</button>
+                    <button className="btn btn-sm" onClick={() => exportPDF(brief)}><Download size={13} /> Exporteren</button>
                     {magBewerken && <button className="btn btn-sm" onClick={() => openBewerken(brief)}><Pencil size={13} /> Bewerken</button>}
                     {magBewerken && <button className="btn btn-sm" style={{ color: '#DC2626', borderColor: '#FECACA' }} onClick={() => verwijder(brief.id)}><Trash2 size={13} /></button>}
                   </div>
