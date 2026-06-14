@@ -7,7 +7,7 @@ import { useEffect, useState } from 'react'
 import {
   LayoutDashboard, Wallet, Map, BookOpen,
   Calendar, MessageSquare, ShieldCheck,
-  Users, LogOut, Sun, Moon, UtensilsCrossed, Scissors, MessageCircle, FileText, Newspaper, Flame, CheckSquare, Gauge, Pin, Layers,
+  Users, LogOut, Sun, Moon, UtensilsCrossed, Scissors, MessageCircle, FileText, Newspaper, Flame, CheckSquare, Gauge, Pin, Layers, Archive, Search, Activity,
 } from 'lucide-react'
 import { useAuth } from './AuthProvider'
 import { useTheme } from './ThemeProvider'
@@ -110,11 +110,14 @@ export default function Sidebar({ isOpen, onClose }: { isOpen?: boolean; onClose
       label: 'Administratie',
       items: [
         { href: '/prikbord', label: 'Prikbord', icon: <Pin size={16} />, vereistRecht: 'pagina_prikbord' as const },
+        { href: '/zoeken', label: 'Zoeken', icon: <Search size={16} /> },
         { href: '/kasboek', label: 'Kasboek', icon: <Wallet size={16} />, vereistRecht: 'pagina_kasboek' as const },
         { href: '/maaltijdlijst', label: 'Maaltijdlijst', icon: <UtensilsCrossed size={16} />, vereistRecht: 'pagina_maaltijdlijst' as const },
         { href: '/beleid', label: 'Beleidsstukken', icon: <FileText size={16} />, vereistRecht: 'pagina_beleid' as const },
         { href: '/brandoefening', label: 'Brandoefening', icon: <Flame size={16} />, vereistRecht: 'pagina_brandoefening' as const },
         { href: '/kilometerstanden', label: 'Kilometerstanden', icon: <Gauge size={16} /> },
+        { href: '/archief', label: 'Archief', icon: <Archive size={16} />, vereistRecht: 'pagina_archief' as const },
+        { href: '/activiteiten-log', label: 'Activiteitenlog', icon: <Activity size={16} />, vereistRecht: 'pagina_activiteiten_log' as const },
       ],
     },
     {

@@ -28,6 +28,8 @@ interface Recht {
   pagina_nieuwsbrieven: Toegang
   pagina_prikbord: Toegang
   pagina_ve_planning: Toegang
+  pagina_archief: Toegang
+  pagina_activiteiten_log: Toegang
 
   prikbord_toevoegen: boolean
   chat_starten: boolean
@@ -159,6 +161,18 @@ const PAGINAS: PaginaDef[] = [
     functies: [],
   },
   {
+    key: 'pagina_archief',
+    label: 'Archief',
+    icon: '🗂️',
+    functies: [],
+  },
+  {
+    key: 'pagina_activiteiten_log',
+    label: 'Activiteitenlog',
+    icon: '📋',
+    functies: [],
+  },
+  {
     key: 'pagina_medewerkers',
     label: 'Medewerkers',
     icon: '👥',
@@ -192,6 +206,8 @@ function leegRecht(): Omit<Recht, 'id' | 'rol' | 'profiel_id'> {
     pagina_nieuwsbrieven: 'geen',
     pagina_prikbord: 'geen',
     pagina_ve_planning: 'geen',
+    pagina_archief: 'geen',
+    pagina_activiteiten_log: 'geen',
     prikbord_toevoegen: false,
     kasboek_export: false,
     kasboek_bonnetjes_inzien: false,
