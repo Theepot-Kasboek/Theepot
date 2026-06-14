@@ -9,7 +9,7 @@ import PreviewModal from '@/components/PreviewModal'
 import {
   Plus, X, Trash2, Download, Pencil, Eye,
   ChevronUp, ChevronDown, ArrowLeft,
-  GripVertical, FileText, Settings
+  GripVertical, FileText, Settings, Send
 } from 'lucide-react'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -27,6 +27,7 @@ interface Notulen {
   locatie_naam: string | null
   aanwezigen: string | null
   secties: Sectie[]
+  gepubliceerd: boolean
   aangemaakt_op: string
   aangemaakt_door: string | null
 }
@@ -230,11 +231,13 @@ export default function NotulenPage() {
       aangemaakt_door: profiel?.id,
       bijgewerkt_op: new Date().toISOString(),
     }
+    // gepubliceerd alleen bij nieuw aanmaken op false zetten
+    const insertData = { ...data, gepubliceerd: false }
     if (actieve) {
       await supabase.from('notulen').update(data).eq('id', actieve.id)
       setToast({ bericht: 'Opgeslagen!', type: 'success' })
     } else {
-      const { data: nieuw } = await supabase.from('notulen').insert(data).select().single()
+      const { data: nieuw } = await supabase.from('notulen').insert(insertData).select().single()
       if (nieuw) setActieve(nieuw as Notulen)
       setToast({ bericht: 'Aangemaakt!', type: 'success' })
     }
@@ -303,8 +306,15 @@ export default function NotulenPage() {
     await haalKoppenOp()
   }
 
-  // Filter
-  const gefilterdeNotulen = notulenLijst.filter(n =>
+  async function togglePubliceer(n: Notulen) {
+    await getSupabase().from('notulen').update({ gepubliceerd: !n.gepubliceerd }).eq('id', n.id)
+    setToast({ bericht: n.gepubliceerd ? 'Notulen verborgen.' : 'Notulen gepubliceerd!', type: 'success' })
+    await haalOp()
+  }
+
+  // Filter: niet-bewerkers zien alleen gepubliceerde notulen
+  const zichtbareNotulen = magBewerken ? notulenLijst : notulenLijst.filter(n => n.gepubliceerd)
+  const gefilterdeNotulen = zichtbareNotulen.filter(n =>
     !zoekterm || n.titel.toLowerCase().includes(zoekterm.toLowerCase()) ||
     fmtDatum(n.vergaderdatum).toLowerCase().includes(zoekterm.toLowerCase()) ||
     (n.locatie_naam ?? '').toLowerCase().includes(zoekterm.toLowerCase()) ||
@@ -555,6 +565,7 @@ export default function NotulenPage() {
               <div
                 key={n.id}
                 className="card"
+                style={{ opacity: !n.gepubliceerd && magBewerken ? 0.75 : 1 }}
                 onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--primary)')}
                 onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--border)')}
               >
@@ -573,7 +584,12 @@ export default function NotulenPage() {
                   </div>
 
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontFamily: 'Sora, sans-serif', fontWeight: 600, fontSize: 14, marginBottom: 4 }}>{n.titel}</div>
+                    <div style={{ fontFamily: 'Sora, sans-serif', fontWeight: 600, fontSize: 14, marginBottom: 4, display: 'flex', alignItems: 'center', gap: 8 }}>
+                      {n.titel}
+                      <span style={{ padding: '2px 8px', borderRadius: 20, fontSize: 10, fontWeight: 600, background: n.gepubliceerd ? 'var(--primary-light)' : 'var(--bg)', color: n.gepubliceerd ? 'var(--primary-text)' : 'var(--text-muted)', border: '1px solid var(--border)' }}>
+                        {n.gepubliceerd ? '● Gepubliceerd' : '○ Concept'}
+                      </span>
+                    </div>
                     <div style={{ fontSize: 12, color: 'var(--text-muted)', display: 'flex', gap: 12, flexWrap: 'wrap' }}>
                       <span>📅 {fmtDatumKort(n.vergaderdatum)}</span>
                       {n.locatie_naam && <span>📍 {n.locatie_naam}</span>}
@@ -585,6 +601,12 @@ export default function NotulenPage() {
                   <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
                     <button className="btn btn-sm" onClick={() => setPreviewHTML(genereerNotulentHTML(n))}><Eye size={13} /> Preview</button>
                     <button className="btn btn-sm" onClick={() => exportHTML(n)}><Download size={13} /> Exporteren</button>
+                    {magBewerken && (
+                      <button className="btn btn-sm" onClick={() => togglePubliceer(n)} title={n.gepubliceerd ? 'Verbergen' : 'Publiceren'}>
+                        {n.gepubliceerd ? <Eye size={13} style={{ opacity: 0.5 }} /> : <Send size={13} color="var(--primary)" />}
+                        {n.gepubliceerd ? ' Verbergen' : ' Publiceren'}
+                      </button>
+                    )}
                     {magBewerken && <button className="btn btn-sm" onClick={() => openBewerken(n)}><Pencil size={13} /> Bewerken</button>}
                     {magBewerken && (
                       <button className="btn btn-sm" style={{ color: '#DC2626', borderColor: '#FECACA' }} onClick={() => verwijder(n.id)}>
