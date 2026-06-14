@@ -31,6 +31,7 @@ interface WeekActiviteit {
   beschrijving: string | null
   materialen: string[]
   activiteit_id: string | null
+  afbeelding_url: string | null
 }
 
 interface BibliotheekActiviteit {
@@ -322,7 +323,7 @@ export default function WeekplanningenPage() {
   }
 
   // ── Activiteit opslaan ──────────────────────────────────────────────────────
-  async function slaActiviteitOp(type: ActType, naam: string, beschrijving: string, materialen: string[], activiteitId: string | null) {
+  async function slaActiviteitOp(type: ActType, naam: string, beschrijving: string, materialen: string[], activiteitId: string | null, afbeeldingUrl: string | null) {
     const planningId = await zorgVoorPlanning()
     if (!planningId) return
 
@@ -330,9 +331,9 @@ export default function WeekplanningenPage() {
     const supabase = getSupabase()
 
     if (bestaand) {
-      await supabase.from('week_activiteiten').update({ naam, beschrijving: beschrijving || null, materialen, activiteit_id: activiteitId }).eq('id', bestaand.id)
+      await supabase.from('week_activiteiten').update({ naam, beschrijving: beschrijving || null, materialen, activiteit_id: activiteitId, afbeelding_url: afbeeldingUrl }).eq('id', bestaand.id)
     } else {
-      await supabase.from('week_activiteiten').insert({ planning_id: planningId, type, naam, beschrijving: beschrijving || null, materialen, activiteit_id: activiteitId })
+      await supabase.from('week_activiteiten').insert({ planning_id: planningId, type, naam, beschrijving: beschrijving || null, materialen, activiteit_id: activiteitId, afbeelding_url: afbeeldingUrl })
     }
 
     setActieveSlot(null)
@@ -570,6 +571,11 @@ function ActiviteitSlot({ type, activiteit, alternatiefType, onWijzigType, onBek
         ) : (
           /* Gevuld slot */
           <div>
+            {activiteit.afbeelding_url && (
+              <div style={{ margin: '-2px -2px 10px', borderRadius: '8px 8px 0 0', overflow: 'hidden', maxHeight: 120 }}>
+                <img src={activiteit.afbeelding_url} alt={activiteit.naam} style={{ width: '100%', height: 120, objectFit: 'cover', display: 'block' }} onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
+              </div>
+            )}
             <div style={{ fontFamily: 'Sora, sans-serif', fontSize: 15, fontWeight: 700, marginBottom: 6 }}>
               {activiteit.naam}
             </div>
@@ -605,7 +611,7 @@ function ActiviteitSlot({ type, activiteit, alternatiefType, onWijzigType, onBek
 function ActiviteitModal({ type, bestaand, onSave, onClose }: {
   type: ActType
   bestaand: WeekActiviteit | null
-  onSave: (type: ActType, naam: string, beschrijving: string, materialen: string[], activiteitId: string | null) => void
+  onSave: (type: ActType, naam: string, beschrijving: string, materialen: string[], activiteitId: string | null, afbeeldingUrl: string | null) => void
   onClose: () => void
 }) {
   const config = TYPE_CONFIG[type]
@@ -618,13 +624,41 @@ function ActiviteitModal({ type, bestaand, onSave, onClose }: {
   const [zoek, setZoek] = useState('')
   const [laden, setLaden] = useState(false)
   const [afbeeldingBestand, setAfbeeldingBestand] = useState<File | null>(null)
-  const [afbeeldingPreview, setAfbeeldingPreview] = useState<string | null>(null)
+  const [afbeeldingPreview, setAfbeeldingPreview] = useState<string | null>(bestaand?.afbeelding_url ?? null)
+  const [afbeeldingUrl, setAfbeeldingUrl] = useState<string | null>(bestaand?.afbeelding_url ?? null)
+  const [urlInvoer, setUrlInvoer] = useState(bestaand?.afbeelding_url ?? '')
+  const [uploading, setUploading] = useState(false)
 
-  function kiesAfbeelding(bestand: File) {
+  async function kiesAfbeelding(bestand: File) {
     setAfbeeldingBestand(bestand)
     const reader = new FileReader()
     reader.onload = e => setAfbeeldingPreview(e.target?.result as string)
     reader.readAsDataURL(bestand)
+
+    // Upload naar Supabase storage
+    setUploading(true)
+    const ext = bestand.name.split('.').pop()?.toLowerCase() || 'jpg'
+    const pad = `week-activiteit-${Date.now()}.${ext}`
+    const supabase = getSupabase()
+    const { error } = await supabase.storage.from('activiteit-afbeeldingen').upload(pad, bestand, { upsert: true })
+    if (!error) {
+      const { data } = supabase.storage.from('activiteit-afbeeldingen').getPublicUrl(pad)
+      setAfbeeldingUrl(data.publicUrl)
+      setUrlInvoer(data.publicUrl)
+    }
+    setUploading(false)
+  }
+
+  function verwerkUrlInvoer(url: string) {
+    setUrlInvoer(url)
+    if (url.trim()) {
+      setAfbeeldingUrl(url.trim())
+      setAfbeeldingPreview(url.trim())
+      setAfbeeldingBestand(null)
+    } else {
+      setAfbeeldingUrl(null)
+      setAfbeeldingPreview(null)
+    }
   }
 
   useEffect(() => {
@@ -647,7 +681,7 @@ function ActiviteitModal({ type, bestaand, onSave, onClose }: {
   function handleSave() {
     if (!naam.trim()) return
     const materialen = materialenRaw.split(',').map(s => s.trim()).filter(Boolean)
-    onSave(type, naam.trim(), beschrijving.trim(), materialen, activiteitId)
+    onSave(type, naam.trim(), beschrijving.trim(), materialen, activiteitId, afbeeldingUrl)
   }
 
   return (
@@ -697,24 +731,34 @@ function ActiviteitModal({ type, bestaand, onSave, onClose }: {
               <div>
                 <label className="form-label">Voorbeeldafbeelding (optioneel)</label>
                 {afbeeldingPreview ? (
-                  <div style={{ position: 'relative', borderRadius: 10, overflow: 'hidden', border: '1px solid var(--border)' }}>
-                    <img src={afbeeldingPreview} alt="Preview" style={{ width: '100%', maxHeight: 160, objectFit: 'cover', display: 'block' }} />
-                    <button onClick={() => { setAfbeeldingPreview(null); setAfbeeldingBestand(null) }} style={{ position: 'absolute', top: 6, right: 6, background: 'rgba(220,38,38,0.8)', border: 'none', color: '#fff', borderRadius: 6, padding: '3px 8px', cursor: 'pointer', fontSize: 11, display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <div style={{ position: 'relative', borderRadius: 10, overflow: 'hidden', border: '1px solid var(--border)', marginBottom: 8 }}>
+                    <img src={afbeeldingPreview} alt="Preview" style={{ width: '100%', maxHeight: 160, objectFit: 'cover', display: 'block' }} onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
+                    <button onClick={() => { setAfbeeldingPreview(null); setAfbeeldingBestand(null); setAfbeeldingUrl(null); setUrlInvoer('') }} style={{ position: 'absolute', top: 6, right: 6, background: 'rgba(220,38,38,0.8)', border: 'none', color: '#fff', borderRadius: 6, padding: '3px 8px', cursor: 'pointer', fontSize: 11, display: 'flex', alignItems: 'center', gap: 4 }}>
                       <X size={11} /> Verwijderen
                     </button>
                   </div>
                 ) : (
-                  <label style={{ cursor: 'pointer', display: 'block' }}>
+                  <label style={{ cursor: 'pointer', display: 'block', marginBottom: 8 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', borderRadius: 9, border: '2px dashed var(--border-dark)', background: 'var(--bg)' }}
                       onMouseEnter={e => (e.currentTarget.style.borderColor = config.kleur)}
                       onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--border-dark)')}
                     >
                       <Upload size={16} color="var(--text-muted)" style={{ opacity: 0.6, flexShrink: 0 }} />
-                      <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>Klik om een foto te kiezen</span>
+                      <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>{uploading ? 'Uploaden...' : 'Klik om een foto te uploaden'}</span>
                     </div>
                     <input type="file" accept="image/*" style={{ display: 'none' }} onChange={e => e.target.files?.[0] && kiesAfbeelding(e.target.files[0])} />
                   </label>
                 )}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: 12, color: 'var(--text-muted)', flexShrink: 0 }}>Of plak URL:</span>
+                  <input
+                    className="form-input"
+                    style={{ fontSize: 12 }}
+                    value={urlInvoer}
+                    onChange={e => verwerkUrlInvoer(e.target.value)}
+                    placeholder="https://..."
+                  />
+                </div>
               </div>
               <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
                 <button className="btn" onClick={onClose}>Annuleren</button>
