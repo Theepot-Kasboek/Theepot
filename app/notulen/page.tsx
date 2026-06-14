@@ -381,6 +381,7 @@ export default function NotulenPage() {
       locatie_naam: editorLocatie || null,
       aanwezigen: editorAanwezigen || null,
       secties: editorSecties,
+      gepubliceerd: actieve?.gepubliceerd ?? false,
       aangemaakt_op: actieve?.aangemaakt_op ?? new Date().toISOString(),
       aangemaakt_door: profiel?.id ?? null,
     }
