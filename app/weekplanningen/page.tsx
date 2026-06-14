@@ -526,6 +526,7 @@ function ActiviteitSlot({ type, activiteit, alternatiefType, onWijzigType, onBek
 }) {
   const config = TYPE_CONFIG[type]
   const altConfig = alternatiefType ? TYPE_CONFIG[alternatiefType] : null
+  const [fotoHoogte, setFotoHoogte] = useState(160)
 
   return (
     <div className="card" style={{ overflow: 'hidden' }}>
@@ -571,29 +572,26 @@ function ActiviteitSlot({ type, activiteit, alternatiefType, onWijzigType, onBek
         ) : (
           /* Gevuld slot */
           <div>
-            {activiteit.afbeelding_url && (() => {
-              const [fotoHoogte, setFotoHoogte] = useState(160)
-              return (
-                <div style={{ margin: '-2px -2px 10px', borderRadius: '8px 8px 0 0', overflow: 'hidden', position: 'relative' }}>
-                  <img
-                    src={activiteit.afbeelding_url}
-                    alt={activiteit.naam}
-                    style={{ width: '100%', height: fotoHoogte, objectFit: 'cover', display: 'block', transition: 'height 0.2s ease' }}
-                    onError={e => { (e.target as HTMLImageElement).parentElement!.style.display = 'none' }}
-                  />
-                  <div style={{ position: 'absolute', bottom: 6, right: 6, display: 'flex', gap: 4 }}>
-                    <button
-                      onClick={e => { e.stopPropagation(); setFotoHoogte(h => Math.max(80, h - 40)) }}
-                      style={{ background: 'rgba(0,0,0,0.45)', border: 'none', color: '#fff', borderRadius: 6, width: 26, height: 26, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                    ><ZoomOut size={13} /></button>
-                    <button
-                      onClick={e => { e.stopPropagation(); setFotoHoogte(h => Math.min(500, h + 40)) }}
-                      style={{ background: 'rgba(0,0,0,0.45)', border: 'none', color: '#fff', borderRadius: 6, width: 26, height: 26, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                    ><ZoomIn size={13} /></button>
-                  </div>
+            {activiteit.afbeelding_url && (
+              <div style={{ margin: '-2px -2px 10px', borderRadius: '8px 8px 0 0', overflow: 'hidden', position: 'relative' }}>
+                <img
+                  src={activiteit.afbeelding_url}
+                  alt={activiteit.naam}
+                  style={{ width: '100%', height: fotoHoogte, objectFit: 'cover', display: 'block', transition: 'height 0.2s ease' }}
+                  onError={e => { (e.target as HTMLImageElement).parentElement!.style.display = 'none' }}
+                />
+                <div style={{ position: 'absolute', bottom: 6, right: 6, display: 'flex', gap: 4 }}>
+                  <button
+                    onClick={e => { e.stopPropagation(); setFotoHoogte(h => Math.max(80, h - 40)) }}
+                    style={{ background: 'rgba(0,0,0,0.45)', border: 'none', color: '#fff', borderRadius: 6, width: 26, height: 26, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                  ><ZoomOut size={13} /></button>
+                  <button
+                    onClick={e => { e.stopPropagation(); setFotoHoogte(h => Math.min(500, h + 40)) }}
+                    style={{ background: 'rgba(0,0,0,0.45)', border: 'none', color: '#fff', borderRadius: 6, width: 26, height: 26, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                  ><ZoomIn size={13} /></button>
                 </div>
-              )
-            })()}
+              </div>
+            )}
             <div style={{ fontFamily: 'Sora, sans-serif', fontSize: 15, fontWeight: 700, marginBottom: 6 }}>
               {activiteit.naam}
             </div>
