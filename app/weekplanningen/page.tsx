@@ -572,8 +572,8 @@ function ActiviteitSlot({ type, activiteit, alternatiefType, onWijzigType, onBek
           /* Gevuld slot */
           <div>
             {activiteit.afbeelding_url && (
-              <div style={{ margin: '-2px -2px 10px', borderRadius: '8px 8px 0 0', overflow: 'hidden', maxHeight: 120 }}>
-                <img src={activiteit.afbeelding_url} alt={activiteit.naam} style={{ width: '100%', height: 120, objectFit: 'cover', display: 'block' }} onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
+              <div style={{ margin: '-2px -2px 10px', borderRadius: '8px 8px 0 0', overflow: 'hidden' }}>
+                <img src={activiteit.afbeelding_url} alt={activiteit.naam} style={{ width: '100%', height: 'auto', display: 'block' }} onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
               </div>
             )}
             <div style={{ fontFamily: 'Sora, sans-serif', fontSize: 15, fontWeight: 700, marginBottom: 6 }}>
