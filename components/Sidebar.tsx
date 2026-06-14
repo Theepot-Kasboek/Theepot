@@ -116,7 +116,7 @@ export default function Sidebar({ isOpen, onClose }: { isOpen?: boolean; onClose
         { href: '/beleid', label: 'Beleidsstukken', icon: <FileText size={16} />, vereistRecht: 'pagina_beleid' as const },
         { href: '/brandoefening', label: 'Brandoefening', icon: <Flame size={16} />, vereistRecht: 'pagina_brandoefening' as const },
         { href: '/kilometerstanden', label: 'Kilometerstanden', icon: <Gauge size={16} /> },
-        { href: '/archief', label: 'Archief', icon: <Archive size={16} />, vereistRecht: 'pagina_archief' as const },
+
         { href: '/activiteiten-log', label: 'Activiteitenlog', icon: <Activity size={16} />, vereistRecht: 'pagina_activiteiten_log' as const },
       ],
     },
