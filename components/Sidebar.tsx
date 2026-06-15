@@ -28,6 +28,7 @@ export default function Sidebar({ isOpen, onClose }: { isOpen?: boolean; onClose
   const { profiel, isSuperadmin, rechten, loading, signOut } = useAuth()
   const { theme, toggleTheme } = useTheme()
   const [ongelezen, setOngelezen] = useState(0)
+  const [ongelezenprikbord, setOngelezenPrikbord] = useState(0)
 
   const initialen = profiel?.naam
     ? profiel.naam.split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase()
@@ -81,6 +82,42 @@ export default function Sidebar({ isOpen, onClose }: { isOpen?: boolean; onClose
     return () => { supabase.removeChannel(channel) }
   }, [profiel, pathname])
 
+  // ── Ongelezen prikbord berichten ─────────────────────────────────────────────
+  useEffect(() => {
+    if (!profiel) return
+    async function haalPrikbord() {
+      const supabase = getSupabase()
+      const { data } = await supabase
+        .from('prikbord_berichten')
+        .select('id, gelezen_door')
+      if (!data) { setOngelezenPrikbord(0); return }
+      const aantal = data.filter((b: { gelezen_door: string[] | null }) =>
+        !b.gelezen_door?.includes(profiel!.id)
+      ).length
+      setOngelezenPrikbord(aantal)
+    }
+    haalPrikbord()
+    const supabase = getSupabase()
+    const channel = supabase
+      .channel('sidebar-prikbord-notificaties')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'prikbord_berichten' },
+        () => haalPrikbord()
+      ).subscribe()
+    return () => { supabase.removeChannel(channel) }
+  }, [profiel, pathname])
+
+  // Extra: herlaad na 1 seconde als je op de prikbordpagina bent
+  useEffect(() => {
+    if (!profiel || !pathname.startsWith('/prikbord')) return
+    const timer = setTimeout(async () => {
+      const supabase = getSupabase()
+      const { data } = await supabase.from('prikbord_berichten').select('id, gelezen_door')
+      if (!data) { setOngelezenPrikbord(0); return }
+      setOngelezenPrikbord(data.filter((b: { gelezen_door: string[] | null }) => !b.gelezen_door?.includes(profiel.id)).length)
+    }, 1500)
+    return () => clearTimeout(timer)
+  }, [profiel, pathname])
+
   // Extra: herlaad na 1 seconde als je op de chatpagina bent (geeft chat pagina tijd om te markeren)
   useEffect(() => {
     if (!profiel || !pathname.startsWith('/chat')) return
@@ -109,7 +146,7 @@ export default function Sidebar({ isOpen, onClose }: { isOpen?: boolean; onClose
     {
       label: 'Administratie',
       items: [
-        { href: '/prikbord', label: 'Prikbord', icon: <Pin size={16} />, vereistRecht: 'pagina_prikbord' as const },
+        { href: '/prikbord', label: 'Prikbord', icon: <Pin size={16} />, notificatie: ongelezenprikbord, vereistRecht: 'pagina_prikbord' as const },
         { href: '/zoeken', label: 'Zoeken', icon: <Search size={16} /> },
         { href: '/kasboek', label: 'Kasboek', icon: <Wallet size={16} />, vereistRecht: 'pagina_kasboek' as const },
         { href: '/maaltijdlijst', label: 'Maaltijdlijst', icon: <UtensilsCrossed size={16} />, vereistRecht: 'pagina_maaltijdlijst' as const },

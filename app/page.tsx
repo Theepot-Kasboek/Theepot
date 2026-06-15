@@ -503,7 +503,7 @@ function WeekplanningWidget({ profielId, isSuperadmin, profiel }: { profielId: s
   const [planning, setPlanning] = useState<{ thema: string | null; knutsel?: string; kook_bak?: string; groepsspel?: string } | null>(null)
   const [laden, setLaden] = useState(true)
   const maandag = startVanWeek(new Date())
-  const weekStart = maandag.toISOString().split('T')[0]
+  const weekStart = `${maandag.getFullYear()}-${String(maandag.getMonth()+1).padStart(2,'0')}-${String(maandag.getDate()).padStart(2,'0')}`
 
   useEffect(() => {
     if (!profiel) return

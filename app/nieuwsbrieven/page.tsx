@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { getSupabase } from '@/lib/supabase'
 import { useAuth } from '@/components/AuthProvider'
 import Topbar from '@/components/Topbar'
@@ -14,7 +14,7 @@ import {
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type Format = 'weekmemo' | 'theepraatje'
+type Format = 'weekmemo' | 'theepraatje' | 'nieuwsbrief'
 
 interface Sectie {
   id: string
@@ -57,8 +57,10 @@ const THEEPRAATJE_SECTIES = [
 ]
 
 function nieuwId() { return Math.random().toString(36).slice(2) }
+const NIEUWSBRIEF_SECTIES = ['Introductie', 'Nieuws', 'Agenda', 'Overig']
+
 function maakSecties(format: Format): Sectie[] {
-  const titels = format === 'weekmemo' ? WEEKMEMO_SECTIES : THEEPRAATJE_SECTIES
+  const titels = format === 'weekmemo' ? WEEKMEMO_SECTIES : format === 'theepraatje' ? THEEPRAATJE_SECTIES : NIEUWSBRIEF_SECTIES
   return titels.map(t => ({ id: nieuwId(), titel: t, inhoud: '' }))
 }
 function fmtDatum(d: string) {
@@ -216,7 +218,7 @@ function genereerTheepraatjeHTML(brief: Nieuwsbrief): string {
 }
 
 function genereerHTML(brief: Nieuwsbrief): string {
-  if (brief.format === 'weekmemo') return genereerWeekMemoHTML(brief)
+  if (brief.format === 'weekmemo' || brief.format === 'nieuwsbrief') return genereerWeekMemoHTML(brief)
   return genereerTheepraatjeHTML(brief)
 }
 
@@ -610,6 +612,25 @@ export default function NieuwsbrievenPage() {
   const [editorSecties, setEditorSecties] = useState<Sectie[]>([])
   const [actieveSectie, setActieveSectie] = useState<string | null>(null)
   const [nieuwSectieNaam, setNieuwSectieNaam] = useState('')
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  function voegLinkIn(sectieId: string, huidigInhoud: string) {
+    const tekst = prompt('Tekst voor de link:')
+    if (!tekst) return
+    const url = prompt('URL (bijv. https://www.detheepot.nl):')
+    if (!url) return
+    const link = `[${tekst}](${url})`
+    const ta = textareaRef.current
+    if (ta) {
+      const start = ta.selectionStart
+      const end = ta.selectionEnd
+      const voor = huidigInhoud.slice(0, start)
+      const na = huidigInhoud.slice(end)
+      updateSectie(sectieId, 'inhoud', voor + link + na)
+    } else {
+      updateSectie(sectieId, 'inhoud', huidigInhoud + (huidigInhoud && !huidigInhoud.endsWith('\n') ? '\n' : '') + link)
+    }
+  }
 
   const haalOp = useCallback(async () => {
     setLaden(true)
@@ -621,7 +642,7 @@ export default function NieuwsbrievenPage() {
   useEffect(() => { haalOp() }, [haalOp])
 
   function nieuwAanmaken(format: Format) {
-    setEditorTitel(format === 'weekmemo' ? 'Weekmemo' : 'Theepraatje')
+    setEditorTitel(format === 'weekmemo' ? 'Weekmemo' : format === 'theepraatje' ? 'Theepraatje' : 'Nieuwsbrief')
     setEditorNummer('')
     setEditorLocatie('')
     setEditorDatum(new Date().toISOString().split('T')[0])
@@ -714,7 +735,7 @@ export default function NieuwsbrievenPage() {
     return (
       <>
         <Topbar
-          titel={editorFormat === 'weekmemo' ? 'Weekmemo' : 'Theepraatje'}
+          titel={editorFormat === 'weekmemo' ? 'Weekmemo' : editorFormat === 'theepraatje' ? 'Theepraatje' : 'Nieuwsbrief'}
           acties={
             <div style={{ display: 'flex', gap: 8 }}>
               {actieve && <>
@@ -740,6 +761,9 @@ export default function NieuwsbrievenPage() {
               </button>
               <button onClick={() => setEditorFormat('theepraatje')} style={{ flex: 1, padding: '10px 14px', borderRadius: 10, background: editorFormat === 'theepraatje' ? 'var(--primary-xlight)' : 'var(--bg)', border: `1.5px solid ${editorFormat === 'theepraatje' ? 'var(--primary)' : 'var(--border)'}`, textAlign: 'center', cursor: 'pointer', transition: 'all 0.15s' }}>
                 <div style={{ fontSize: 11, fontWeight: 700, color: editorFormat === 'theepraatje' ? 'var(--primary-text)' : 'var(--text-muted)' }}>📰 Theepraatje</div>
+              </button>
+              <button onClick={() => setEditorFormat('nieuwsbrief')} style={{ flex: 1, padding: '10px 14px', borderRadius: 10, background: editorFormat === 'nieuwsbrief' ? 'var(--primary-xlight)' : 'var(--bg)', border: `1.5px solid ${editorFormat === 'nieuwsbrief' ? 'var(--primary)' : 'var(--border)'}`, textAlign: 'center', cursor: 'pointer', transition: 'all 0.15s' }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: editorFormat === 'nieuwsbrief' ? 'var(--primary-text)' : 'var(--text-muted)' }}>📄 Nieuwsbrief</div>
                 <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>Voor ouders</div>
               </button>
             </div>
@@ -750,7 +774,7 @@ export default function NieuwsbrievenPage() {
               <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 <div><label className="form-label">Titel</label><input className="form-input" value={editorTitel} onChange={e => setEditorTitel(e.target.value)} /></div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                  <div><label className="form-label">{editorFormat === 'weekmemo' ? 'Weeknummer' : 'Nummer'}</label><input className="form-input" value={editorNummer} onChange={e => setEditorNummer(e.target.value)} placeholder={editorFormat === 'weekmemo' ? '20' : '119'} /></div>
+                  <div><label className="form-label">{editorFormat === 'weekmemo' ? 'Weeknummer' : 'Nummer'}</label><input className="form-input" value={editorNummer} onChange={e => setEditorNummer(e.target.value)} placeholder={editorFormat === 'weekmemo' ? '20' : '119'} style={{ display: editorFormat === 'nieuwsbrief' ? 'none' : undefined }} /></div>
                   <div><label className="form-label">Datum</label><input type="date" className="form-input" value={editorDatum} onChange={e => setEditorDatum(e.target.value)} /></div>
                 </div>
                 <div><label className="form-label">Locatie (optioneel)</label><input className="form-input" value={editorLocatie} onChange={e => setEditorLocatie(e.target.value)} placeholder="Bijv. Lisse" /></div>
@@ -802,23 +826,17 @@ export default function NieuwsbrievenPage() {
                   <div className="card-body">
                     {/* Toolbar */}
                     <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
-                      <button className="btn btn-sm" title="Hyperlink invoegen"
-                        onClick={() => {
-                          const tekst = prompt('Tekst voor de link:')
-                          if (!tekst) return
-                          const url = prompt('URL (bijv. https://www.detheepot.nl):')
-                          if (!url) return
-                          const link = `[${tekst}](${url})`
-                          updateSectie(sectie.id, 'inhoud', sectie.inhoud + (sectie.inhoud && !sectie.inhoud.endsWith('\n') ? '\n' : '') + link)
-                        }}>
+                      <button className="btn btn-sm" title="Hyperlink invoegen (Cmd+K / Ctrl+K)"
+                        onClick={() => voegLinkIn(sectie.id, sectie.inhoud)}>
                         🔗 Link invoegen
                       </button>
                       <span style={{ fontSize: 11, color: 'var(--text-muted)', alignSelf: 'center' }}>
-                        Of typ: [tekst](https://url.nl) • Bullets: begin regel met •
+                        Cmd+K / Ctrl+K • [tekst](https://url.nl) • Bullets: begin regel met •
                       </span>
                     </div>
-                    <textarea value={sectie.inhoud} onChange={e => updateSectie(sectie.id, 'inhoud', e.target.value)}
+                    <textarea ref={textareaRef} value={sectie.inhoud} onChange={e => updateSectie(sectie.id, 'inhoud', e.target.value)}
                       placeholder={`Inhoud voor "${sectie.titel}"...`} autoFocus
+                      onKeyDown={e => { if ((e.metaKey || e.ctrlKey) && e.key === 'k') { e.preventDefault(); voegLinkIn(sectie.id, sectie.inhoud) } }}
                       style={{ width: '100%', minHeight: 380, border: '1px solid var(--border-dark)', borderRadius: 9, padding: '12px 14px', fontSize: 13, fontFamily: 'DM Sans, sans-serif', lineHeight: 1.8, background: 'var(--bg)', color: 'var(--text)', resize: 'vertical', outline: 'none' }}
                       onFocus={e => (e.target.style.borderColor = 'var(--primary)')} onBlur={e => (e.target.style.borderColor = 'var(--border-dark)')} />
                     <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 6 }}>{sectie.inhoud.length} tekens</div>
@@ -844,6 +862,7 @@ export default function NieuwsbrievenPage() {
           magBewerken ? (
             <div style={{ display: 'flex', gap: 8 }}>
               <button className="btn" onClick={() => nieuwAanmaken('weekmemo')}><Plus size={14} /> Weekmemo</button>
+              <button className="btn" onClick={() => nieuwAanmaken('nieuwsbrief')}><Plus size={14} /> Nieuwsbrief</button>
               <button className="btn btn-primary" onClick={() => nieuwAanmaken('theepraatje')}><Plus size={14} /> Theepraatje</button>
             </div>
           ) : undefined
@@ -861,6 +880,7 @@ export default function NieuwsbrievenPage() {
             {magBewerken && (
               <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
                 <button className="btn" onClick={() => nieuwAanmaken('weekmemo')}><Plus size={14} /> Weekmemo</button>
+                <button className="btn" onClick={() => nieuwAanmaken('nieuwsbrief')}><Plus size={14} /> Nieuwsbrief</button>
                 <button className="btn btn-primary" onClick={() => nieuwAanmaken('theepraatje')}><Plus size={14} /> Theepraatje</button>
               </div>
             )}
