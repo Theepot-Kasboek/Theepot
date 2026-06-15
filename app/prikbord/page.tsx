@@ -58,9 +58,19 @@ export default function PrikbordPage() {
 
   useEffect(() => {
     haalOp()
-    getSupabase().from('kasboek_locaties').select('naam').eq('actief', true).order('naam')
-      .then(({ data }) => setLocaties((data ?? []).map((l: { naam: string }) => l.naam)))
-  }, [haalOp])
+    async function laadLocaties() {
+      const supabase = getSupabase()
+      const { data: alle } = await supabase.from('kasboek_locaties').select('naam').eq('actief', true).order('naam')
+      const alleNamen: string[] = (alle ?? []).map((l: { naam: string }) => l.naam)
+      const magAlles = isSuperadmin || profiel?.rol === 'directie' || profiel?.rol === 'leidinggevende'
+      if (magAlles) { setLocaties(alleNamen); return }
+      if (!profiel) return
+      const { data: toegang } = await supabase.from('locatie_toegang').select('locatie_naam').eq('profiel_id', profiel.id).eq('locatie_type', 'prikbord').neq('toegang', 'geen')
+      const toegankelijk = (toegang ?? []).map((t: { locatie_naam: string }) => t.locatie_naam)
+      setLocaties(alleNamen.filter(n => toegankelijk.includes(n)))
+    }
+    laadLocaties()
+  }, [haalOp, isSuperadmin, profiel])
 
   async function verwijder(id: string) {
     if (!confirm('Bericht verwijderen?')) return

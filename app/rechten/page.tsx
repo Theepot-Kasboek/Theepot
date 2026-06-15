@@ -592,6 +592,7 @@ const LOCATIE_SECTIES = [
   { type: 'gesprekken',      icon: '💬', label: '10-minutengesprekken' },
   { type: 'brandoefening',   icon: '🔥', label: 'Brandoefening' },
   { type: 've_planning',      icon: '📋', label: 'VE Planning' },
+  { type: 'prikbord',         icon: '📌', label: 'Prikbord' },
 ]
 
 function LocatieToegang({ profielen, kasboekLocaties, maaltijdLocaties, locatieToegang, onRefresh, onToast }: {
@@ -663,6 +664,7 @@ function LocatieToegang({ profielen, kasboekLocaties, maaltijdLocaties, locatieT
     if (type === 'gesprekken') return kasboekLocaties
     if (type === 'brandoefening') return kasboekLocaties
     if (type === 've_planning') return kasboekLocaties
+    if (type === 'prikbord') return kasboekLocaties
     return []
   }
 
