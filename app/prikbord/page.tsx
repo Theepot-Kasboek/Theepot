@@ -79,7 +79,14 @@ export default function PrikbordPage() {
     await haalOp()
   }
 
-  const gefilterd = actieveLocatie === 'alle' ? berichten : berichten.filter(b => b.locatie_naam === actieveLocatie || b.locatie_naam === 'alle')
+  // Berichten filteren op basis van toegankelijke locaties
+  const magAllesZien = isSuperadmin || profiel?.rol === 'directie' || profiel?.rol === 'leidinggevende'
+  const toegankelijkeBerichten = magAllesZien
+    ? berichten
+    : berichten.filter(b => b.locatie_naam === 'alle' || locaties.includes(b.locatie_naam))
+  const gefilterd = actieveLocatie === 'alle'
+    ? toegankelijkeBerichten
+    : toegankelijkeBerichten.filter(b => b.locatie_naam === actieveLocatie || b.locatie_naam === 'alle')
 
   if (!magZien) return (
     <>
