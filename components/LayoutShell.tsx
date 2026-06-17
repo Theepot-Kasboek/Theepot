@@ -3,6 +3,7 @@
 import { usePathname } from 'next/navigation'
 import { useState, useEffect } from 'react'
 import Sidebar from './Sidebar'
+import SpeedDial from './SpeedDial'
 
 const GEEN_SIDEBAR = ['/login']
 
@@ -38,6 +39,7 @@ export default function LayoutShell({ children }: { children: React.ReactNode })
         {/* Geef toggle door via context aan children */}
         <MobielContext.Provider value={{ toggleSidebar: () => setSidebarOpen(o => !o) }}>
           {children}
+          <SpeedDial />
         </MobielContext.Provider>
       </div>
     </div>
