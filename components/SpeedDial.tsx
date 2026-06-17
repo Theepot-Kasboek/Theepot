@@ -85,7 +85,7 @@ export default function SpeedDial() {
   const zichtbareItems = ALLE_ITEMS.filter(item => {
     if (item.superadminOnly && !isSuperadmin) return false
     if (item.vereistRecht) {
-      const recht = (rechten as Record<string, string>)[item.vereistRecht]
+      const recht = (rechten as unknown as Record<string, string>)[item.vereistRecht]
       if (recht === 'geen') return false
     }
     if (item.href === pathname) return false
