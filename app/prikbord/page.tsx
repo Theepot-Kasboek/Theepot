@@ -16,6 +16,7 @@ interface PrikbordBericht {
   aangemaakt_door: string | null
   aangemaakt_op: string
   verloopdatum: string | null
+  gelezen_door?: string[]
   profiel_naam?: string
 }
 
@@ -55,6 +56,29 @@ export default function PrikbordPage() {
     setBerichten(actief)
     setLaden(false)
   }, [])
+
+  // Markeer alle berichten als gelezen zodra de pagina geladen is
+  useEffect(() => {
+    if (!profiel || berichten.length === 0) return
+    const ongelezen = berichten.filter((b) => !b.gelezen_door?.includes(profiel.id))
+    if (ongelezen.length === 0) return
+    const supabase = getSupabase()
+    Promise.all(
+      ongelezen.map(async (b) => {
+        const { data } = await supabase
+          .from('prikbord_berichten')
+          .select('gelezen_door')
+          .eq('id', b.id)
+          .single()
+        const huidig: string[] = data?.gelezen_door ?? []
+        if (huidig.includes(profiel.id)) return
+        await supabase
+          .from('prikbord_berichten')
+          .update({ gelezen_door: Array.from(new Set([...huidig, profiel.id])) })
+          .eq('id', b.id)
+      })
+    )
+  }, [profiel, berichten])
 
   useEffect(() => {
     haalOp()
