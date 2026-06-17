@@ -142,7 +142,7 @@ export default function KilometerstandenPage() {
       />
 
       <div className="page-content">
-        <div style={{ display: 'grid', gridTemplateColumns: '260px 1fr', gap: 16 }}>
+        <div className="layout-split layout-split-sm">
 
           {/* Voertuigenlijst */}
           <div>

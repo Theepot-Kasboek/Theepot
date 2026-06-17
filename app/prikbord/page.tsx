@@ -270,7 +270,7 @@ function BerichtModal({ bericht, locaties, onSave, onClose }: {
             <textarea className="form-textarea" style={{ minHeight: 120 }} value={inhoud} onChange={e => setInhoud(e.target.value)} placeholder="Schrijf hier de mededeling..." />
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          <div className="grid-2col" style={{ gap: 10 }}>
             <div>
               <label className="form-label">Locatie</label>
               <select className="form-select" value={locatie} onChange={e => setLocatie(e.target.value)}>

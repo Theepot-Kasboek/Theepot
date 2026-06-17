@@ -406,7 +406,7 @@ export default function NotulenPage() {
           }
         />
 
-        <div className="page-content" style={{ display: 'grid', gridTemplateColumns: '320px 1fr', gap: 16 }}>
+        <div className="page-content layout-split layout-split-lg">
 
           {/* Links: meta + secties */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>

@@ -568,7 +568,7 @@ function PlanningModal({ planning, locatie, onSave, onClose }: {
         </div>
         <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div><label className="form-label">Thema *</label><input className="form-input" value={thema} onChange={e => setThema(e.target.value)} placeholder="Bijv. Middeleeuwen, Ruimtevaart" autoFocus /></div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+          <div className="grid-3col" style={{ gap: 8 }}>
             <div><label className="form-label">Week van *</label><input type="number" className="form-input" value={weekVan} onChange={e => setWeekVan(e.target.value)} placeholder="1" min="1" max="52" /></div>
             <div><label className="form-label">Week tot *</label><input type="number" className="form-input" value={weekTot} onChange={e => setWeekTot(e.target.value)} placeholder="4" min="1" max="52" /></div>
             <div><label className="form-label">Jaar *</label><input type="number" className="form-input" value={jaar} onChange={e => setJaar(e.target.value)} /></div>

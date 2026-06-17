@@ -648,7 +648,7 @@ export default function KasboekPage() {
         {actieveLocatie && (
           <>
             {/* Saldo kaarten */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 20 }}>
+            <div className="grid-3col" style={{ marginBottom: 20 }}>
               {[
                 { label: 'Inkomsten', bedrag: inkomsten, kleur: 'var(--success)', bg: 'color-mix(in srgb, var(--success) 12%, var(--bg-card))', icoon: '↑' },
                 { label: 'Uitgaven',  bedrag: uitgaven,  kleur: 'var(--danger)',  bg: 'color-mix(in srgb, var(--danger) 12%, var(--bg-card))',  icoon: '↓' },
@@ -664,7 +664,7 @@ export default function KasboekPage() {
               ))}
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: magBewerkenKasboek ? '1fr 2fr' : '1fr', gap: 16 }}>
+            <div className={magBewerkenKasboek ? 'layout-split layout-split-md' : ''} style={magBewerkenKasboek ? {} : { display: 'flex', flexDirection: 'column', gap: 14 }}>
               {/* Links: formulier + per categorie */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                 {!magBewerkenKasboek && (

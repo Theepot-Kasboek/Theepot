@@ -295,10 +295,10 @@ export default function ChatPage() {
         }
       />
 
-      <div style={{ display: 'flex', height: 'calc(100vh - 56px)', overflow: 'hidden' }}>
+      <div className="chat-split">
 
         {/* ── Linker paneel: gesprekkenlijst ── */}
-        <div style={{ width: 300, borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column', background: 'var(--bg-card)', flexShrink: 0 }}>
+        <div className={`chat-panel-left${actiefGesprek ? ' actief-geselecteerd' : ''}`} style={{ borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column', background: 'var(--bg-card)' }}>
 
           {/* Support sectie bovenaan */}
           {supportProfiel && profiel?.id !== supportProfiel.id && (
@@ -381,7 +381,7 @@ export default function ChatPage() {
         </div>
 
         {/* ── Rechter paneel: berichten ── */}
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div className="chat-panel-right">
           {!actiefGesprek ? (
             <div className="empty-state" style={{ height: '100%' }}>
               <MessageSquare size={40} />

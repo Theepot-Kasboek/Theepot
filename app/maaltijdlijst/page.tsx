@@ -565,7 +565,7 @@ export default function MaaltijdlijstPage() {
             {laden ? (
               <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>Laden...</div>
             ) : (
-              <div style={{ overflowX: 'auto' }}>
+              <div className="table-scroll-x">
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, minWidth: 700 }}>
                   <thead>
                     <tr>

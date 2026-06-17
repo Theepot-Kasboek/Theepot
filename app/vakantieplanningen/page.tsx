@@ -939,7 +939,7 @@ function NieuwePlanningModal({ onSave, onClose, vakanties = STANDAARD_VAKANTIES,
             <label className="form-label">Naam planning *</label>
             <input className="form-input" value={naam} onChange={e => setNaam(e.target.value)} placeholder="Bijv. Zomervakantie 2026 — BSO De Theepot" autoFocus />
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          <div className="grid-2col" style={{ gap: 12 }}>
             <div>
               <label className="form-label">Vakantie</label>
               <select className="form-select" value={vakantie} onChange={e => {
@@ -1324,7 +1324,7 @@ function InstellingenModal({ planning, onSave, onClose, vakanties, onVakantieToe
             <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--primary-text)', display: 'flex', alignItems: 'center', gap: 6 }}>
               📍 Lisse / Hillegom (Midden)
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+            <div className="grid-2col" style={{ gap: 8 }}>
               <div>
                 <label className="form-label">Startdatum</label>
                 <div style={{ fontSize: 13, color: 'var(--text)', padding: '7px 10px', background: 'var(--bg-card)', borderRadius: 8, border: '1px solid var(--border)' }}>
@@ -1347,7 +1347,7 @@ function InstellingenModal({ planning, onSave, onClose, vakanties, onVakantieToe
               📍 Lisserbroek (Noord)
               <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-muted)' }}>— optioneel, vul in als de vakantie op een andere week valt</span>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+            <div className="grid-2col" style={{ gap: 8 }}>
               <div><label className="form-label">Startdatum Noord</label><input type="date" className="form-input" value={startNoord} onChange={e => setStartNoord(e.target.value)} /></div>
               <div><label className="form-label">Einddatum Noord</label><input type="date" className="form-input" value={eindNoord} onChange={e => setEindNoord(e.target.value)} /></div>
             </div>

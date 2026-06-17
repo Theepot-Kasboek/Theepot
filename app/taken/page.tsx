@@ -231,10 +231,10 @@ export default function TakenPage() {
   // ─── RENDER ─────────────────────────────────────────────────────────────────
 
   return (
-    <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', background: 'var(--bg)' }}>
+    <div className="taken-layout" style={{ height: '100vh', background: 'var(--bg)' }}>
 
       {/* ── Linker paneel ── */}
-      <div style={{ width: 240, background: 'var(--bg-card)', borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
+      <div className="taken-sidebar" style={{ background: 'var(--bg-card)', borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column' }}>
         <div style={{ padding: '16px 14px 10px', borderBottom: '1px solid var(--border)' }}>
           <div style={{ fontFamily: 'Sora, sans-serif', fontSize: 15, fontWeight: 700 }}>Taken & Notities</div>
           <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{profiel?.naam}</div>
@@ -502,7 +502,7 @@ function TaakDetail({ taak, lijst, lijsten, onUpdate, onVerwijder, onToggle, onC
   function slaOp() { onUpdate(taak.id, { titel: titel.trim() || taak.titel, notitie: notitie.trim() || null }) }
 
   return (
-    <div style={{ width: 300, background: 'var(--bg-card)', borderLeft: '1px solid var(--border)', display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
+    <div className="taken-detail" style={{ background: 'var(--bg-card)', borderLeft: '1px solid var(--border)', display: 'flex', flexDirection: 'column' }}>
       <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 10 }}>
         <button onClick={() => onToggle(taak)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, flexShrink: 0 }}>
           {taak.voltooid ? <CheckCircle2 size={22} color={kleur} fill={kleur} /> : <Circle size={22} />}

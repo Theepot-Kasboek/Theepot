@@ -300,15 +300,15 @@ export default function AgendaPage() {
     while (cellen.length % 7 !== 0) cellen.push(null)
 
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
+      <div className="table-scroll-x" style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
         {/* Weekdagen header */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', borderBottom: '1px solid var(--border)' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', minWidth: 560, borderBottom: '1px solid var(--border)' }}>
           {['Ma', 'Di', 'Wo', 'Do', 'Vr', 'Za', 'Zo'].map(d => (
             <div key={d} style={{ padding: '8px 0', textAlign: 'center', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{d}</div>
           ))}
         </div>
         {/* Rijen */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gridTemplateRows: `repeat(${cellen.length / 7}, 1fr)`, flex: 1, overflow: 'auto' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gridTemplateRows: `repeat(${cellen.length / 7}, 1fr)`, flex: 1, overflow: 'auto', minWidth: 560 }}>
           {cellen.map((dag, i) => {
             if (!dag) return <div key={i} style={{ borderRight: '1px solid var(--border)', borderBottom: '1px solid var(--border)', background: 'var(--bg)' }} />
             const dagAfspraken = afsprakenVanDag(dag)

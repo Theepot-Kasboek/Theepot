@@ -365,7 +365,7 @@ export default function GesprekkenPage() {
           </div>
         )}
 
-        <div style={{ display: 'grid', gridTemplateColumns: '280px 1fr', gap: 16 }}>
+        <div className="layout-split layout-split-md">
 
           {/* Linker paneel: mappen */}
           <div>

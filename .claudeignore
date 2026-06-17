@@ -1,0 +1,9 @@
+node_modules
+.next
+.vercel
+.git
+public
+tsconfig.tsbuildinfo
+next-env.d.ts
+ios
+*.log

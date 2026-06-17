@@ -459,7 +459,7 @@ export default function WeekplanningenPage() {
             {laden ? (
               <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>Laden...</div>
             ) : (
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+              <div className="grid-2col">
 
                 {/* Slot 1: Knutsel / Koken */}
                 <ActiviteitSlot

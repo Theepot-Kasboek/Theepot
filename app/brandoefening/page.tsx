@@ -347,7 +347,7 @@ export default function BrandoefeningPage() {
           </div>
         )}
 
-        <div style={{ display: 'grid', gridTemplateColumns: '220px 1fr', gap: 16 }}>
+        <div className="layout-split layout-split-sm">
           {/* Weken lijst */}
           <div>
             <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 10 }}>Oefenweken</div>
