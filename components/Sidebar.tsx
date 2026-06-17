@@ -7,7 +7,7 @@ import { useEffect, useState } from 'react'
 import {
   LayoutDashboard, Wallet, Map, BookOpen,
   Calendar, MessageSquare, ShieldCheck,
-  Users, LogOut, Sun, Moon, UtensilsCrossed, Scissors, MessageCircle, FileText, Newspaper, Flame, CheckSquare, Gauge, Pin, Layers, Archive, Search, Activity, ClipboardList, Bell,
+  Users, LogOut, Sun, Moon, UtensilsCrossed, Scissors, MessageCircle, FileText, Newspaper, Flame, CheckSquare, Gauge, Pin, Layers, Archive, Search, Activity, ClipboardList,
 } from 'lucide-react'
 import { useAuth } from './AuthProvider'
 import { useTheme } from './ThemeProvider'
@@ -29,8 +29,7 @@ export default function Sidebar({ isOpen, onClose }: { isOpen?: boolean; onClose
   const { theme, toggleTheme } = useTheme()
   const [ongelezen, setOngelezen] = useState(0)
   const [ongelezenprikbord, setOngelezenPrikbord] = useState(0)
-  const [emailNotif, setEmailNotif] = useState(false)
-  const [emailNotifLaden, setEmailNotifLaden] = useState(false)
+
 
   const initialen = profiel?.naam
     ? profiel.naam.split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase()
@@ -83,22 +82,6 @@ export default function Sidebar({ isOpen, onClose }: { isOpen?: boolean; onClose
 
     return () => { supabase.removeChannel(channel) }
   }, [profiel, pathname])
-
-  // ── Email notificatie instelling laden ──────────────────────────────────────
-  useEffect(() => {
-    if (!profiel) return
-    getSupabase().from('profielen').select('chat_email_notif').eq('id', profiel.id).single()
-      .then(({ data }) => setEmailNotif(data?.chat_email_notif ?? false))
-  }, [profiel])
-
-  async function toggleEmailNotif() {
-    if (!profiel) return
-    setEmailNotifLaden(true)
-    const nieuw = !emailNotif
-    await getSupabase().from('profielen').update({ chat_email_notif: nieuw }).eq('id', profiel.id)
-    setEmailNotif(nieuw)
-    setEmailNotifLaden(false)
-  }
 
   // ── Ongelezen prikbord berichten ─────────────────────────────────────────────
   useEffect(() => {
@@ -296,37 +279,6 @@ export default function Sidebar({ isOpen, onClose }: { isOpen?: boolean; onClose
 
       {/* Footer: darkmode toggle + gebruiker */}
       <div className="sidebar-footer">
-        <button
-          onClick={toggleEmailNotif}
-          disabled={emailNotifLaden}
-          title="E-mailmelding bij nieuw chatbericht"
-          style={{
-            display: 'flex', alignItems: 'center', gap: 9,
-            width: '100%', padding: '7px 10px', borderRadius: 8,
-            background: 'none', border: 'none', cursor: 'pointer',
-            color: 'var(--text-muted)', fontSize: 13,
-            marginBottom: 4, transition: 'background 0.12s',
-            opacity: emailNotifLaden ? 0.6 : 1,
-          }}
-          onMouseEnter={e => (e.currentTarget.style.background = 'var(--primary-xlight)')}
-          onMouseLeave={e => (e.currentTarget.style.background = 'none')}
-        >
-          <Bell size={15} color={emailNotif ? 'var(--primary)' : undefined} />
-          <span>E-mail bij chat</span>
-          <div style={{
-            marginLeft: 'auto', width: 32, height: 18, borderRadius: 9,
-            background: emailNotif ? 'var(--primary)' : 'var(--border-dark)',
-            position: 'relative', transition: 'background 0.2s', flexShrink: 0,
-          }}>
-            <div style={{
-              position: 'absolute', top: 2,
-              left: emailNotif ? 16 : 2,
-              width: 14, height: 14, borderRadius: '50%',
-              background: '#fff', transition: 'left 0.2s',
-            }} />
-          </div>
-        </button>
-
         <button
           onClick={toggleTheme}
           style={{

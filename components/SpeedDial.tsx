@@ -127,7 +127,7 @@ export default function SpeedDial() {
           <div style={{ maxHeight: 340, overflowY: 'auto', padding: '6px 0' }}>
             {zichtbareItems.length === 0 ? (
               <div style={{ padding: '16px 14px', fontSize: 12, color: 'var(--text-muted)', textAlign: 'center' }}>
-                Geen pagina's gevonden
+                Geen pagina&apos;s gevonden
               </div>
             ) : zichtbareItems.map(item => (
               <Link
