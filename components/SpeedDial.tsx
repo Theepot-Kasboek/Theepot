@@ -44,8 +44,8 @@ const ALLE_ITEMS: SpeedDialItem[] = [
   { href: '/rechten', label: 'Rechtenbeheer', icon: <ShieldCheck size={18} />, superadminOnly: true },
 ]
 
-const WIEL_RADIUS = 110  // px afstand van centrum tot items
-const ITEM_SIZE = 48     // px diameter van elk item
+const ITEM_SIZE = 48
+const WIEL_RADIUS = 130
 
 export default function SpeedDial() {
   const [open, setOpen] = useState(false)
@@ -84,129 +84,150 @@ export default function SpeedDial() {
   })
 
   const n = zichtbareItems.length
-
-  // Verdeel items over een halve cirkel links van het knopje (van boven naar beneden)
-  // Hoek: van -90deg (boven) naar +90deg (onder), gespiegeld naar links
-  function getPos(idx: number) {
-    const startAngle = -80
-    const endAngle = 80
-    const angle = n === 1 ? 0 : startAngle + (idx / (n - 1)) * (endAngle - startAngle)
-    const rad = (angle * Math.PI) / 180
-    // Items waaieren naar links: x negatief
-    const x = -Math.cos(rad) * WIEL_RADIUS
-    const y = Math.sin(rad) * WIEL_RADIUS
-    return { x, y }
-  }
-
   const hoveredItem = zichtbareItems.find(i => i.href === hoveredHref)
 
   return (
     <>
-      {/* Backdrop bij open */}
+      {/* Backdrop */}
       {open && (
         <div
           onClick={() => setOpen(false)}
-          style={{ position: 'fixed', inset: 0, zIndex: 498, background: 'rgba(0,0,0,0.25)' }}
+          style={{ position: 'fixed', inset: 0, zIndex: 498, background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(2px)' }}
         />
       )}
 
-      <div
-        ref={ref}
-        style={{
-          position: 'fixed',
-          right: 0,
-          top: '50%',
-          transform: 'translateY(-50%)',
-          zIndex: 499,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}
-      >
-        {/* Wiel items */}
-        {open && zichtbareItems.map((item, idx) => {
-          const { x, y } = getPos(idx)
-          const isHovered = hoveredHref === item.href
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              title={item.label}
-              onMouseEnter={() => setHoveredHref(item.href)}
-              onMouseLeave={() => setHoveredHref(null)}
-              style={{
-                position: 'absolute',
-                width: ITEM_SIZE,
-                height: ITEM_SIZE,
-                borderRadius: '50%',
-                background: isHovered ? 'var(--primary)' : 'var(--bg-card)',
-                border: `2px solid ${isHovered ? 'var(--primary)' : 'var(--border)'}`,
-                boxShadow: isHovered ? '0 4px 16px rgba(0,0,0,0.25)' : '0 2px 8px rgba(0,0,0,0.15)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: isHovered ? '#fff' : 'var(--text)',
-                textDecoration: 'none',
-                transform: `translate(calc(${x}px - 50%), calc(${y}px - 50%))`,
-                transition: 'all 0.15s ease',
-                animation: `wieldItem 0.2s ease ${idx * 15}ms both`,
-              }}
-            >
-              {item.icon}
-            </Link>
-          )
-        })}
-
-        {/* Label van hovered item */}
-        {open && hoveredItem && (
-          <div style={{
-            position: 'absolute',
-            right: 64,
-            background: 'var(--bg-card)',
-            border: '1px solid var(--border)',
-            borderRadius: 8,
-            padding: '4px 10px',
-            fontSize: 12,
-            fontWeight: 600,
-            color: 'var(--text)',
-            whiteSpace: 'nowrap',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-            pointerEvents: 'none',
-          }}>
-            {hoveredItem.label}
-          </div>
-        )}
-
-        {/* Centraal knopje */}
-        <button
-          onClick={() => setOpen(o => !o)}
-          title="Snelle navigatie (Cmd+G)"
+      {/* Wiel — verschijnt in midden van scherm bij open */}
+      {open && (
+        <div
+          ref={ref}
           style={{
-            position: 'relative',
-            zIndex: 1,
-            width: 44,
-            height: 44,
-            borderRadius: '50%',
-            background: open ? '#DC2626' : 'var(--primary)',
-            border: 'none',
-            cursor: 'pointer',
+            position: 'fixed',
+            left: '50%',
+            top: '50%',
+            transform: 'translate(-50%, -50%)',
+            zIndex: 500,
+            width: 0,
+            height: 0,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            boxShadow: '0 4px 16px rgba(0,0,0,0.3)',
-            transition: 'background 0.2s, transform 0.2s',
-            color: '#fff',
-            transform: open ? 'rotate(45deg)' : 'rotate(0deg)',
           }}
         >
-          {open ? <X size={20} /> : <Zap size={20} />}
+          {/* Cirkelvormige items */}
+          {zichtbareItems.map((item, idx) => {
+            const angle = (idx / n) * 360 - 90
+            const rad = (angle * Math.PI) / 180
+            const x = Math.cos(rad) * WIEL_RADIUS
+            const y = Math.sin(rad) * WIEL_RADIUS
+            const isHovered = hoveredHref === item.href
+
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                title={item.label}
+                onMouseEnter={() => setHoveredHref(item.href)}
+                onMouseLeave={() => setHoveredHref(null)}
+                style={{
+                  position: 'absolute',
+                  width: ITEM_SIZE,
+                  height: ITEM_SIZE,
+                  borderRadius: '50%',
+                  background: isHovered ? 'var(--primary)' : 'var(--bg-card)',
+                  border: `2px solid ${isHovered ? 'var(--primary)' : 'var(--border)'}`,
+                  boxShadow: isHovered ? '0 4px 20px rgba(0,0,0,0.3)' : '0 2px 10px rgba(0,0,0,0.2)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: isHovered ? '#fff' : 'var(--text)',
+                  textDecoration: 'none',
+                  left: `calc(${x}px - ${ITEM_SIZE / 2}px)`,
+                  top: `calc(${y}px - ${ITEM_SIZE / 2}px)`,
+                  transition: 'background 0.15s, border-color 0.15s, box-shadow 0.15s',
+                  animation: `wieldItem 0.25s cubic-bezier(0.34, 1.56, 0.64, 1) ${idx * 20}ms both`,
+                }}
+              >
+                {item.icon}
+              </Link>
+            )
+          })}
+
+          {/* Label midden */}
+          <div style={{
+            position: 'absolute',
+            textAlign: 'center',
+            pointerEvents: 'none',
+            width: 120,
+            left: -60,
+            top: -12,
+          }}>
+            {hoveredItem ? (
+              <span style={{
+                fontSize: 12, fontWeight: 700, color: 'var(--text)',
+                background: 'var(--bg-card)', border: '1px solid var(--border)',
+                borderRadius: 8, padding: '3px 10px',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                display: 'inline-block',
+              }}>
+                {hoveredItem.label}
+              </span>
+            ) : (
+              <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)' }}>Kies een pagina</span>
+            )}
+          </div>
+
+          {/* Sluit knop in midden */}
+          <button
+            onClick={() => setOpen(false)}
+            style={{
+              position: 'absolute',
+              width: 44, height: 44,
+              borderRadius: '50%',
+              background: '#DC2626',
+              border: 'none', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              color: '#fff',
+              boxShadow: '0 4px 16px rgba(220,38,38,0.4)',
+              left: -22, top: -22,
+              zIndex: 1,
+            }}
+          >
+            <X size={20} />
+          </button>
+        </div>
+      )}
+
+      {/* Trigger knopje — altijd zichtbaar aan rechterkant, half verborgen */}
+      {!open && (
+        <button
+          onClick={() => setOpen(true)}
+          title="Snelle navigatie (Cmd+G)"
+          style={{
+            position: 'fixed',
+            right: -16,
+            top: '50%',
+            transform: 'translateY(-50%)',
+            zIndex: 499,
+            width: 44, height: 44,
+            borderRadius: '50%',
+            background: 'var(--primary)',
+            border: 'none', cursor: 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            boxShadow: '-2px 0 16px rgba(0,0,0,0.2)',
+            color: '#fff',
+            transition: 'right 0.2s',
+          }}
+          onMouseEnter={e => (e.currentTarget.style.right = '0px')}
+          onMouseLeave={e => (e.currentTarget.style.right = '-16px')}
+        >
+          <Zap size={20} />
         </button>
-      </div>
+      )}
 
       <style>{`
         @keyframes wieldItem {
-          from { opacity: 0; transform: translate(calc(var(--tx, 0px) - 50%), calc(var(--ty, 0px) - 50%)) scale(0.6); }
-          to   { opacity: 1; }
+          from { opacity: 0; transform: scale(0.3); }
+          to   { opacity: 1; transform: scale(1); }
         }
       `}</style>
     </>
