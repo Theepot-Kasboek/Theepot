@@ -21,38 +21,39 @@ interface SpeedDialItem {
 }
 
 const ALLE_ITEMS: SpeedDialItem[] = [
-  { href: '/', label: 'Dashboard', icon: <LayoutDashboard size={15} /> },
-  { href: '/prikbord', label: 'Prikbord', icon: <Pin size={15} />, vereistRecht: 'pagina_prikbord' },
-  { href: '/zoeken', label: 'Zoeken', icon: <Search size={15} /> },
-  { href: '/kasboek', label: 'Kasboek', icon: <Wallet size={15} />, vereistRecht: 'pagina_kasboek' },
-  { href: '/maaltijdlijst', label: 'Maaltijdlijst', icon: <UtensilsCrossed size={15} />, vereistRecht: 'pagina_maaltijdlijst' },
-  { href: '/beleid', label: 'Beleidsstukken', icon: <FileText size={15} />, vereistRecht: 'pagina_beleid' },
-  { href: '/brandoefening', label: 'Brandoefening', icon: <Flame size={15} />, vereistRecht: 'pagina_brandoefening' },
-  { href: '/kilometerstanden', label: 'Kilometerstanden', icon: <Gauge size={15} /> },
-  { href: '/activiteiten-log', label: 'Activiteitenlog', icon: <Activity size={15} />, vereistRecht: 'pagina_activiteiten_log' },
-  { href: '/gesprekken', label: '10-minutengesprekken', icon: <MessageCircle size={15} /> },
-  { href: '/vakantieplanningen', label: 'Vakantieplanningen', icon: <Map size={15} /> },
-  { href: '/weekplanningen', label: 'Weekplanningen', icon: <Scissors size={15} /> },
-  { href: '/activiteiten', label: 'Activiteitenbeheer', icon: <BookOpen size={15} />, vereistRecht: 'pagina_activiteiten' },
-  { href: '/ve-planning', label: 'VE Planning', icon: <Layers size={15} />, vereistRecht: 'pagina_ve_planning' },
-  { href: '/agenda', label: 'Agenda', icon: <Calendar size={15} />, vereistRecht: 'pagina_agenda' },
-  { href: '/taken', label: 'Taken & Notities', icon: <CheckSquare size={15} /> },
-  { href: '/chat', label: 'Chat', icon: <MessageSquare size={15} />, vereistRecht: 'pagina_chat' },
-  { href: '/nieuwsbrieven', label: 'Nieuwsbrieven', icon: <Newspaper size={15} />, vereistRecht: 'pagina_nieuwsbrieven' },
-  { href: '/notulen', label: 'Notulen', icon: <ClipboardList size={15} /> },
-  { href: '/medewerkers', label: 'Medewerkers', icon: <Users size={15} />, superadminOnly: true },
-  { href: '/rechten', label: 'Rechtenbeheer', icon: <ShieldCheck size={15} />, superadminOnly: true },
+  { href: '/', label: 'Dashboard', icon: <LayoutDashboard size={18} /> },
+  { href: '/prikbord', label: 'Prikbord', icon: <Pin size={18} />, vereistRecht: 'pagina_prikbord' },
+  { href: '/zoeken', label: 'Zoeken', icon: <Search size={18} /> },
+  { href: '/kasboek', label: 'Kasboek', icon: <Wallet size={18} />, vereistRecht: 'pagina_kasboek' },
+  { href: '/maaltijdlijst', label: 'Maaltijdlijst', icon: <UtensilsCrossed size={18} />, vereistRecht: 'pagina_maaltijdlijst' },
+  { href: '/beleid', label: 'Beleidsstukken', icon: <FileText size={18} />, vereistRecht: 'pagina_beleid' },
+  { href: '/brandoefening', label: 'Brandoefening', icon: <Flame size={18} />, vereistRecht: 'pagina_brandoefening' },
+  { href: '/kilometerstanden', label: 'Kilometerstanden', icon: <Gauge size={18} /> },
+  { href: '/activiteiten-log', label: 'Activiteitenlog', icon: <Activity size={18} />, vereistRecht: 'pagina_activiteiten_log' },
+  { href: '/gesprekken', label: '10-minutengesprekken', icon: <MessageCircle size={18} /> },
+  { href: '/vakantieplanningen', label: 'Vakantieplanningen', icon: <Map size={18} /> },
+  { href: '/weekplanningen', label: 'Weekplanningen', icon: <Scissors size={18} /> },
+  { href: '/activiteiten', label: 'Activiteitenbeheer', icon: <BookOpen size={18} />, vereistRecht: 'pagina_activiteiten' },
+  { href: '/ve-planning', label: 'VE Planning', icon: <Layers size={18} />, vereistRecht: 'pagina_ve_planning' },
+  { href: '/agenda', label: 'Agenda', icon: <Calendar size={18} />, vereistRecht: 'pagina_agenda' },
+  { href: '/taken', label: 'Taken & Notities', icon: <CheckSquare size={18} /> },
+  { href: '/chat', label: 'Chat', icon: <MessageSquare size={18} />, vereistRecht: 'pagina_chat' },
+  { href: '/nieuwsbrieven', label: 'Nieuwsbrieven', icon: <Newspaper size={18} />, vereistRecht: 'pagina_nieuwsbrieven' },
+  { href: '/notulen', label: 'Notulen', icon: <ClipboardList size={18} /> },
+  { href: '/medewerkers', label: 'Medewerkers', icon: <Users size={18} />, superadminOnly: true },
+  { href: '/rechten', label: 'Rechtenbeheer', icon: <ShieldCheck size={18} />, superadminOnly: true },
 ]
+
+const WIEL_RADIUS = 110  // px afstand van centrum tot items
+const ITEM_SIZE = 48     // px diameter van elk item
 
 export default function SpeedDial() {
   const [open, setOpen] = useState(false)
-  const [zoek, setZoek] = useState('')
+  const [hoveredHref, setHoveredHref] = useState<string | null>(null)
   const { rechten, isSuperadmin } = useAuth()
   const pathname = usePathname()
   const ref = useRef<HTMLDivElement>(null)
-  const zoekRef = useRef<HTMLInputElement>(null)
 
-  // Sluit bij klik buiten
   useEffect(() => {
     function handler(e: MouseEvent) {
       if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
@@ -61,21 +62,11 @@ export default function SpeedDial() {
     return () => document.removeEventListener('mousedown', handler)
   }, [])
 
-  // Sluit bij navigatie
-  useEffect(() => { setOpen(false); setZoek('') }, [pathname])
+  useEffect(() => { setOpen(false) }, [pathname])
 
-  // Focus zoekbalk bij openen
-  useEffect(() => {
-    if (open) setTimeout(() => zoekRef.current?.focus(), 100)
-  }, [open])
-
-  // Keyboard shortcut: G opent het wieltje
   useEffect(() => {
     function handler(e: KeyboardEvent) {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'g') {
-        e.preventDefault()
-        setOpen(o => !o)
-      }
+      if ((e.metaKey || e.ctrlKey) && e.key === 'g') { e.preventDefault(); setOpen(o => !o) }
       if (e.key === 'Escape') setOpen(false)
     }
     document.addEventListener('keydown', handler)
@@ -89,97 +80,135 @@ export default function SpeedDial() {
       if (recht === 'geen') return false
     }
     if (item.href === pathname) return false
-    if (zoek.trim()) {
-      return item.label.toLowerCase().includes(zoek.toLowerCase())
-    }
     return true
   })
 
+  const n = zichtbareItems.length
+
+  // Verdeel items over een halve cirkel links van het knopje (van boven naar beneden)
+  // Hoek: van -90deg (boven) naar +90deg (onder), gespiegeld naar links
+  function getPos(idx: number) {
+    const startAngle = -80
+    const endAngle = 80
+    const angle = n === 1 ? 0 : startAngle + (idx / (n - 1)) * (endAngle - startAngle)
+    const rad = (angle * Math.PI) / 180
+    // Items waaieren naar links: x negatief
+    const x = -Math.cos(rad) * WIEL_RADIUS
+    const y = Math.sin(rad) * WIEL_RADIUS
+    return { x, y }
+  }
+
+  const hoveredItem = zichtbareItems.find(i => i.href === hoveredHref)
+
   return (
-    <div ref={ref} style={{ position: 'fixed', bottom: 28, right: 28, zIndex: 500 }}>
-      {/* Popup */}
+    <>
+      {/* Backdrop bij open */}
       {open && (
-        <div style={{
-          position: 'absolute', bottom: 60, right: 0,
-          width: 280, background: 'var(--bg-card)',
-          borderRadius: 16, border: '1px solid var(--border)',
-          boxShadow: '0 16px 48px rgba(0,0,0,0.2)',
-          overflow: 'hidden',
-          animation: 'fadeInUp 0.15s ease',
-        }}>
-          {/* Zoekbalk */}
-          <div style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)' }}>
-            <input
-              ref={zoekRef}
-              value={zoek}
-              onChange={e => setZoek(e.target.value)}
-              placeholder="Zoek pagina..."
-              style={{
-                width: '100%', padding: '7px 10px', borderRadius: 8,
-                border: '1px solid var(--border-dark)', background: 'var(--bg)',
-                color: 'var(--text)', fontSize: 12, outline: 'none',
-                fontFamily: 'DM Sans, sans-serif',
-              }}
-            />
-          </div>
-
-          {/* Items */}
-          <div style={{ maxHeight: 340, overflowY: 'auto', padding: '6px 0' }}>
-            {zichtbareItems.length === 0 ? (
-              <div style={{ padding: '16px 14px', fontSize: 12, color: 'var(--text-muted)', textAlign: 'center' }}>
-                Geen pagina&apos;s gevonden
-              </div>
-            ) : zichtbareItems.map(item => (
-              <Link
-                key={item.href}
-                href={item.href}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 10,
-                  padding: '8px 14px', textDecoration: 'none',
-                  color: 'var(--text)', fontSize: 13,
-                  transition: 'background 0.1s',
-                }}
-                onMouseEnter={e => (e.currentTarget.style.background = 'var(--primary-xlight)')}
-                onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-              >
-                <span style={{ color: 'var(--primary)', flexShrink: 0, display: 'flex' }}>{item.icon}</span>
-                <span>{item.label}</span>
-              </Link>
-            ))}
-          </div>
-
-          <div style={{ padding: '6px 14px 8px', borderTop: '1px solid var(--border)', fontSize: 10, color: 'var(--text-muted)' }}>
-            Cmd+G om te openen · Esc om te sluiten
-          </div>
-        </div>
+        <div
+          onClick={() => setOpen(false)}
+          style={{ position: 'fixed', inset: 0, zIndex: 498, background: 'rgba(0,0,0,0.25)' }}
+        />
       )}
 
-      {/* Trigger knop */}
-      <button
-        onClick={() => setOpen(o => !o)}
-        title="Snelle navigatie (Cmd+G)"
+      <div
+        ref={ref}
         style={{
-          width: 48, height: 48, borderRadius: '50%',
-          background: open ? 'var(--primary-text)' : 'var(--primary)',
-          border: 'none', cursor: 'pointer',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          boxShadow: '0 4px 16px rgba(0,0,0,0.25)',
-          transition: 'transform 0.2s, background 0.2s',
-          transform: open ? 'rotate(45deg)' : 'rotate(0deg)',
-          color: '#fff',
+          position: 'fixed',
+          right: 0,
+          top: '50%',
+          transform: 'translateY(-50%)',
+          zIndex: 499,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
         }}
-        onMouseEnter={e => (e.currentTarget.style.transform = open ? 'rotate(45deg) scale(1.08)' : 'scale(1.08)')}
-        onMouseLeave={e => (e.currentTarget.style.transform = open ? 'rotate(45deg)' : 'rotate(0deg)')}
       >
-        {open ? <X size={20} /> : <Zap size={20} />}
-      </button>
+        {/* Wiel items */}
+        {open && zichtbareItems.map((item, idx) => {
+          const { x, y } = getPos(idx)
+          const isHovered = hoveredHref === item.href
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              title={item.label}
+              onMouseEnter={() => setHoveredHref(item.href)}
+              onMouseLeave={() => setHoveredHref(null)}
+              style={{
+                position: 'absolute',
+                width: ITEM_SIZE,
+                height: ITEM_SIZE,
+                borderRadius: '50%',
+                background: isHovered ? 'var(--primary)' : 'var(--bg-card)',
+                border: `2px solid ${isHovered ? 'var(--primary)' : 'var(--border)'}`,
+                boxShadow: isHovered ? '0 4px 16px rgba(0,0,0,0.25)' : '0 2px 8px rgba(0,0,0,0.15)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: isHovered ? '#fff' : 'var(--text)',
+                textDecoration: 'none',
+                transform: `translate(calc(${x}px - 50%), calc(${y}px - 50%))`,
+                transition: 'all 0.15s ease',
+                animation: `wieldItem 0.2s ease ${idx * 15}ms both`,
+              }}
+            >
+              {item.icon}
+            </Link>
+          )
+        })}
+
+        {/* Label van hovered item */}
+        {open && hoveredItem && (
+          <div style={{
+            position: 'absolute',
+            right: 64,
+            background: 'var(--bg-card)',
+            border: '1px solid var(--border)',
+            borderRadius: 8,
+            padding: '4px 10px',
+            fontSize: 12,
+            fontWeight: 600,
+            color: 'var(--text)',
+            whiteSpace: 'nowrap',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+            pointerEvents: 'none',
+          }}>
+            {hoveredItem.label}
+          </div>
+        )}
+
+        {/* Centraal knopje */}
+        <button
+          onClick={() => setOpen(o => !o)}
+          title="Snelle navigatie (Cmd+G)"
+          style={{
+            position: 'relative',
+            zIndex: 1,
+            width: 44,
+            height: 44,
+            borderRadius: '50%',
+            background: open ? '#DC2626' : 'var(--primary)',
+            border: 'none',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxShadow: '0 4px 16px rgba(0,0,0,0.3)',
+            transition: 'background 0.2s, transform 0.2s',
+            color: '#fff',
+            transform: open ? 'rotate(45deg)' : 'rotate(0deg)',
+          }}
+        >
+          {open ? <X size={20} /> : <Zap size={20} />}
+        </button>
+      </div>
 
       <style>{`
-        @keyframes fadeInUp {
-          from { opacity: 0; transform: translateY(8px); }
-          to   { opacity: 1; transform: translateY(0); }
+        @keyframes wieldItem {
+          from { opacity: 0; transform: translate(calc(var(--tx, 0px) - 50%), calc(var(--ty, 0px) - 50%)) scale(0.6); }
+          to   { opacity: 1; }
         }
       `}</style>
-    </div>
+    </>
   )
 }
