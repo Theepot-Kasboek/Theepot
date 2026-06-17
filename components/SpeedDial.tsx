@@ -176,24 +176,7 @@ export default function SpeedDial() {
             )}
           </div>
 
-          {/* Sluit knop in midden */}
-          <button
-            onClick={() => setOpen(false)}
-            style={{
-              position: 'absolute',
-              width: 44, height: 44,
-              borderRadius: '50%',
-              background: '#DC2626',
-              border: 'none', cursor: 'pointer',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              color: '#fff',
-              boxShadow: '0 4px 16px rgba(220,38,38,0.4)',
-              left: -22, top: -22,
-              zIndex: 1,
-            }}
-          >
-            <X size={20} />
-          </button>
+
         </div>
       )}
 
