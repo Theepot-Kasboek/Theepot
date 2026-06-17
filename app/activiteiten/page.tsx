@@ -289,15 +289,20 @@ function ActiviteitenPage() {
   const [activiteiten, setActiviteiten] = useState<Activiteit[]>([])
   const [loading, setLoading] = useState(true)
   const [zoekterm, setZoekterm] = useState('')
-  const [actieveFilter, setActieveFilter] = useState(
-    categorieParam ? `cat:${categorieParam}` : themaParam ? `thema:${themaParam}` : 'all'
-  )
   const [geselecteerd, setGeselecteerd] = useState<Activiteit | null>(null)
   const [bewerkActiviteit, setBewerkActiviteit] = useState<Activiteit | null>(null)
   const [toevoegen, setToevoegen] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
   const [pdfOrientatie, setPdfOrientatie] = useState<'portrait' | 'landscape'>('portrait')
   const [toast, setToast] = useState<{ bericht: string; type: 'success' | 'error' } | null>(null)
+  const [geselecteerdeCategorieen, setGeselecteerdeCategorieen] = useState<string[]>(
+    categorieParam ? [categorieParam] : []
+  )
+  const [geselecteerdeLeeftijden, setGeselecteerdeLeeftijden] = useState<string[]>([])
+  const [geselecteerdeThemas, setGeselecteerdeThemas] = useState<string[]>(
+    themaParam ? [themaParam] : []
+  )
+  const [kortFilter, setKortFilter] = useState(false)
 
   const laadActiviteiten = useCallback(async () => {
     setLoading(true)
@@ -308,8 +313,8 @@ function ActiviteitenPage() {
 
   useEffect(() => { laadActiviteiten() }, [laadActiviteiten])
   useEffect(() => {
-    if (categorieParam) setActieveFilter(`cat:${categorieParam}`)
-    else if (themaParam) setActieveFilter(`thema:${themaParam}`)
+    if (categorieParam) setGeselecteerdeCategorieen([categorieParam])
+    if (themaParam) setGeselecteerdeThemas([themaParam])
   }, [themaParam, categorieParam])
 
   const categorieen = useMemo(() =>
@@ -325,6 +330,33 @@ function ActiviteitenPage() {
     return Array.from(new Set(alle)).sort()
   }, [activiteiten])
 
+  const heeftActieveFilters = geselecteerdeCategorieen.length > 0 || geselecteerdeLeeftijden.length > 0 || geselecteerdeThemas.length > 0 || kortFilter
+
+  function wisAlleFilters() {
+    setGeselecteerdeCategorieen([])
+    setGeselecteerdeLeeftijden([])
+    setGeselecteerdeThemas([])
+    setKortFilter(false)
+  }
+
+  function toggleCategorie(cat: string) {
+    setGeselecteerdeCategorieen(prev =>
+      prev.includes(cat) ? prev.filter(c => c !== cat) : [...prev, cat]
+    )
+  }
+
+  function toggleLeeftijd(key: string) {
+    setGeselecteerdeLeeftijden(prev =>
+      prev.includes(key) ? prev.filter(l => l !== key) : [...prev, key]
+    )
+  }
+
+  function toggleThema(thema: string) {
+    setGeselecteerdeThemas(prev =>
+      prev.includes(thema) ? prev.filter(t => t !== thema) : [...prev, thema]
+    )
+  }
+
   const gefilterd = activiteiten.filter(a => {
     const zoek = zoekterm.toLowerCase()
     const matchZoek = !zoekterm ||
@@ -333,20 +365,28 @@ function ActiviteitenPage() {
       (Array.isArray(a.thema) ? a.thema.join(' ') : (a.thema ?? '')).toLowerCase().includes(zoek) ||
       (a.categorie ?? '').toLowerCase().includes(zoek) ||
       (a.materialen ?? []).some(m => m.toLowerCase().includes(zoek))
-    let matchFilter = true
-    if (actieveFilter === 'kort') matchFilter = a.tijdsduur <= 30
-    else if (actieveFilter === 'leeftijd_jong') {
+
+    const matchCategorie = geselecteerdeCategorieen.length === 0 ||
+      geselecteerdeCategorieen.includes(a.categorie ?? '')
+
+    let matchLeeftijd = geselecteerdeLeeftijden.length === 0
+    if (!matchLeeftijd) {
       const l = (typeof a.leeftijd === 'string' ? a.leeftijd : '').toLowerCase()
-      matchFilter = l.includes('4') || l.includes('5') || l.includes('6') || l.includes('7') || l.includes('jong') || l.includes('klein')
+      if (geselecteerdeLeeftijden.includes('leeftijd_jong')) {
+        matchLeeftijd = matchLeeftijd || l.includes('4') || l.includes('5') || l.includes('6') || l.includes('7') || l.includes('jong') || l.includes('klein')
+      }
+      if (geselecteerdeLeeftijden.includes('leeftijd_oud')) {
+        const getallen = l.match(/\d+/g)?.map(Number) ?? []
+        matchLeeftijd = matchLeeftijd || getallen.some(n => n >= 8) || l.includes('oud') || l.includes('groot')
+      }
     }
-    else if (actieveFilter === 'leeftijd_oud') {
-      const l = (typeof a.leeftijd === 'string' ? a.leeftijd : '').toLowerCase()
-      const getallen = l.match(/\d+/g)?.map(Number) ?? []
-      matchFilter = getallen.some(n => n >= 8) || l.includes('8') || l.includes('oud') || l.includes('groot')
-    }
-    else if (actieveFilter.startsWith('cat:')) matchFilter = a.categorie === actieveFilter.slice(4)
-    else if (actieveFilter.startsWith('thema:')) { const t = actieveFilter.slice(6); matchFilter = Array.isArray(a.thema) ? a.thema.includes(t) : a.thema === t }
-    return matchZoek && matchFilter
+
+    const matchThema = geselecteerdeThemas.length === 0 ||
+      geselecteerdeThemas.some(t => Array.isArray(a.thema) ? a.thema.includes(t) : a.thema === t)
+
+    const matchKort = !kortFilter || a.tijdsduur <= 30
+
+    return matchZoek && matchCategorie && matchLeeftijd && matchThema && matchKort
   })
 
   async function slaOp(data: Omit<Activiteit, 'id' | 'created_at'>) {
@@ -497,39 +537,63 @@ function ActiviteitenPage() {
             <span style={{ fontSize: 13, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{gefilterd.length} resultaten</span>
           </div>
 
-          <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap', marginBottom: 10 }}>
+          <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap', marginBottom: 10, alignItems: 'center' }}>
+            <button
+              onClick={wisAlleFilters}
+              style={{ padding: '5px 12px', borderRadius: 20, fontSize: 12, fontWeight: 500, cursor: 'pointer', border: '1.5px solid', borderColor: !heeftActieveFilters ? 'var(--primary)' : 'var(--border-dark)', background: !heeftActieveFilters ? 'var(--primary)' : 'var(--bg-card)', color: !heeftActieveFilters ? '#fff' : 'var(--text-muted)', transition: 'all 0.12s' }}
+            >
+              Alle
+            </button>
             {[
-              { key: 'all', label: 'Alle' },
               { key: 'leeftijd_jong', label: '👶 4–7 jaar' },
               { key: 'leeftijd_oud', label: '🧒 8+ jaar' },
-
-              { key: 'kort', label: '⏱ Kort (≤30 min)' },
-            ].map(f => (
-              <button key={f.key} onClick={() => setActieveFilter(f.key)} style={{ padding: '5px 12px', borderRadius: 20, fontSize: 12, fontWeight: 500, cursor: 'pointer', border: '1.5px solid', borderColor: actieveFilter === f.key ? 'var(--primary)' : 'var(--border-dark)', background: actieveFilter === f.key ? 'var(--primary)' : 'var(--bg-card)', color: actieveFilter === f.key ? '#fff' : 'var(--text-muted)', transition: 'all 0.12s' }}>
-                {f.label}
-              </button>
-            ))}
+            ].map(f => {
+              const actief = geselecteerdeLeeftijden.includes(f.key)
+              return (
+                <button key={f.key} onClick={() => toggleLeeftijd(f.key)} style={{ padding: '5px 12px', borderRadius: 20, fontSize: 12, fontWeight: 500, cursor: 'pointer', border: '1.5px solid', borderColor: actief ? 'var(--primary)' : 'var(--border-dark)', background: actief ? 'var(--primary)' : 'var(--bg-card)', color: actief ? '#fff' : 'var(--text-muted)', transition: 'all 0.12s' }}>
+                  {f.label}
+                </button>
+              )
+            })}
+            <button
+              onClick={() => setKortFilter(v => !v)}
+              style={{ padding: '5px 12px', borderRadius: 20, fontSize: 12, fontWeight: 500, cursor: 'pointer', border: '1.5px solid', borderColor: kortFilter ? 'var(--primary)' : 'var(--border-dark)', background: kortFilter ? 'var(--primary)' : 'var(--bg-card)', color: kortFilter ? '#fff' : 'var(--text-muted)', transition: 'all 0.12s' }}
+            >
+              ⏱ Kort (≤30 min)
+            </button>
+            {heeftActieveFilters && (
+              <span style={{ fontSize: 11, color: 'var(--text-muted)', marginLeft: 4 }}>
+                — meerdere filters actief
+              </span>
+            )}
           </div>
 
           {categorieen.length > 0 && (
             <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap', alignItems: 'center', marginBottom: 8 }}>
               <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', whiteSpace: 'nowrap' }}>Categorie</span>
-              {categorieen.map(c => (
-                <button key={c} onClick={() => setActieveFilter(`cat:${c}`)} style={{ padding: '5px 12px', borderRadius: 20, fontSize: 12, fontWeight: 500, cursor: 'pointer', border: '1.5px solid', borderColor: actieveFilter === `cat:${c}` ? getCategorieKleur(c) : 'var(--border-dark)', background: actieveFilter === `cat:${c}` ? getCategorieKleur(c) : 'var(--bg-card)', color: actieveFilter === `cat:${c}` ? '#fff' : 'var(--text-muted)', transition: 'all 0.12s' }}>
-                  {getCategorieEmoji(c)} {c}
-                </button>
-              ))}
+              {categorieen.map(c => {
+                const actief = geselecteerdeCategorieen.includes(c)
+                const kleur = getCategorieKleur(c)
+                return (
+                  <button key={c} onClick={() => toggleCategorie(c)} style={{ padding: '5px 12px', borderRadius: 20, fontSize: 12, fontWeight: 500, cursor: 'pointer', border: '1.5px solid', borderColor: actief ? kleur : 'var(--border-dark)', background: actief ? kleur : 'var(--bg-card)', color: actief ? '#fff' : 'var(--text-muted)', transition: 'all 0.12s' }}>
+                    {getCategorieEmoji(c)} {c}
+                  </button>
+                )
+              })}
             </div>
           )}
 
           {themas.length > 0 && (
             <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap', alignItems: 'center' }}>
               <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', whiteSpace: 'nowrap' }}>Thema</span>
-              {themas.map(t => (
-                <button key={t} onClick={() => setActieveFilter(`thema:${t}`)} style={{ padding: '5px 12px', borderRadius: 20, fontSize: 12, fontWeight: 500, cursor: 'pointer', border: '1.5px solid', borderColor: actieveFilter === `thema:${t}` ? '#D97706' : 'var(--border-dark)', background: actieveFilter === `thema:${t}` ? '#D97706' : 'var(--bg-card)', color: actieveFilter === `thema:${t}` ? '#fff' : 'var(--text-muted)', transition: 'all 0.12s' }}>
-                  {getThemaEmoji(t)} {t}
-                </button>
-              ))}
+              {themas.map(t => {
+                const actief = geselecteerdeThemas.includes(t)
+                return (
+                  <button key={t} onClick={() => toggleThema(t)} style={{ padding: '5px 12px', borderRadius: 20, fontSize: 12, fontWeight: 500, cursor: 'pointer', border: '1.5px solid', borderColor: actief ? '#D97706' : 'var(--border-dark)', background: actief ? '#D97706' : 'var(--bg-card)', color: actief ? '#fff' : 'var(--text-muted)', transition: 'all 0.12s' }}>
+                    {getThemaEmoji(t)} {t}
+                  </button>
+                )
+              })}
             </div>
           )}
         </div>
