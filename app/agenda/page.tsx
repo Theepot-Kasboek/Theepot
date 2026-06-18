@@ -7,7 +7,7 @@ import Topbar from '@/components/Topbar'
 import Toast from '@/components/Toast'
 import {
   ChevronLeft, ChevronRight, Plus, X, Calendar,
-  Clock, AlignLeft, Users, Pencil, Trash2, Share2, Eye, Upload, Bell
+  Clock, AlignLeft, Users, Pencil, Trash2, Share2, Eye, Upload, Bell, Link2
 } from 'lucide-react'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -123,7 +123,10 @@ export default function AgendaPage() {
   const [nieuweKalenderModal, setNieuweKalenderModal] = useState(false)
   const [deelModal, setDeelModal] = useState<Kalender | null>(null)
   const [icsModal, setIcsModal] = useState(false)
+  const [abonneerModal, setAbonneerModal] = useState(false)
   const [klikDatum, setKlikDatum] = useState<Date | null>(null)
+
+  const magAbonneren = isSuperadmin || profiel?.rol === 'directie' || profiel?.rol === 'leidinggevende'
 
   // Toast
   const [toast, setToast] = useState<{ bericht: string; type: 'success' | 'error' } | null>(null)
@@ -557,6 +560,9 @@ export default function AgendaPage() {
             {/* Kalenders + Nieuw */}
             <button className="btn" onClick={() => setKalenderPanelOpen(true)}><Calendar size={14} /> Kalenders</button>
             <button className="btn" onClick={() => setIcsModal(true)}><Upload size={14} /> ICS</button>
+            {magAbonneren && (
+              <button className="btn" onClick={() => setAbonneerModal(true)}><Link2 size={14} /> Abonneer</button>
+            )}
             <button className="btn btn-primary" onClick={() => openNieuw()}><Plus size={14} /> Afspraak</button>
           </div>
         }
@@ -773,12 +779,73 @@ export default function AgendaPage() {
         />
       )}
 
+      {abonneerModal && profiel && (
+        <AbonneerModal profielId={profiel.id} onClose={() => setAbonneerModal(false)} />
+      )}
+
       {toast && <Toast bericht={toast.bericht} type={toast.type} onClose={() => setToast(null)} />}
     </>
   )
 }
 
 // ─── Sub-componenten ──────────────────────────────────────────────────────────
+
+function AbonneerModal({ profielId, onClose }: { profielId: string; onClose: () => void }) {
+  const [gekopieerd, setGekopieerd] = useState(false)
+
+  // Haal de feed-URL op via de server (token wordt server-side gegenereerd)
+  const [url, setUrl] = useState<string | null>(null)
+  useEffect(() => {
+    fetch(`/api/agenda/ical/token?uid=${profielId}`)
+      .then(r => r.json())
+      .then(d => setUrl(d.url))
+      .catch(() => setUrl(null))
+  }, [profielId])
+
+  function kopieer() {
+    if (!url) return
+    navigator.clipboard.writeText(url)
+    setGekopieerd(true)
+    setTimeout(() => setGekopieerd(false), 2000)
+  }
+
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="modal-box" style={{ maxWidth: 480 }} onClick={e => e.stopPropagation()}>
+        <div className="card-header">
+          <span className="card-title">Agenda abonneren</span>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex' }}><X size={18} /></button>
+        </div>
+        <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: 0 }}>
+            Kopieer de onderstaande URL en voeg hem toe als kalenderabonnement in Google Agenda of Apple Agenda. De agenda wordt automatisch gesynchroniseerd.
+          </p>
+
+          <div style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 12px', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: 12, color: 'var(--text-muted)', flex: 1, wordBreak: 'break-all', fontFamily: 'monospace' }}>
+              {url ?? 'Laden…'}
+            </span>
+            <button
+              className="btn btn-sm btn-primary"
+              onClick={kopieer}
+              disabled={!url}
+              style={{ flexShrink: 0 }}
+            >
+              {gekopieerd ? 'Gekopieerd!' : 'Kopieer'}
+            </button>
+          </div>
+
+          <div style={{ fontSize: 12, color: 'var(--text-muted)', display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <strong style={{ color: 'var(--text)' }}>Hoe toevoegen?</strong>
+            <span><strong>Google Agenda:</strong> Instellingen → Andere agenda's → Via URL toevoegen</span>
+            <span><strong>Apple Agenda:</strong> Archief → Nieuw kalenderabonnement → plak de URL</span>
+            <span><strong>iPhone/iPad:</strong> Instellingen → Agenda → Accounts → Account toevoegen → Overig → Abonnementsagenda</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 function KalenderRij({ kalender, zichtbaar, onToggle }: { kalender: Kalender; zichtbaar: boolean; onToggle: () => void }) {
   return (
