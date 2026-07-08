@@ -837,7 +837,7 @@ function AbonneerModal({ profielId, onClose }: { profielId: string; onClose: () 
 
           <div style={{ fontSize: 12, color: 'var(--text-muted)', display: 'flex', flexDirection: 'column', gap: 6 }}>
             <strong style={{ color: 'var(--text)' }}>Hoe toevoegen?</strong>
-            <span><strong>Google Agenda:</strong> Instellingen → Andere agenda's → Via URL toevoegen</span>
+            <span><strong>Google Agenda:</strong> Instellingen → Andere agenda&apos;s → Via URL toevoegen</span>
             <span><strong>Apple Agenda:</strong> Archief → Nieuw kalenderabonnement → plak de URL</span>
             <span><strong>iPhone/iPad:</strong> Instellingen → Agenda → Accounts → Account toevoegen → Overig → Abonnementsagenda</span>
           </div>
