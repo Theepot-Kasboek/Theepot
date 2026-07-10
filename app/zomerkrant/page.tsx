@@ -124,7 +124,7 @@ function genereerExportHTML(ed: EditorState): string {
 <html lang="nl">
 <head>
 <meta charset="UTF-8">
-<title>Theepot Zomer Krant — ${fmtDatum(ed.datum)}</title>
+<title>Theepot Zomerkrant — ${fmtDatum(ed.datum)}</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Patrick+Hand&family=Caveat:wght@600;700&family=Quicksand:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
@@ -160,7 +160,7 @@ function genereerExportHTML(ed: EditorState): string {
   <div class="tape tr"></div>
   <div class="masthead">
     <div class="kicker">BSO De Theepot</div>
-    <h1 class="krant-titel">Theepot Zomer Krant</h1>
+    <h1 class="krant-titel">Theepot Zomerkrant</h1>
     <div class="subtitle">☀️ Zomervakantie editie ☀️</div>
     <div class="meta-row">
       <div class="meta-field"><span class="meta-label">Datum:</span> ${fmtDatum(ed.datum)}</div>
@@ -191,7 +191,7 @@ function genereerExportHTML(ed: EditorState): string {
       </div>
     </div>
   </div>
-  <div class="footer-strip">Theepot Zomer Krant • Zomervakantie • pagina wordt gebundeld tot het zomerboek</div>
+  <div class="footer-strip">Theepot Zomerkrant • Zomervakantie • pagina wordt gebundeld tot het zomerboek</div>
 </div>
 </body>
 </html>`
@@ -501,7 +501,7 @@ export default function ZomerkrantPage() {
               <div style={{ padding: '18px 36px 10px', textAlign: 'center', borderBottom: '3px solid var(--plum)', position: 'relative' }}>
                 <div style={{ fontWeight: 700, letterSpacing: 3, textTransform: 'uppercase', fontSize: 11, color: 'var(--plum)', opacity: 0.75 }}>BSO De Theepot</div>
                 <div style={{ fontFamily: "'Caveat', cursive", fontSize: 54, lineHeight: 0.9, margin: '2px 0 4px', color: 'var(--plum-dark)', letterSpacing: 1 }}>
-                  Theepot Zomer Krant
+                  Theepot Zomerkrant
                 </div>
                 <div style={{ fontFamily: "'Patrick Hand', cursive", fontSize: 16, color: 'var(--ink)' }}>
                   ☀️ Zomervakantie editie ☀️
@@ -627,7 +627,7 @@ export default function ZomerkrantPage() {
 
               {/* Footer strip */}
               <div style={{ textAlign: 'center', padding: '6px 20px 10px', fontFamily: "'Patrick Hand', cursive", fontSize: 11, color: 'rgba(58,42,87,0.6)', borderTop: '1px solid rgba(91,58,142,0.15)' }}>
-                Theepot Zomer Krant • Zomervakantie • pagina wordt gebundeld tot het zomerboek
+                Theepot Zomerkrant • Zomervakantie • pagina wordt gebundeld tot het zomerboek
               </div>
             </div>
 
@@ -669,7 +669,7 @@ export default function ZomerkrantPage() {
           <div className="empty-state">
             <Newspaper size={36} />
             <h3>Nog geen edities</h3>
-            <p>Maak de eerste dag-editie aan voor de Theepot Zomer Krant.</p>
+            <p>Maak de eerste dag-editie aan voor de Theepot Zomerkrant.</p>
             {magBewerken && (
               <button className="btn btn-primary" onClick={nieuwAanmaken}>
                 <Plus size={14} /> Nieuwe editie
