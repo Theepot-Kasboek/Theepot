@@ -413,7 +413,6 @@ export default function ZomerkrantPage() {
     }
 
     const blokBorder: React.CSSProperties = {
-      padding: '12px 26px',
       borderBottom: '2px solid rgba(91,58,142,0.25)',
     }
 
@@ -431,7 +430,23 @@ export default function ZomerkrantPage() {
     return (
       <>
         {/* Google Fonts voor krant-design */}
-        <style>{`@import url('https://fonts.googleapis.com/css2?family=Patrick+Hand&family=Caveat:wght@600;700&family=Quicksand:wght@400;500;600;700&display=swap');`}</style>
+        <style>{`
+          @import url('https://fonts.googleapis.com/css2?family=Patrick+Hand&family=Caveat:wght@600;700&family=Quicksand:wght@400;500;600;700&display=swap');
+          .zomerkrant-grid { display: grid; grid-template-columns: 1fr 1fr; }
+          .zomerkrant-col-left { border-right: 3px solid var(--plum); }
+          .zomerkrant-titel { font-size: 54px; }
+          .zomerkrant-masthead { padding: 18px 36px 10px; }
+          .zomerkrant-block { padding: 12px 26px; }
+          @media (max-width: 640px) {
+            .zomerkrant-grid { grid-template-columns: 1fr; }
+            .zomerkrant-col-left { border-right: none; border-bottom: 3px solid var(--plum); }
+            .zomerkrant-masthead { padding: 14px 18px 8px; }
+            .zomerkrant-block { padding: 10px 16px; }
+          }
+          @media (max-width: 480px) {
+            .zomerkrant-titel { font-size: 36px; }
+          }
+        `}</style>
 
         <Topbar
           titel="🗞️ Zomerkrant"
@@ -473,7 +488,7 @@ export default function ZomerkrantPage() {
           }
         />
 
-        <div className="page-content" style={{ overflowX: 'auto' }}>
+        <div className="page-content">
           {/* Krant container met CSS variabelen voor theming */}
           <div style={{ ...cssVars, maxWidth: 860, margin: '0 auto', width: '100%' }}>
             <div style={{
@@ -498,9 +513,9 @@ export default function ZomerkrantPage() {
               }} />
 
               {/* Masthead */}
-              <div style={{ padding: '18px 36px 10px', textAlign: 'center', borderBottom: '3px solid var(--plum)', position: 'relative' }}>
+              <div className="zomerkrant-masthead" style={{ textAlign: 'center', borderBottom: '3px solid var(--plum)', position: 'relative' }}>
                 <div style={{ fontWeight: 700, letterSpacing: 3, textTransform: 'uppercase', fontSize: 11, color: 'var(--plum)', opacity: 0.75 }}>BSO De Theepot</div>
-                <div style={{ fontFamily: "'Caveat', cursive", fontSize: 54, lineHeight: 0.9, margin: '2px 0 4px', color: 'var(--plum-dark)', letterSpacing: 1 }}>
+                <div className="zomerkrant-titel" style={{ fontFamily: "'Caveat', cursive", lineHeight: 0.9, margin: '2px 0 4px', color: 'var(--plum-dark)', letterSpacing: 1 }}>
                   Theepot Zomerkrant
                 </div>
                 <div style={{ fontFamily: "'Patrick Hand', cursive", fontSize: 16, color: 'var(--ink)' }}>
@@ -529,13 +544,13 @@ export default function ZomerkrantPage() {
               </div>
 
               {/* Tweekoloms grid */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr' }}>
+              <div className="zomerkrant-grid">
 
                 {/* ── Linker kolom ────────────────────────────────────────── */}
-                <div style={{ borderRight: '3px solid var(--plum)' }}>
+                <div className="zomerkrant-col-left">
 
                   {/* Weer */}
-                  <div style={blokBorder}>
+                  <div className="zomerkrant-block" style={blokBorder}>
                     <div style={blokH2}><span>🌤️</span> Weer</div>
                     <textarea
                       value={ed.weer_tekst}
@@ -547,7 +562,7 @@ export default function ZomerkrantPage() {
                   </div>
 
                   {/* Interview */}
-                  <div style={blokBorder}>
+                  <div className="zomerkrant-block" style={blokBorder}>
                     <div style={{ ...blokH2, gap: 4 }}>
                       <span>🎤</span>
                       <span>Interview met</span>
@@ -568,7 +583,7 @@ export default function ZomerkrantPage() {
                   </div>
 
                   {/* Foto interview */}
-                  <div style={{ ...blokBorder, borderBottom: 'none' }}>
+                  <div className="zomerkrant-block" style={{ ...blokBorder, borderBottom: 'none' }}>
                     <div style={blokH2}><span>📸</span> Foto interview</div>
                     <FotoVak
                       url={ed.foto_interview_url}
@@ -586,7 +601,7 @@ export default function ZomerkrantPage() {
                 <div>
 
                   {/* Review activiteit */}
-                  <div style={blokBorder}>
+                  <div className="zomerkrant-block" style={blokBorder}>
                     <div style={blokH2}><span>⭐</span> Review activiteit</div>
                     <textarea
                       value={ed.review_activiteit_tekst}
@@ -598,7 +613,7 @@ export default function ZomerkrantPage() {
                   </div>
 
                   {/* Foto activiteit */}
-                  <div style={blokBorder}>
+                  <div className="zomerkrant-block" style={blokBorder}>
                     <div style={blokH2}><span>📸</span> Foto activiteit</div>
                     <FotoVak
                       url={ed.foto_activiteit_url}
@@ -612,7 +627,7 @@ export default function ZomerkrantPage() {
                   </div>
 
                   {/* Hahaha */}
-                  <div style={{ ...blokBorder, borderBottom: 'none' }}>
+                  <div className="zomerkrant-block" style={{ ...blokBorder, borderBottom: 'none' }}>
                     <div style={blokH2}><span>😂</span> Hahaha (grap van de dag)</div>
                     <textarea
                       value={ed.hahaha_tekst}
