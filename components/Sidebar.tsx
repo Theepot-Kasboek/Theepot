@@ -7,7 +7,7 @@ import { useEffect, useState } from 'react'
 import {
   LayoutDashboard, Wallet, Map, BookOpen,
   Calendar, MessageSquare, ShieldCheck,
-  Users, LogOut, Sun, Moon, UtensilsCrossed, Scissors, MessageCircle, FileText, Newspaper, Flame, CheckSquare, Gauge, Pin, Layers, Archive, Search, Activity, ClipboardList, BookMarked,
+  Users, LogOut, Sun, Moon, UtensilsCrossed, Scissors, MessageCircle, FileText, Newspaper, Flame, CheckSquare, Gauge, Pin, Layers, Archive, Search, Activity, ClipboardList,
 } from 'lucide-react'
 import { useAuth } from './AuthProvider'
 import { useTheme } from './ThemeProvider'
@@ -171,7 +171,6 @@ export default function Sidebar({ isOpen, onClose }: { isOpen?: boolean; onClose
         { href: '/weekplanningen', label: 'Weekplanningen', icon: <Scissors size={16} /> },
         { href: '/activiteiten', label: 'Activiteitenbeheer', icon: <BookOpen size={16} /> },
         { href: '/ve-planning', label: 'VE Planning', icon: <Layers size={16} /> },
-        { href: '/zomerkrant', label: 'Zomerkrant', icon: <BookMarked size={16} />, vereistRecht: 'pagina_zomerkrant' as const },
       ],
     },
     {
