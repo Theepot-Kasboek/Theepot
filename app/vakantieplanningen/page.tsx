@@ -743,6 +743,15 @@ function DocumentWeergave({ planning, weken, activiteiten, dagDatumStr, tekstGro
   tekstGrootte: number
 }) {
   const [downloadenBezig, setDownloadenBezig] = useState(false)
+  const [venstBreedte, setVenstBreedte] = useState(typeof window !== 'undefined' ? window.innerWidth : 1200)
+  const [popupFoto, setPopupFoto] = useState<{ url: string; alt: string } | null>(null)
+  const kleinScherm = venstBreedte < 700
+
+  useEffect(() => {
+    function onResize() { setVenstBreedte(window.innerWidth) }
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
 
   function activiteitenVan(weekId: string, dag: Dag) {
     return activiteiten.filter(a => a.week_id === weekId && a.dag === dag).sort((a, b) => a.volgorde - b.volgorde)
@@ -884,17 +893,31 @@ function DocumentWeergave({ planning, weken, activiteiten, dagDatumStr, tekstGro
                               )}
                             </div>
 
-                            {/* Foto rechts — automatisch geschaald */}
-                            {act.afbeelding_pad && (
-                              <div style={{ flexShrink: 0, width: 200, alignSelf: 'stretch', position: 'relative', borderLeft: '1px solid var(--border)' }}>
-                                <img
-                                  src={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/activiteit-afbeeldingen/${act.afbeelding_pad}`}
-                                  alt={act.naam}
-                                  style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-                                  onError={e => { (e.target as HTMLImageElement).parentElement!.style.display = 'none' }}
-                                />
-                              </div>
-                            )}
+                            {/* Foto rechts — automatisch geschaald naar volledige foto */}
+                            {act.afbeelding_pad && (() => {
+                              const fotoUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/activiteit-afbeeldingen/${act.afbeelding_pad}`
+                              return (
+                                <div style={{ flexShrink: 0, maxWidth: kleinScherm ? 140 : 260, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 10, borderLeft: '1px solid var(--border)' }}>
+                                  {kleinScherm ? (
+                                    <button
+                                      className="btn btn-sm"
+                                      onClick={() => setPopupFoto({ url: fotoUrl, alt: act.naam })}
+                                      style={{ whiteSpace: 'nowrap' }}
+                                    >
+                                      <Eye size={13} /> Foto bekijken
+                                    </button>
+                                  ) : (
+                                    <img
+                                      src={fotoUrl}
+                                      alt={act.naam}
+                                      style={{ maxWidth: '100%', maxHeight: 220, width: 'auto', height: 'auto', objectFit: 'contain', display: 'block', borderRadius: 6, cursor: 'pointer' }}
+                                      onClick={() => setPopupFoto({ url: fotoUrl, alt: act.naam })}
+                                      onError={e => { (e.target as HTMLImageElement).parentElement!.style.display = 'none' }}
+                                    />
+                                  )}
+                                </div>
+                              )
+                            })()}
                           </div>
                         </div>
                       ))}
@@ -906,6 +929,27 @@ function DocumentWeergave({ planning, weken, activiteiten, dagDatumStr, tekstGro
           </div>
         )
       })}
+
+      {/* Foto pop-up */}
+      {popupFoto && (
+        <div
+          onClick={() => setPopupFoto(null)}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}
+        >
+          <button
+            onClick={() => setPopupFoto(null)}
+            style={{ position: 'absolute', top: 20, right: 20, background: 'rgba(255,255,255,0.15)', border: 'none', borderRadius: '50%', width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#fff' }}
+          >
+            <X size={20} />
+          </button>
+          <img
+            src={popupFoto.url}
+            alt={popupFoto.alt}
+            onClick={e => e.stopPropagation()}
+            style={{ maxWidth: '90vw', maxHeight: '90vh', width: 'auto', height: 'auto', objectFit: 'contain', borderRadius: 8 }}
+          />
+        </div>
+      )}
     </div>
   )
 }
