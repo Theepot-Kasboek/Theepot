@@ -38,7 +38,10 @@ function maandaagVanWeek(d: Date): Date {
 }
 
 function toDateStr(d: Date): string {
-  return d.toISOString().split('T')[0]
+  const jaar = d.getFullYear()
+  const maand = String(d.getMonth() + 1).padStart(2, '0')
+  const dag = String(d.getDate()).padStart(2, '0')
+  return `${jaar}-${maand}-${dag}`
 }
 
 function fmtWeek(weekStart: string): string {
@@ -273,7 +276,7 @@ async function exporteerPDF(
 // ─── Hoofd pagina ─────────────────────────────────────────────────────────────
 
 export default function MaaltijdlijstPage() {
-  const { profiel, isSuperadmin, maaltijdToegang } = useAuth()
+  const { profiel, isSuperadmin, maaltijdToegang, rechten } = useAuth()
   const [toegestaneLocaties, setToegestaneLocaties] = useState<{naam: string; toegang: string}[]>([])
 
   const [locaties, setLocaties] = useState<Locatie[]>([])
@@ -466,6 +469,7 @@ export default function MaaltijdlijstPage() {
 
   const isHuidigeWeek = huidigWeekStart === toDateStr(maandaagVanWeek(new Date()))
   const magBewerken = isSuperadmin || (actieveLocatie ? maaltijdToegang(actieveLocatie.naam) === 'bewerken' : false)
+  const magKindToevoegen = isSuperadmin || (magBewerken && rechten.maaltijdlijst_kind_toevoegen)
 
   // ─── RENDER ──────────────────────────────────────────────────────────────────
 
@@ -593,7 +597,7 @@ export default function MaaltijdlijstPage() {
                             </td>
                             <td colSpan={4} style={{ padding: '10px 14px', border: '1px solid var(--border)', color: 'var(--text-muted)', fontSize: 12, fontStyle: 'italic' }}>Geen kinderen</td>
                             <td style={{ border: '1px solid var(--border)', textAlign: 'center', padding: 6 }}>
-                              {magBewerken && <button onClick={() => setExtraModal(dag)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--primary)', display: 'flex', alignItems: 'center', margin: '0 auto' }} title="Extra kind toevoegen"><UserPlus size={14} /></button>}
+                              {magKindToevoegen && <button onClick={() => setExtraModal(dag)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--primary)', display: 'flex', alignItems: 'center', margin: '0 auto' }} title="Extra kind toevoegen"><UserPlus size={14} /></button>}
                             </td>
                           </tr>
                         ] : dagRegs.map((reg, i) => (
@@ -643,7 +647,7 @@ export default function MaaltijdlijstPage() {
                             {/* Acties */}
                             <td style={{ padding: '6px', border: '1px solid var(--border)', textAlign: 'center' }}>
                               <div style={{ display: 'flex', gap: 4, justifyContent: 'center' }}>
-                                {magBewerken && i === dagRegs.length - 1 && (
+                                {magKindToevoegen && i === dagRegs.length - 1 && (
                                   <button onClick={() => setExtraModal(dag)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--primary)', display: 'flex' }} title="Extra toevoegen"><UserPlus size={13} /></button>
                                 )}
                                 {magBewerken && (

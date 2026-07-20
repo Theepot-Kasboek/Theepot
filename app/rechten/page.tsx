@@ -42,6 +42,7 @@ interface Recht {
   vakantie_exporteren: boolean
   weekplanning_exporteren: boolean
   gesprekken_exporteren: boolean
+  maaltijdlijst_kind_toevoegen: boolean
 }
 
 type Toegang = 'geen' | 'lezen' | 'bewerken'
@@ -110,7 +111,9 @@ const PAGINAS: PaginaDef[] = [
     key: 'pagina_maaltijdlijst',
     label: 'Maaltijdlijst',
     icon: '🍽️',
-    functies: [],
+    functies: [
+      { key: 'maaltijdlijst_kind_toevoegen', label: 'Kind toevoegen', beschrijving: 'Extra kinderen toevoegen aan de maaltijdlijst', vereist: 'lezen' },
+    ],
   },
   {
     key: 'pagina_weekplanningen',
@@ -219,6 +222,7 @@ function leegRecht(): Omit<Recht, 'id' | 'rol' | 'profiel_id'> {
     chat_starten: false,
     weekplanning_exporteren: false,
     gesprekken_exporteren: false,
+    maaltijdlijst_kind_toevoegen: false,
   }
 }
 
