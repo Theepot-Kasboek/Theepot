@@ -1,0 +1,12 @@
+.DS_Store
+build/
+DerivedData/
+*.xcuserstate
+xcuserdata/
+.swiftpm/
+
+# Xcode project zelf wordt gegenereerd met `xcodegen generate` uit project.yml
+TheepotMobile.xcodeproj/
+
+# Bevat echte Supabase-sleutels — nooit committen
+TheepotMobile/Services/Secrets.swift
