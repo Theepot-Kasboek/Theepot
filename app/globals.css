@@ -682,6 +682,7 @@ h1, h2, h3, h4, h5, h6,
 
 .grid-2col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 .grid-3col { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.grid-4col { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
 
 .table-scroll-x { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 
@@ -692,6 +693,7 @@ h1, h2, h3, h4, h5, h6,
 
   .grid-2col { grid-template-columns: 1fr; }
   .grid-3col { grid-template-columns: 1fr 1fr; }
+  .grid-4col { grid-template-columns: 1fr 1fr; }
 
   /* Maak de mobiele tweede kolom panel scrollbaar als het er toch staat */
   .layout-split > *:nth-child(2) { min-width: 0; }
@@ -699,6 +701,7 @@ h1, h2, h3, h4, h5, h6,
 
 @media (max-width: 480px) {
   .grid-3col { grid-template-columns: 1fr; }
+  .grid-4col { grid-template-columns: 1fr; }
 }
 
 /* Taken pagina drie-paneel layout */

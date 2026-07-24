@@ -51,7 +51,8 @@ async function exportKasboekPDF(
   entries: KasboekEntry[],
   inkomsten: number,
   uitgaven: number,
-  saldo: number,
+  beginsaldo: number,
+  eindsaldo: number,
   perCategorie: Record<string, { inkomst: number; uitgave: number }>
 ) {
   const { jsPDF } = await import('jspdf')
@@ -91,14 +92,18 @@ async function exportKasboekPDF(
   doc.setFont('helvetica', 'normal')
   doc.setTextColor(...donkerGroen)
   doc.text(`${locatieNaam} — ${maandLabel}`, marge, y)
-  y += 14
+  y += 6
+  doc.setFontSize(9)
+  doc.setTextColor(...grijs)
+  doc.text(`Beginsaldo (overgenomen van vorige maand): ${fmt(beginsaldo)}`, marge, y)
+  y += 10
 
   // Samenvatting blokken
   const blokB = (breedte - 8) / 3
   const blokken = [
     { label: 'Inkomsten', bedrag: inkomsten, kleur: [22, 163, 74] as [number,number,number], bg: [240, 253, 244] as [number,number,number] },
     { label: 'Uitgaven',  bedrag: uitgaven,  kleur: [220, 38, 38]  as [number,number,number], bg: [254, 242, 242] as [number,number,number] },
-    { label: 'Saldo',     bedrag: saldo,     kleur: saldo >= 0 ? donkerGroen : [220, 38, 38] as [number,number,number], bg: saldo >= 0 ? lichtGroen : lichtRood },
+    { label: 'Eindsaldo', bedrag: eindsaldo, kleur: eindsaldo >= 0 ? donkerGroen : [220, 38, 38] as [number,number,number], bg: eindsaldo >= 0 ? lichtGroen : lichtRood },
   ]
 
   blokken.forEach((b, i) => {
@@ -252,6 +257,9 @@ export default function KasboekPage() {
   const [entries, setEntries] = useState<KasboekEntry[]>([])
   const [laden, setLaden] = useState(false)
   const [fout, setFout] = useState<string | null>(null)
+
+  // Beginsaldo: doorlopend saldo van alle vorige maanden
+  const [beginsaldo, setBeginsaldo] = useState(0)
   const [toast, setToast] = useState<{ bericht: string; type: 'success' | 'error' } | null>(null)
 
   // Formulier
@@ -371,6 +379,24 @@ export default function KasboekPage() {
   }, [huidigePeriode, actieveLocatie])
 
   useEffect(() => { haalOp() }, [haalOp])
+
+  // ── Beginsaldo ophalen (som van alle boekingen uit voorgaande maanden) ─────
+  const haalBeginsaldoOp = useCallback(async () => {
+    if (!actieveLocatie) return
+    const { data, error } = await getSupabase()
+      .from('kasboek_entries')
+      .select('bedrag, type')
+      .lt('periode', huidigePeriode)
+      .eq('locatie', actieveLocatie.naam)
+
+    if (!error && data) {
+      const totaal = (data as { bedrag: number; type: 'inkomst' | 'uitgave' }[])
+        .reduce((s, e) => s + (e.type === 'inkomst' ? e.bedrag : -e.bedrag), 0)
+      setBeginsaldo(totaal)
+    }
+  }, [huidigePeriode, actieveLocatie])
+
+  useEffect(() => { haalBeginsaldoOp() }, [haalBeginsaldoOp])
 
   // ── Boeking toevoegen ───────────────────────────────────────────────────────
   async function handleToevoegen(e: React.FormEvent) {
@@ -518,7 +544,7 @@ export default function KasboekPage() {
   // ── Berekeningen ────────────────────────────────────────────────────────────
   const inkomsten = entries.filter(e => e.type === 'inkomst').reduce((s, e) => s + e.bedrag, 0)
   const uitgaven  = entries.filter(e => e.type === 'uitgave').reduce((s, e) => s + e.bedrag, 0)
-  const saldo     = inkomsten - uitgaven
+  const eindsaldo = beginsaldo + inkomsten - uitgaven
 
   const perCategorie: Record<string, { inkomst: number; uitgave: number }> = {}
   entries.forEach(e => {
@@ -568,7 +594,8 @@ export default function KasboekPage() {
                   entries,
                   inkomsten,
                   uitgaven,
-                  saldo,
+                  beginsaldo,
+                  eindsaldo,
                   perCategorie
                 )}
               >
@@ -648,11 +675,12 @@ export default function KasboekPage() {
         {actieveLocatie && (
           <>
             {/* Saldo kaarten */}
-            <div className="grid-3col" style={{ marginBottom: 20 }}>
+            <div className="grid-4col" style={{ marginBottom: 20 }}>
               {[
+                { label: 'Beginsaldo', bedrag: beginsaldo, kleur: 'var(--text-muted)', bg: 'var(--bg)', icoon: '↦' },
                 { label: 'Inkomsten', bedrag: inkomsten, kleur: 'var(--success)', bg: 'color-mix(in srgb, var(--success) 12%, var(--bg-card))', icoon: '↑' },
                 { label: 'Uitgaven',  bedrag: uitgaven,  kleur: 'var(--danger)',  bg: 'color-mix(in srgb, var(--danger) 12%, var(--bg-card))',  icoon: '↓' },
-                { label: 'Saldo',     bedrag: saldo,     kleur: saldo >= 0 ? 'var(--primary-text)' : 'var(--danger)', bg: saldo >= 0 ? 'var(--primary-light)' : 'color-mix(in srgb, var(--danger) 12%, var(--bg-card))', icoon: '=' },
+                { label: 'Eindsaldo', bedrag: eindsaldo, kleur: eindsaldo >= 0 ? 'var(--primary-text)' : 'var(--danger)', bg: eindsaldo >= 0 ? 'var(--primary-light)' : 'color-mix(in srgb, var(--danger) 12%, var(--bg-card))', icoon: '=' },
               ].map(k => (
                 <div key={k.label} className="stat-card" style={{ background: k.bg, border: '1px solid var(--border)' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
