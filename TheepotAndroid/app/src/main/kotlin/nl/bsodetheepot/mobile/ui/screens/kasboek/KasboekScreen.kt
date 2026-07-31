@@ -34,18 +34,23 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import kotlinx.coroutines.launch
 import nl.bsodetheepot.mobile.data.models.Locatie
 import nl.bsodetheepot.mobile.data.models.LocatieService
@@ -85,6 +90,21 @@ fun KasboekScreen(session: SessionViewModel) {
     }
 
     LaunchedEffect(actieveLocatie, maand) { laad() }
+
+    // Ververst de boekingen zodra het scherm weer in beeld komt (bv. na terugkeren
+    // vanuit de achtergrond), zodat boekingen die ondertussen op een ander toestel
+    // zijn toegevoegd meteen zichtbaar zijn.
+    val laadState = rememberUpdatedState(::laad)
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                scope.launch { laadState.value() }
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
 
     val magBewerken = actieveLocatie?.let { session.toegang(it.naam, "kasboek") == Toegang.BEWERKEN } ?: false
     val inkomsten = entries.filter { it.type == KasboekType.INKOMST }.sumOf { it.bedrag }
@@ -127,8 +147,8 @@ fun KasboekScreen(session: SessionViewModel) {
             LazyColumn {
                 items(entries, key = { it.id }) { entry ->
                     ListItem(
-                        headlineContent = { Text(entry.omschrijving?.ifBlank { entry.categorie } ?: entry.categorie) },
-                        supportingContent = { Text(entry.categorie) },
+                        headlineContent = { Text(entry.omschrijving?.ifBlank { entry.categorie ?: "" } ?: entry.categorie ?: "") },
+                        supportingContent = { if (entry.categorie != null) Text(entry.categorie) },
                         leadingContent = { if (entry.bonnetjePad != null) Icon(Icons.Filled.AttachFile, contentDescription = "Heeft bonnetje") },
                         trailingContent = {
                             val kleur = if (entry.type == KasboekType.INKOMST) TheepotGroenDonker else androidx.compose.ui.graphics.Color(0xFFC62828)

@@ -14,7 +14,7 @@ enum class KasboekType {
 data class KasboekEntry(
     val id: String,
     val periode: String,
-    val categorie: String,
+    val categorie: String? = null,
     val omschrijving: String? = null,
     val bedrag: Double,
     val type: KasboekType,
