@@ -171,7 +171,7 @@ export default function Sidebar({ isOpen, onClose }: { isOpen?: boolean; onClose
         { href: '/weekplanningen', label: 'Weekplanningen', icon: <Scissors size={16} /> },
         { href: '/activiteiten', label: 'Activiteitenbeheer', icon: <BookOpen size={16} /> },
         { href: '/ve-planning', label: 'VE Planning', icon: <Layers size={16} /> },
-        { href: '/competitie', label: 'Competitie Activiteiten', icon: <Trophy size={16} /> },
+        { href: '/competitie', label: 'Competitie Activiteiten', icon: <Trophy size={16} />, superadminOnly: true },
       ],
     },
     {

@@ -2,9 +2,10 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { getSupabase } from '@/lib/supabase'
+import { useAuth } from '@/components/AuthProvider'
 import Topbar from '@/components/Topbar'
 import Toast from '@/components/Toast'
-import { Trophy, X } from 'lucide-react'
+import { Trophy, X, ShieldCheck } from 'lucide-react'
 
 // ─── Config ─────────────────────────────────────────────────────────────────
 
@@ -71,6 +72,7 @@ function rozeRoodTotaal(data: RozeRoodData, bonus: RozeRoodBonusData, naam: stri
 // ─── Pagina ─────────────────────────────────────────────────────────────────
 
 export default function CompetitiePage() {
+  const { isSuperadmin } = useAuth()
   const [kikkerData, setKikkerData] = useState<KikkerData>(legeKikkerData())
   const [dierenkringData, setDierenkringData] = useState<DierenkringData>(legeDierenkringData())
   const [rozeRoodData, setRozeRoodData] = useState<RozeRoodData>(legeRozeRoodData())
@@ -194,6 +196,21 @@ export default function CompetitiePage() {
   }).sort((a, b) => b.totaal - a.totaal)
   const topTotaal = ranglijst[0]?.totaal ?? 0
   const maxTotaal = Math.max(1, ...ranglijst.map(r => r.totaal))
+
+  if (!isSuperadmin) {
+    return (
+      <>
+        <Topbar titel="Competitie Activiteiten" subtitel="Geen toegang" />
+        <div className="page-content">
+          <div className="empty-state">
+            <ShieldCheck size={36} />
+            <h3>Geen toegang</h3>
+            <p>Alleen superadmins kunnen de Competitie Activiteiten beheren.</p>
+          </div>
+        </div>
+      </>
+    )
+  }
 
   if (laden) {
     return (
