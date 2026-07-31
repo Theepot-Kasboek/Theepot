@@ -276,7 +276,7 @@ async function exporteerPDF(
 // ─── Hoofd pagina ─────────────────────────────────────────────────────────────
 
 export default function MaaltijdlijstPage() {
-  const { profiel, isSuperadmin, maaltijdToegang, rechten } = useAuth()
+  const { profiel, isSuperadmin, maaltijdToegang } = useAuth()
   const [toegestaneLocaties, setToegestaneLocaties] = useState<{naam: string; toegang: string}[]>([])
 
   const [locaties, setLocaties] = useState<Locatie[]>([])
@@ -469,7 +469,7 @@ export default function MaaltijdlijstPage() {
 
   const isHuidigeWeek = huidigWeekStart === toDateStr(maandaagVanWeek(new Date()))
   const magBewerken = isSuperadmin || (actieveLocatie ? maaltijdToegang(actieveLocatie.naam) === 'bewerken' : false)
-  const magKindToevoegen = isSuperadmin || (magBewerken && rechten.maaltijdlijst_kind_toevoegen)
+  const magKindToevoegen = magBewerken
 
   // ─── RENDER ──────────────────────────────────────────────────────────────────
 
@@ -497,7 +497,7 @@ export default function MaaltijdlijstPage() {
                 )}
               </div>
             )}
-            {isSuperadmin && actieveLocatie && (
+            {magBewerken && actieveLocatie && (
               <button className="btn" onClick={() => setStandaardModal(true)}>
                 <Settings size={14} /> Standaard kinderen
               </button>
