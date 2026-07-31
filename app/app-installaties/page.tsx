@@ -202,13 +202,15 @@ export default function AppInstallatiesPage() {
         <VersieModal
           versie={versieModal === 'nieuw' ? null : versieModal}
           onSave={async (data) => {
-            if (versieModal === 'nieuw') {
-              await getSupabase().from('app_versies').insert(data)
-              setToast({ bericht: 'Versie toegevoegd!', type: 'success' })
-            } else {
-              await getSupabase().from('app_versies').update(data).eq('id', (versieModal as AppVersie).id)
-              setToast({ bericht: 'Opgeslagen!', type: 'success' })
+            const { error } = versieModal === 'nieuw'
+              ? await getSupabase().from('app_versies').insert(data)
+              : await getSupabase().from('app_versies').update(data).eq('id', (versieModal as AppVersie).id)
+
+            if (error) {
+              setToast({ bericht: `Opslaan mislukt: ${error.message}`, type: 'error' })
+              return
             }
+            setToast({ bericht: versieModal === 'nieuw' ? 'Versie toegevoegd!' : 'Opgeslagen!', type: 'success' })
             setVersieModal(null)
             await haalOp()
           }}
@@ -221,13 +223,15 @@ export default function AppInstallatiesPage() {
           apparaat={apparaatModal === 'nieuw' ? null : apparaatModal}
           versies={versies}
           onSave={async (data) => {
-            if (apparaatModal === 'nieuw') {
-              await getSupabase().from('app_installaties').insert(data)
-              setToast({ bericht: 'Apparaat toegevoegd!', type: 'success' })
-            } else {
-              await getSupabase().from('app_installaties').update(data).eq('id', (apparaatModal as AppInstallatie).id)
-              setToast({ bericht: 'Opgeslagen!', type: 'success' })
+            const { error } = apparaatModal === 'nieuw'
+              ? await getSupabase().from('app_installaties').insert(data)
+              : await getSupabase().from('app_installaties').update(data).eq('id', (apparaatModal as AppInstallatie).id)
+
+            if (error) {
+              setToast({ bericht: `Opslaan mislukt: ${error.message}`, type: 'error' })
+              return
             }
+            setToast({ bericht: apparaatModal === 'nieuw' ? 'Apparaat toegevoegd!' : 'Opgeslagen!', type: 'success' })
             setApparaatModal(null)
             await haalOp()
           }}
