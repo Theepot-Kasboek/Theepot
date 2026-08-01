@@ -37,8 +37,18 @@ interface KmRegistratie {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function fmtDatum(d: string) {
+function fmtDatum(d: string | Date) {
   return new Date(d).toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric' })
+}
+
+/**
+ * Vandaag als "JJJJ-MM-DD" in Nederlandse tijd.
+ * Niet via toISOString(): die rekent naar UTC, waardoor je 's nachts
+ * (zomertijd tussen 00:00 en 02:00) de dag ervoor ingevuld krijgt.
+ */
+function vandaagLokaal(): string {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
 function fmtKenteken(k: string) {
@@ -182,7 +192,7 @@ export default function KilometerstandenPage() {
                           )}
                         </div>
                         {volgende && (
-                          <div style={{ flexShrink: 0, width: 8, height: 8, borderRadius: '50%', background: kleur }} title={`Volgende: ${fmtDatum(volgende.toISOString())}`} />
+                          <div style={{ flexShrink: 0, width: 8, height: 8, borderRadius: '50%', background: kleur }} title={`Volgende: ${fmtDatum(volgende)}`} />
                         )}
                       </div>
                     )
@@ -223,7 +233,7 @@ export default function KilometerstandenPage() {
                     {actiefVolgende ? (
                       <>
                         <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Volgende invoer</div>
-                        <div style={{ fontSize: 13, fontWeight: 600, color: actiefStatus }}>{fmtDatum(actiefVolgende.toISOString())}</div>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: actiefStatus }}>{fmtDatum(actiefVolgende)}</div>
                         {actiefVolgende < new Date() && (
                           <div style={{ fontSize: 11, color: '#EF4444', display: 'flex', alignItems: 'center', gap: 3, marginTop: 2 }}>
                             <AlertCircle size={11} /> Te laat
@@ -460,7 +470,7 @@ function RegistratieModal({ voertuig, laasteStand, onSave, onClose }: {
   onClose: () => void
 }) {
   const [stand, setStand] = useState('')
-  const [datum, setDatum] = useState(new Date().toISOString().split('T')[0])
+  const [datum, setDatum] = useState(vandaagLokaal)
   const [notitie, setNotitie] = useState('')
   const [fout, setFout] = useState('')
 
