@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { getSupabase } from '@/lib/supabase'
+import { vandaagLokaal } from '@/lib/datum'
 import { useAuth } from '@/components/AuthProvider'
 import Topbar from '@/components/Topbar'
 import Toast from '@/components/Toast'
@@ -254,7 +255,7 @@ function VersieModal({ versie, onSave, onClose }: {
   const [platform, setPlatform] = useState<Platform>(versie?.platform ?? 'android')
   const [versienummer, setVersienummer] = useState(versie?.versie ?? '')
   const [wijzigingen, setWijzigingen] = useState(versie?.wijzigingen ?? '')
-  const [uitgebrachtOp, setUitgebrachtOp] = useState(versie?.uitgebracht_op ?? new Date().toISOString().slice(0, 10))
+  const [uitgebrachtOp, setUitgebrachtOp] = useState(versie?.uitgebracht_op ?? vandaagLokaal())
 
   return (
     <div className="modal-backdrop" onClick={e => { if (e.target === e.currentTarget) onClose() }}>
@@ -319,7 +320,7 @@ function ApparaatModal({ apparaat, versies, onSave, onClose }: {
   const [platform, setPlatform] = useState<Platform>(apparaat?.platform ?? 'android')
   const [versieId, setVersieId] = useState(apparaat?.versie_id ?? '')
   const [notitie, setNotitie] = useState(apparaat?.notitie ?? '')
-  const [geinstalleerdOp, setGeinstalleerdOp] = useState(apparaat?.geinstalleerd_op ?? new Date().toISOString().slice(0, 10))
+  const [geinstalleerdOp, setGeinstalleerdOp] = useState(apparaat?.geinstalleerd_op ?? vandaagLokaal())
 
   const versiesVoorPlatform = versies.filter(v => v.platform === platform)
 

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { getSupabase } from '@/lib/supabase'
+import { vandaagLokaal } from '@/lib/datum'
 import { useAuth } from '@/components/AuthProvider'
 import Topbar from '@/components/Topbar'
 import Toast from '@/components/Toast'
@@ -645,7 +646,7 @@ export default function NieuwsbrievenPage() {
     setEditorTitel(format === 'weekmemo' ? 'Weekmemo' : format === 'theepraatje' ? 'Theepraatje' : 'Nieuwsbrief')
     setEditorNummer('')
     setEditorLocatie('')
-    setEditorDatum(new Date().toISOString().split('T')[0])
+    setEditorDatum(vandaagLokaal())
     setEditorFormat(format)
     setEditorSecties(maakSecties(format))
     setActieve(null)

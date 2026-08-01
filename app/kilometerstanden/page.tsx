@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { getSupabase } from '@/lib/supabase'
+import { vandaagLokaal } from '@/lib/datum'
 import { useAuth } from '@/components/AuthProvider'
 import Topbar from '@/components/Topbar'
 import Toast from '@/components/Toast'
@@ -39,16 +40,6 @@ interface KmRegistratie {
 
 function fmtDatum(d: string | Date) {
   return new Date(d).toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric' })
-}
-
-/**
- * Vandaag als "JJJJ-MM-DD" in Nederlandse tijd.
- * Niet via toISOString(): die rekent naar UTC, waardoor je 's nachts
- * (zomertijd tussen 00:00 en 02:00) de dag ervoor ingevuld krijgt.
- */
-function vandaagLokaal(): string {
-  const d = new Date()
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
 function fmtKenteken(k: string) {

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { getSupabase } from '@/lib/supabase'
+import { vandaagLokaal } from '@/lib/datum'
 import { useAuth } from '@/components/AuthProvider'
 import Topbar from '@/components/Topbar'
 import Toast from '@/components/Toast'
@@ -198,7 +199,7 @@ export default function NotulenPage() {
 
   function nieuwAanmaken() {
     setEditorTitel('Notulen Teamvergadering')
-    setEditorDatum(new Date().toISOString().split('T')[0])
+    setEditorDatum(vandaagLokaal())
     setEditorLocatie('')
     setEditorAanwezigen('')
     setEditorSecties(maakSectiesVanKoppen(standaardKoppen))

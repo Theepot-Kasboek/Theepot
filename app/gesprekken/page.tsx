@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { getSupabase } from '@/lib/supabase'
+import { vandaagLokaal } from '@/lib/datum'
 import { useAuth } from '@/components/AuthProvider'
 import Topbar from '@/components/Topbar'
 import Toast from '@/components/Toast'
@@ -638,7 +639,7 @@ function FormulierModal({ map, formulier, onSave, onClose }: {
   onClose: () => void
 }) {
   const [kindNaam, setKindNaam] = useState(formulier?.kind_naam ?? '')
-  const [datum, setDatum] = useState(formulier?.datum ?? new Date().toISOString().split('T')[0])
+  const [datum, setDatum] = useState(formulier?.datum ?? vandaagLokaal())
   const [actieveVeld, setActieveVeld] = useState<number | null>(null)
   const [laden, setLaden] = useState(false)
   const [waarden, setWaarden] = useState<Record<string, string>>({

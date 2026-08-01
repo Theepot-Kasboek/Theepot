@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import { getSupabase } from '@/lib/supabase'
+import { datumSleutel } from '@/lib/datum'
 import { useAuth } from '@/components/AuthProvider'
 import Topbar from '@/components/Topbar'
 import Toast from '@/components/Toast'
@@ -483,7 +484,7 @@ export default function AgendaPage() {
     // Groepeer per dag
     const perDag: Record<string, Afspraak[]> = {}
     komende.forEach(a => {
-      const key = new Date(a.start_tijd).toISOString().split('T')[0]
+      const key = datumSleutel(a.start_tijd)
       if (!perDag[key]) perDag[key] = []
       perDag[key].push(a)
     })
