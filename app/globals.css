@@ -758,3 +758,33 @@ h1, h2, h3, h4, h5, h6,
     display: none;
   }
 }
+
+/* ─── SUPPORT / HANDLEIDING ──────────────────────────── */
+
+/* Zoekbalk plakt bovenaan en loopt door tot in de padding van .page-content */
+.support-zoekbalk {
+  position: sticky;
+  top: -20px;   /* gelijk aan de padding van .page-content, zodat hij bovenaan plakt */
+  z-index: 5;
+  background: var(--bg);
+  margin: -20px -20px 12px;
+  padding: 20px 20px 12px;
+}
+
+/* Inhoudsopgave blijft meelopen naast het document */
+.support-inhoud {
+  position: sticky;
+  top: 76px;
+}
+
+@media (max-width: 768px) {
+  .support-zoekbalk {
+    top: -12px;
+    margin: -12px -12px 10px;
+    padding: 12px 12px 10px;
+  }
+
+  .support-inhoud {
+    position: static;
+  }
+}
