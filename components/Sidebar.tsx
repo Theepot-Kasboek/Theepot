@@ -12,6 +12,9 @@ import {
 import { useAuth } from './AuthProvider'
 import { useTheme } from './ThemeProvider'
 import { getSupabase, ROL_LABELS } from '@/lib/supabase'
+import { haalPrikbordLocaties, isZichtbaarPrikbordBericht, type PrikbordZichtbaarheid } from '@/lib/prikbord'
+
+type PrikbordTelling = PrikbordZichtbaarheid & { gelezen_door: string[] | null }
 
 interface NavItem {
   href: string
@@ -29,6 +32,7 @@ export default function Sidebar({ isOpen, onClose }: { isOpen?: boolean; onClose
   const { theme, toggleTheme } = useTheme()
   const [ongelezen, setOngelezen] = useState(0)
   const [ongelezenprikbord, setOngelezenPrikbord] = useState(0)
+  const magAllesZien = isSuperadmin || profiel?.rol === 'directie' || profiel?.rol === 'leidinggevende'
 
 
   const initialen = profiel?.naam
@@ -84,15 +88,20 @@ export default function Sidebar({ isOpen, onClose }: { isOpen?: boolean; onClose
   }, [profiel, pathname])
 
   // ── Ongelezen prikbord berichten ─────────────────────────────────────────────
+  // Tel alleen berichten die je op de prikbordpagina ook echt te zien krijgt:
+  // niet verlopen én voor een locatie waar je toegang toe hebt.
   useEffect(() => {
     if (!profiel) return
     async function haalPrikbord() {
       const supabase = getSupabase()
+      const locaties = await haalPrikbordLocaties(profiel!.id, magAllesZien)
       const { data } = await supabase
         .from('prikbord_berichten')
-        .select('id, gelezen_door')
+        .select('id, gelezen_door, locatie_naam, verloopdatum')
       if (!data) { setOngelezenPrikbord(0); return }
-      const aantal = data.filter((b: { gelezen_door: string[] | null }) =>
+      const nu = new Date()
+      const aantal = data.filter((b: PrikbordTelling) =>
+        isZichtbaarPrikbordBericht(b, { magAllesZien, locaties, nu }) &&
         !b.gelezen_door?.includes(profiel!.id)
       ).length
       setOngelezenPrikbord(aantal)
@@ -105,19 +114,24 @@ export default function Sidebar({ isOpen, onClose }: { isOpen?: boolean; onClose
         () => haalPrikbord()
       ).subscribe()
     return () => { supabase.removeChannel(channel) }
-  }, [profiel, pathname])
+  }, [profiel, pathname, magAllesZien])
 
   // Extra: herlaad na 1 seconde als je op de prikbordpagina bent
   useEffect(() => {
     if (!profiel || !pathname.startsWith('/prikbord')) return
     const timer = setTimeout(async () => {
       const supabase = getSupabase()
-      const { data } = await supabase.from('prikbord_berichten').select('id, gelezen_door')
+      const locaties = await haalPrikbordLocaties(profiel.id, magAllesZien)
+      const { data } = await supabase.from('prikbord_berichten').select('id, gelezen_door, locatie_naam, verloopdatum')
       if (!data) { setOngelezenPrikbord(0); return }
-      setOngelezenPrikbord(data.filter((b: { gelezen_door: string[] | null }) => !b.gelezen_door?.includes(profiel.id)).length)
+      const nu = new Date()
+      setOngelezenPrikbord(data.filter((b: PrikbordTelling) =>
+        isZichtbaarPrikbordBericht(b, { magAllesZien, locaties, nu }) &&
+        !b.gelezen_door?.includes(profiel.id)
+      ).length)
     }, 1500)
     return () => clearTimeout(timer)
-  }, [profiel, pathname])
+  }, [profiel, pathname, magAllesZien])
 
   // Extra: herlaad na 1 seconde als je op de chatpagina bent (geeft chat pagina tijd om te markeren)
   useEffect(() => {

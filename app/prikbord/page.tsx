@@ -6,6 +6,7 @@ import { useAuth } from '@/components/AuthProvider'
 import Topbar from '@/components/Topbar'
 import Toast from '@/components/Toast'
 import { Plus, X, Trash2, Pencil, Pin, AlertTriangle, Info, MapPin } from 'lucide-react'
+import { haalPrikbordLocaties, isZichtbaarPrikbordBericht } from '@/lib/prikbord'
 
 interface PrikbordBericht {
   id: string
@@ -35,6 +36,7 @@ export default function PrikbordPage() {
   const magZien = isSuperadmin || rechten.pagina_prikbord !== 'geen'
   const magBewerken = isSuperadmin || rechten.pagina_prikbord === 'bewerken'
   const magToevoegen = isSuperadmin || rechten.prikbord_toevoegen === true
+  const magAllesZien = isSuperadmin || profiel?.rol === 'directie' || profiel?.rol === 'leidinggevende'
 
   const [berichten, setBerichten] = useState<PrikbordBericht[]>([])
   const [locaties, setLocaties] = useState<string[]>([])
@@ -57,10 +59,11 @@ export default function PrikbordPage() {
     setLaden(false)
   }, [])
 
-  // Markeer alle berichten als gelezen zodra de pagina geladen is
+  // Markeer alle zichtbare berichten als gelezen zodra de pagina geladen is
   useEffect(() => {
     if (!profiel || berichten.length === 0) return
-    const ongelezen = berichten.filter((b) => !b.gelezen_door?.includes(profiel.id))
+    const zichtbaar = berichten.filter((b) => isZichtbaarPrikbordBericht(b, { magAllesZien, locaties }))
+    const ongelezen = zichtbaar.filter((b) => !b.gelezen_door?.includes(profiel.id))
     if (ongelezen.length === 0) return
     const supabase = getSupabase()
     Promise.all(
@@ -78,23 +81,16 @@ export default function PrikbordPage() {
           .eq('id', b.id)
       })
     )
-  }, [profiel, berichten])
+  }, [profiel, berichten, locaties, magAllesZien])
 
   useEffect(() => {
     haalOp()
     async function laadLocaties() {
-      const supabase = getSupabase()
-      const { data: alle } = await supabase.from('kasboek_locaties').select('naam').eq('actief', true).order('naam')
-      const alleNamen: string[] = (alle ?? []).map((l: { naam: string }) => l.naam)
-      const magAlles = isSuperadmin || profiel?.rol === 'directie' || profiel?.rol === 'leidinggevende'
-      if (magAlles) { setLocaties(alleNamen); return }
       if (!profiel) return
-      const { data: toegang } = await supabase.from('locatie_toegang').select('locatie_naam').eq('profiel_id', profiel.id).eq('locatie_type', 'prikbord').neq('toegang', 'geen')
-      const toegankelijk = (toegang ?? []).map((t: { locatie_naam: string }) => t.locatie_naam)
-      setLocaties(alleNamen.filter(n => toegankelijk.includes(n)))
+      setLocaties(await haalPrikbordLocaties(profiel.id, magAllesZien))
     }
     laadLocaties()
-  }, [haalOp, isSuperadmin, profiel])
+  }, [haalOp, profiel, magAllesZien])
 
   async function verwijder(id: string) {
     if (!confirm('Bericht verwijderen?')) return
@@ -104,10 +100,7 @@ export default function PrikbordPage() {
   }
 
   // Berichten filteren op basis van toegankelijke locaties
-  const magAllesZien = isSuperadmin || profiel?.rol === 'directie' || profiel?.rol === 'leidinggevende'
-  const toegankelijkeBerichten = magAllesZien
-    ? berichten
-    : berichten.filter(b => b.locatie_naam === 'alle' || locaties.includes(b.locatie_naam))
+  const toegankelijkeBerichten = berichten.filter(b => isZichtbaarPrikbordBericht(b, { magAllesZien, locaties }))
   const gefilterd = actieveLocatie === 'alle'
     ? toegankelijkeBerichten
     : toegankelijkeBerichten.filter(b => b.locatie_naam === actieveLocatie || b.locatie_naam === 'alle')

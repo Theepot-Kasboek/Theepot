@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { useAuth } from '@/components/AuthProvider'
 import Topbar from '@/components/Topbar'
 import { getSupabase } from '@/lib/supabase'
+import { haalPrikbordLocaties, isZichtbaarPrikbordBericht } from '@/lib/prikbord'
 import {
   BookOpen, Calendar, MessageSquare, Users, Scissors,
   ChevronRight, Settings, X, GripVertical, Plus,
@@ -695,26 +696,31 @@ interface PrikbordBericht {
   aangemaakt_op: string; verloopdatum: string | null
 }
 
-function PrikbordWidget({ profiel, isSuperadmin }: { profiel: { naam: string; rol?: string } | null; isSuperadmin: boolean }) {
+function PrikbordWidget({ profiel, isSuperadmin }: { profiel: { id: string; naam: string; rol?: string } | null; isSuperadmin: boolean }) {
   const [berichten, setBerichten] = useState<PrikbordBericht[]>([])
   const [laden, setLaden] = useState(true)
+  const magAllesZien = isSuperadmin || profiel?.rol === 'directie' || profiel?.rol === 'leidinggevende'
+  const profielId = profiel?.id
 
   useEffect(() => {
     async function laad() {
+      if (!profielId) return
       setLaden(true)
+      const locaties = await haalPrikbordLocaties(profielId, magAllesZien)
       const { data } = await getSupabase()
         .from('prikbord_berichten')
         .select('*')
         .order('prioriteit', { ascending: false })
         .order('aangemaakt_op', { ascending: false })
-        .limit(5)
       const nu = new Date()
-      const actief = (data ?? []).filter((b: PrikbordBericht) => !b.verloopdatum || new Date(b.verloopdatum) >= nu)
+      const actief = (data ?? [])
+        .filter((b: PrikbordBericht) => isZichtbaarPrikbordBericht(b, { magAllesZien, locaties, nu }))
+        .slice(0, 5)
       setBerichten(actief)
       setLaden(false)
     }
     laad()
-  }, [])
+  }, [profielId, magAllesZien])
 
   function prKleur(p: string) {
     if (p === 'urgent') return '#EF4444'
