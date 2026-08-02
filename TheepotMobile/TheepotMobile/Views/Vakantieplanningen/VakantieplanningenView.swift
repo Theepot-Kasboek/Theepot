@@ -1,5 +1,59 @@
 import SwiftUI
 
+/// Alle layoutkeuzes in dit scherm komen uit de werkelijk beschikbare breedte,
+/// niet uit de oriëntatie of de size class. Een iPad in portret is namelijk net
+/// zo breed als sommige iPads in landschap, en met een oriëntatiecheck kreeg je
+/// daar onnodig één kolom met schermbrede foto's. Zo vult de planning het hele
+/// scherm op de iPad mini (744pt), de 10.9" (820pt) en liggend (1133/1180pt),
+/// terwijl de iPhone-weergave ongewijzigd blijft.
+struct PlanningLayout {
+    /// Breedte die de inhoud werkelijk mag gebruiken (buitenmarge er al af).
+    let inhoudBreedte: CGFloat
+
+    static let buitenMarge: CGFloat = 16
+    static let kaartTussenruimte: CGFloat = 12
+    /// Smaller dan dit wordt een activiteitkaart onleesbaar, dus dan liever
+    /// één kolom minder.
+    private static let minKaartBreedte: CGFloat = 330
+
+    init(schermBreedte: CGFloat) {
+        inhoudBreedte = max(0, schermBreedte - PlanningLayout.buitenMarge * 2)
+    }
+
+    /// Zoveel kaarten naast elkaar als er passen; boven de vier wordt het een
+    /// onrustige muur van tegels.
+    var kolommen: Int {
+        let passend = Int((inhoudBreedte + Self.kaartTussenruimte) / (Self.minKaartBreedte + Self.kaartTussenruimte))
+        return min(4, max(1, passend))
+    }
+
+    var kaartBreedte: CGFloat {
+        let tussenruimte = Self.kaartTussenruimte * CGFloat(kolommen - 1)
+        return max(0, (inhoudBreedte - tussenruimte) / CGFloat(kolommen))
+    }
+
+    var rasterKolommen: [GridItem] {
+        Array(repeating: GridItem(.flexible(), spacing: Self.kaartTussenruimte), count: kolommen)
+    }
+
+    /// iPhone-formaat: koppen en tekst blijven klein, ook al is een kaart
+    /// schermbreed.
+    var compactScherm: Bool { inhoudBreedte < 600 }
+
+    /// De vijf dagkolommen passen alleen zonder horizontaal scrollen als elke
+    /// kolom nog een activiteitnaam kwijt kan.
+    var weekTabelPastVolledig: Bool { inhoudBreedte >= 700 }
+
+    /// Pas boven deze breedte is er ruimte voor royale koppen en padding in de
+    /// weektabel; een iPad in portret zit daar nog onder.
+    var ruimeWeekTabel: Bool { inhoudBreedte >= 900 }
+
+    var kopFont: Font { compactScherm ? .title3.weight(.bold) : .title.weight(.bold) }
+    var subKopFont: Font { compactScherm ? .footnote : .body }
+    var dagKopFont: Font { compactScherm ? .headline : .title3.weight(.bold) }
+    var sectieSpatie: CGFloat { compactScherm ? 16 : 22 }
+}
+
 /// Spiegelt de "document weergave" van app/vakantieplanningen/page.tsx: per week
 /// de dagen met activiteiten, inclusief foto's — zodat dit er hetzelfde uitziet
 /// als het dashboard op het web.
@@ -24,16 +78,20 @@ struct VakantieplanningenView: View {
                 } else if zichtbarePlanningen.isEmpty {
                     ContentUnavailableView("Geen planningen beschikbaar", systemImage: "sun.max")
                 } else {
-                    ScrollView {
-                        LazyVStack(spacing: 12) {
-                            ForEach(zichtbarePlanningen) { planning in
-                                NavigationLink(value: planning) {
-                                    PlanningKaart(planning: planning, magBewerken: magBewerken)
+                    GeometryReader { geo in
+                        let layout = PlanningLayout(schermBreedte: geo.size.width)
+                        ScrollView {
+                            LazyVGrid(columns: layout.rasterKolommen, alignment: .leading, spacing: PlanningLayout.kaartTussenruimte) {
+                                ForEach(zichtbarePlanningen) { planning in
+                                    NavigationLink(value: planning) {
+                                        PlanningKaart(planning: planning, magBewerken: magBewerken)
+                                    }
+                                    .buttonStyle(.plain)
                                 }
-                                .buttonStyle(.plain)
                             }
+                            .padding(PlanningLayout.buitenMarge)
                         }
-                        .padding(16)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
                     }
                     .theepotAchtergrond()
                 }
@@ -98,7 +156,6 @@ private struct PlanningKaart: View {
 
 private struct VakantiePlanningDetailView: View {
     let planning: VakantiePlanning
-    @Environment(\.horizontalSizeClass) private var sizeClass
     @State private var weken: [VakantieWeek] = []
     @State private var activiteiten: [VakantieActiviteit] = []
     @State private var actieveWeekId: String?
@@ -122,25 +179,13 @@ private struct VakantiePlanningDetailView: View {
         }
     }
 
-    /// Op iPad (regular width) is er genoeg ruimte om de weektabel als echte
-    /// tabel met 5 vaste kolommen te tonen; op iPhone scrollt de tabel horizontaal.
-    private var isIPadBreedte: Bool { sizeClass == .regular }
-
-    /// Landscape op iPad krijgt een veel bredere inhoudskolom (meer ruimte
-    /// naast elkaar); portrait blijft leesbaar-breed maar de kaarten zelf
-    /// worden dan juist hoger (zie ActiviteitKaart's "groot"-formaat).
-    private func inhoudMaxBreedte(liggend: Bool) -> CGFloat {
-        guard isIPadBreedte else { return .infinity }
-        return liggend ? 1300 : 900
-    }
-
     private var actieveWeek: VakantieWeek? {
         weken.first { $0.id == actieveWeekId }
     }
 
     var body: some View {
         GeometryReader { geo in
-            let liggend = geo.size.width > geo.size.height
+            let layout = PlanningLayout(schermBreedte: geo.size.width)
 
             Group {
                 if isLoading {
@@ -153,28 +198,28 @@ private struct VakantiePlanningDetailView: View {
                             if planning.startDatumNoord != nil {
                                 regioWisselaar
                             }
-                            if isIPadBreedte {
-                                HStack(alignment: .top, spacing: 12) {
-                                    weekTabs
-                                    Spacer(minLength: 12)
-                                    weergaveToggle
-                                }
-                            } else {
+                            if layout.compactScherm {
                                 HStack {
                                     Spacer()
                                     weergaveToggle
                                 }
                                 weekTabs
+                            } else {
+                                HStack(alignment: .top, spacing: 12) {
+                                    weekTabs
+                                    Spacer(minLength: 12)
+                                    weergaveToggle
+                                }
                             }
                             if let week = actieveWeek {
                                 switch weergave {
-                                case .overzicht: weekOverzichtTabel(week: week)
-                                case .document: weekDocument(week: week, liggend: liggend)
+                                case .overzicht: weekOverzichtTabel(week: week, layout: layout)
+                                case .document: weekDocument(week: week, layout: layout)
                                 }
                             }
                         }
-                        .padding(16)
-                        .frame(maxWidth: inhoudMaxBreedte(liggend: liggend))
+                        .padding(PlanningLayout.buitenMarge)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     }
                     .frame(maxWidth: .infinity)
                     .theepotAchtergrond()
@@ -193,11 +238,19 @@ private struct VakantiePlanningDetailView: View {
         }
         .sheet(item: $detailActiviteit) { activiteit in
             NavigationStack {
-                ScrollView {
-                    ActiviteitKaart(activiteit: activiteit, liggend: true, onTap: {}) { url in
-                        popupFoto = FotoItem(url: url)
+                GeometryReader { sheetGeo in
+                    let sheetLayout = PlanningLayout(schermBreedte: sheetGeo.size.width)
+                    ScrollView {
+                        ActiviteitKaart(
+                            activiteit: activiteit,
+                            kaartBreedte: sheetLayout.inhoudBreedte,
+                            compactScherm: sheetLayout.compactScherm,
+                            onTap: {}
+                        ) { url in
+                            popupFoto = FotoItem(url: url)
+                        }
+                        .padding(PlanningLayout.buitenMarge)
                     }
-                    .padding(16)
                 }
                 .theepotAchtergrond()
                 .navigationTitle(activiteit.naam)
@@ -306,48 +359,48 @@ private struct VakantiePlanningDetailView: View {
 
     // ─── Weekoverzicht: compacte tabel met 5 dagkolommen ───────────────────
 
-    private func weekOverzichtTabel(week: VakantieWeek) -> some View {
+    private func weekOverzichtTabel(week: VakantieWeek, layout: PlanningLayout) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             VStack(alignment: .leading, spacing: 2) {
-                Text("Week \(week.weekNummer) — \(week.naam)").font(.title3.weight(.bold))
+                Text("Week \(week.weekNummer) — \(week.naam)").font(layout.kopFont)
                 Text("\(planning.vakantie) · \(planning.thema ?? "")")
-                    .font(.footnote)
+                    .font(layout.subKopFont)
                     .foregroundStyle(.secondary)
             }
 
-            if isIPadBreedte {
-                dagKolommen(week: week, kolomBreedte: nil)
+            if layout.weekTabelPastVolledig {
+                dagKolommen(week: week, kolomBreedte: nil, ruim: layout.ruimeWeekTabel)
             } else {
                 ScrollView(.horizontal, showsIndicators: false) {
-                    dagKolommen(week: week, kolomBreedte: 168)
+                    dagKolommen(week: week, kolomBreedte: 168, ruim: false)
                 }
             }
         }
     }
 
-    private func dagKolommen(week: VakantieWeek, kolomBreedte: CGFloat?) -> some View {
+    private func dagKolommen(week: VakantieWeek, kolomBreedte: CGFloat?, ruim: Bool) -> some View {
         HStack(alignment: .top, spacing: 8) {
             ForEach(Dag.allCases, id: \.self) { dag in
-                dagKolom(week: week, dag: dag, breedte: kolomBreedte)
+                dagKolom(week: week, dag: dag, breedte: kolomBreedte, ruim: ruim)
             }
         }
     }
 
-    private func dagKolom(week: VakantieWeek, dag: Dag, breedte: CGFloat?) -> some View {
+    private func dagKolom(week: VakantieWeek, dag: Dag, breedte: CGFloat?, ruim: Bool) -> some View {
         let dagActiviteiten = activiteiten
             .filter { $0.weekId == week.id && $0.dag == dag }
             .sorted { $0.volgorde < $1.volgorde }
 
-        return VStack(alignment: .leading, spacing: isIPadBreedte ? 8 : 6) {
+        return VStack(alignment: .leading, spacing: ruim ? 8 : 6) {
             VStack(alignment: .leading, spacing: 1) {
-                Text(dag.label).font(isIPadBreedte ? .headline : .subheadline.weight(.bold))
+                Text(dag.label).font(ruim ? .headline : .subheadline.weight(.bold))
                 Text(dagDatumStr(week: week, dag: dag))
-                    .font(isIPadBreedte ? .caption : .caption2)
+                    .font(ruim ? .caption : .caption2)
                     .opacity(0.85)
             }
             .foregroundStyle(.white)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, isIPadBreedte ? 12 : 10).padding(.vertical, isIPadBreedte ? 10 : 8)
+            .padding(.horizontal, ruim ? 12 : 10).padding(.vertical, ruim ? 10 : 8)
             .background(Color.theepotGroen)
             .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
 
@@ -357,7 +410,7 @@ private struct VakantiePlanningDetailView: View {
                     .foregroundStyle(.tertiary)
                     .padding(.horizontal, 10).padding(.vertical, 8)
             } else {
-                VStack(spacing: isIPadBreedte ? 8 : 6) {
+                VStack(spacing: ruim ? 8 : 6) {
                     ForEach(dagActiviteiten) { activiteit in
                         Button {
                             detailActiviteit = activiteit
@@ -365,18 +418,18 @@ private struct VakantiePlanningDetailView: View {
                             HStack(spacing: 6) {
                                 if activiteit.afbeeldingPad != nil {
                                     Image(systemName: "photo.fill")
-                                        .font(.system(size: isIPadBreedte ? 11 : 9))
+                                        .font(.system(size: ruim ? 11 : 9))
                                         .foregroundStyle(Color.theepotGroenTekst)
                                 }
                                 Text(activiteit.naam)
-                                    .font(isIPadBreedte ? .subheadline.weight(.semibold) : .caption.weight(.semibold))
+                                    .font(ruim ? .subheadline.weight(.semibold) : .caption.weight(.semibold))
                                     .foregroundStyle(.primary)
                                     .multilineTextAlignment(.leading)
                                     .lineLimit(2)
                                 Spacer(minLength: 0)
                             }
                             .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.horizontal, isIPadBreedte ? 12 : 10).padding(.vertical, isIPadBreedte ? 9 : 7)
+                            .padding(.horizontal, ruim ? 12 : 10).padding(.vertical, ruim ? 9 : 7)
                             .background(Color(.tertiarySystemBackground))
                             .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                         }
@@ -387,22 +440,21 @@ private struct VakantiePlanningDetailView: View {
         }
         .frame(width: breedte, alignment: .leading)
         .frame(maxWidth: breedte == nil ? .infinity : nil)
-        .padding(isIPadBreedte ? 10 : 8)
+        .padding(ruim ? 10 : 8)
         .background(Color(.secondarySystemBackground).opacity(0.5))
         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 
     // ─── Documentweergave: dagen onder elkaar met volledige details + foto's ─
 
-    private func weekDocument(week: VakantieWeek, liggend: Bool) -> some View {
-        let groot = isIPadBreedte
+    private func weekDocument(week: VakantieWeek, layout: PlanningLayout) -> some View {
         let dagenTeTonen: [Dag] = dagFilter.map { [$0] } ?? Dag.allCases
 
-        return VStack(alignment: .leading, spacing: groot ? 22 : 16) {
+        return VStack(alignment: .leading, spacing: layout.sectieSpatie) {
             VStack(alignment: .leading, spacing: 2) {
-                Text("Week \(week.weekNummer) — \(week.naam)").font(groot ? .largeTitle.weight(.bold) : .title3.weight(.bold))
+                Text("Week \(week.weekNummer) — \(week.naam)").font(layout.kopFont)
                 Text("\(planning.vakantie) · \(planning.thema ?? "")")
-                    .font(groot ? .title3 : .footnote)
+                    .font(layout.subKopFont)
                     .foregroundStyle(.secondary)
             }
 
@@ -413,7 +465,7 @@ private struct VakantiePlanningDetailView: View {
                     .filter { $0.weekId == week.id && $0.dag == dag }
                     .sorted { $0.volgorde < $1.volgorde }
                 if !dagActiviteiten.isEmpty {
-                    dagSectie(dag: dag, week: week, activiteiten: dagActiviteiten, liggend: liggend, groot: groot)
+                    dagSectie(dag: dag, week: week, activiteiten: dagActiviteiten, layout: layout)
                 } else if dagFilter != nil {
                     Text("Geen activiteiten op \(dag.label.lowercased()) in deze week.")
                         .font(.subheadline)
@@ -450,46 +502,31 @@ private struct VakantiePlanningDetailView: View {
         }
     }
 
-    /// Aantal kolommen voor activiteiten binnen een dag als het scherm breed
-    /// genoeg is: op iPad-landscape 3 naast elkaar, op iPhone-landscape 2.
-    private func kolomAantal(liggend: Bool, groot: Bool) -> Int {
-        guard liggend else { return 1 }
-        return groot ? 3 : 2
-    }
-
-    /// Bij landscape (breed scherm) staat de tekst naast de foto zoals in de
-    /// webversie; bij portrait staat de foto groot boven de tekst — leesbaarder
-    /// op een smal scherm dan een gekwetste 84pt-thumbnail naast de tekst.
-    /// `groot` (iPad) schaalt lettertypes, foto's en padding nog een keer op.
-    private func dagSectie(dag: Dag, week: VakantieWeek, activiteiten: [VakantieActiviteit], liggend: Bool, groot: Bool) -> some View {
-        VStack(alignment: .leading, spacing: groot ? 14 : 10) {
+    /// Kolomaantal, tekstgrootte en fotoplaatsing volgen de beschikbare breedte
+    /// (zie PlanningLayout), zodat een iPad in portret net zo goed twee kolommen
+    /// krijgt als een iPhone er één krijgt.
+    private func dagSectie(dag: Dag, week: VakantieWeek, activiteiten: [VakantieActiviteit], layout: PlanningLayout) -> some View {
+        VStack(alignment: .leading, spacing: layout.compactScherm ? 10 : 14) {
             HStack {
-                Text(dag.label).font(groot ? .title.weight(.bold) : .headline).foregroundStyle(.white)
+                Text(dag.label).font(layout.dagKopFont).foregroundStyle(.white)
                 Spacer()
                 Text(dagDatumStr(week: week, dag: dag))
-                    .font(groot ? .title3 : .caption)
+                    .font(layout.compactScherm ? .caption : .subheadline)
                     .foregroundStyle(.white.opacity(0.85))
             }
-            .padding(.horizontal, groot ? 18 : 14).padding(.vertical, groot ? 12 : 8)
+            .padding(.horizontal, layout.compactScherm ? 14 : 18).padding(.vertical, layout.compactScherm ? 8 : 12)
             .background(Color.theepotGroen)
             .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
 
-            let kolommen = kolomAantal(liggend: liggend, groot: groot)
-            if kolommen > 1 {
-                let grid = Array(repeating: GridItem(.flexible(), spacing: 12), count: kolommen)
-                LazyVGrid(columns: grid, alignment: .leading, spacing: 12) {
-                    ForEach(activiteiten) { activiteit in
-                        ActiviteitKaart(activiteit: activiteit, liggend: true, groot: groot, onTap: { detailActiviteit = activiteit }) { url in
-                            popupFoto = FotoItem(url: url)
-                        }
-                    }
-                }
-            } else {
-                VStack(spacing: groot ? 14 : 10) {
-                    ForEach(activiteiten) { activiteit in
-                        ActiviteitKaart(activiteit: activiteit, liggend: liggend, groot: groot, onTap: { detailActiviteit = activiteit }) { url in
-                            popupFoto = FotoItem(url: url)
-                        }
+            LazyVGrid(columns: layout.rasterKolommen, alignment: .leading, spacing: PlanningLayout.kaartTussenruimte) {
+                ForEach(activiteiten) { activiteit in
+                    ActiviteitKaart(
+                        activiteit: activiteit,
+                        kaartBreedte: layout.kaartBreedte,
+                        compactScherm: layout.compactScherm,
+                        onTap: { detailActiviteit = activiteit }
+                    ) { url in
+                        popupFoto = FotoItem(url: url)
                     }
                 }
             }
@@ -531,27 +568,84 @@ private struct FotoItem: Identifiable {
 
 private struct ActiviteitKaart: View {
     let activiteit: VakantieActiviteit
-    /// true = breed scherm (landscape/iPad): foto naast de tekst, zoals op het web.
-    /// false = smal scherm (portrait): foto groot bovenaan, tekst eronder.
-    let liggend: Bool
-    /// true op iPad: alles (foto, lettertypes, padding) een tandje groter.
-    var groot: Bool = false
+    /// Breedte die deze kaart in het raster krijgt. Bepaalt tekstgrootte,
+    /// fotoformaat en of de foto naast of boven de tekst past — de kaart weet
+    /// zelf niets van apparaten of oriëntatie.
+    let kaartBreedte: CGFloat
+    /// Op de iPhone blijft alles compact, ook als de kaart schermbreed is.
+    let compactScherm: Bool
     /// Tikken op de tekst opent de losse detailweergave van deze activiteit.
     let onTap: () -> Void
     let onFotoTap: (URL) -> Void
+
+    private enum Schaal { case compact, normaal, ruim }
+
+    private var schaal: Schaal {
+        if compactScherm { return .compact }
+        return kaartBreedte >= 520 ? .ruim : .normaal
+    }
+
+    /// Alleen op een echt brede kaart houdt de tekst naast een foto nog genoeg
+    /// ruimte over; daaronder staat de foto bovenaan over de volle breedte.
+    private var fotoNaastTekst: Bool { kaartBreedte >= 480 }
 
     private var fotoURL: URL? {
         guard let pad = activiteit.afbeeldingPad, !pad.isEmpty else { return nil }
         return Secrets.supabaseURL.appendingPathComponent("storage/v1/object/public/activiteit-afbeeldingen/\(pad)")
     }
 
-    private var fotoZijkant: CGFloat { groot ? 150 : 84 }
-    private var fotoBoven: CGFloat { groot ? 300 : 170 }
+    private var fotoZijkant: CGFloat { schaal == .ruim ? 150 : 110 }
+
+    private var fotoBoven: CGFloat {
+        switch schaal {
+        case .compact: return 170
+        case .normaal: return 200
+        case .ruim: return 260
+        }
+    }
+
+    private var titelFont: Font {
+        switch schaal {
+        case .compact: return .subheadline.weight(.bold)
+        case .normaal: return .headline
+        case .ruim: return .title2.weight(.bold)
+        }
+    }
+
+    private var tekstFont: Font {
+        switch schaal {
+        case .compact: return .footnote
+        case .normaal: return .subheadline
+        case .ruim: return .body
+        }
+    }
+
+    private var lijstFont: Font {
+        switch schaal {
+        case .compact: return .caption
+        case .normaal: return .footnote
+        case .ruim: return .subheadline
+        }
+    }
+
+    private var labelFont: Font {
+        schaal == .ruim ? .caption.weight(.bold) : .caption2.weight(.bold)
+    }
+
+    private var kaartPadding: CGFloat {
+        switch schaal {
+        case .compact: return 12
+        case .normaal: return 14
+        case .ruim: return 18
+        }
+    }
+
+    private var binnenSpatie: CGFloat { schaal == .compact ? 6 : 8 }
 
     var body: some View {
         Group {
-            if liggend {
-                HStack(alignment: .top, spacing: groot ? 16 : 12) {
+            if fotoNaastTekst {
+                HStack(alignment: .top, spacing: schaal == .ruim ? 16 : 12) {
                     tekstBlok
                     Spacer(minLength: 0)
                     if let fotoURL {
@@ -559,7 +653,7 @@ private struct ActiviteitKaart: View {
                     }
                 }
             } else {
-                VStack(alignment: .leading, spacing: groot ? 14 : 10) {
+                VStack(alignment: .leading, spacing: binnenSpatie + 4) {
                     if let fotoURL {
                         fotoKnop(url: fotoURL, breedte: nil, hoogte: fotoBoven)
                             .frame(maxWidth: .infinity)
@@ -568,26 +662,26 @@ private struct ActiviteitKaart: View {
                 }
             }
         }
-        .theepotGlasKaart(hoekradius: 14, padding: groot ? 18 : 12)
+        .theepotGlasKaart(hoekradius: 14, padding: kaartPadding)
     }
 
     private var tekstBlok: some View {
-        VStack(alignment: .leading, spacing: groot ? 8 : 6) {
-            Text(activiteit.naam).font(groot ? .title2.weight(.bold) : .subheadline.weight(.bold))
+        VStack(alignment: .leading, spacing: binnenSpatie) {
+            Text(activiteit.naam).font(titelFont)
 
             if let beschrijving = activiteit.beschrijving, !beschrijving.isEmpty {
-                Text(beschrijving).font(groot ? .body : .footnote).foregroundStyle(.secondary)
+                Text(beschrijving).font(tekstFont).foregroundStyle(.secondary)
             }
 
             if let benodigdheden = activiteit.benodigdheden, !benodigdheden.isEmpty {
-                VStack(alignment: .leading, spacing: groot ? 5 : 3) {
+                VStack(alignment: .leading, spacing: schaal == .compact ? 3 : 5) {
                     Text("BENODIGDHEDEN")
-                        .font(groot ? .caption.weight(.bold) : .caption2.weight(.bold))
+                        .font(labelFont)
                         .foregroundStyle(.secondary)
                     ForEach(benodigdheden, id: \.self) { item in
                         HStack(spacing: 6) {
-                            Circle().fill(Color.theepotGroen).frame(width: groot ? 6 : 5, height: groot ? 6 : 5)
-                            Text(item).font(groot ? .subheadline : .caption)
+                            Circle().fill(Color.theepotGroen).frame(width: schaal == .compact ? 5 : 6, height: schaal == .compact ? 5 : 6)
+                            Text(item).font(lijstFont)
                         }
                     }
                 }
@@ -595,7 +689,7 @@ private struct ActiviteitKaart: View {
             }
 
             Text(activiteit.categorie.uppercased())
-                .font(groot ? .caption.weight(.bold) : .caption2.weight(.bold))
+                .font(labelFont)
                 .foregroundStyle(Color.theepotGroenTekst)
                 .padding(.top, 2)
         }
@@ -620,7 +714,7 @@ private struct ActiviteitKaart: View {
             }
             .frame(width: breedte, height: hoogte)
             .frame(maxWidth: breedte == nil ? .infinity : nil)
-            .clipShape(RoundedRectangle(cornerRadius: groot ? 14 : 10, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: schaal == .compact ? 10 : 14, style: .continuous))
             .clipped()
         }
         .buttonStyle(.plain)
