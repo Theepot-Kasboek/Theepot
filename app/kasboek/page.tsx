@@ -7,7 +7,7 @@ import Topbar from '@/components/Topbar'
 import Toast from '@/components/Toast'
 import {
   ChevronLeft, ChevronRight, Plus, Trash2,
-  MapPin, Settings, X, Building2, Tag, Paperclip, Download, Eye
+  MapPin, Settings, X, Building2, Tag, Paperclip, Download, Eye, Pencil
 } from 'lucide-react'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -42,6 +42,35 @@ function navigeerMaand(datum: Date, richting: number): Date {
 }
 
 const STANDAARD_CATEGORIEEN = ['Omzet', 'Inkopen', 'Personeelskosten', 'Overige kosten', 'Materialen', 'Huisvestingskosten']
+
+// Bestandsnaam uit het opslagpad halen (pad = locatie/periode/tijdstempel_naam)
+function bonnetjeNaam(pad: string): string {
+  return pad.split('/').pop()?.replace(/^\d+_/, '') ?? 'Bonnetje'
+}
+
+// ─── Bonnetje uploaden ────────────────────────────────────────────────────────
+// Converteert HEIC/HEIF naar JPEG en geeft het opgeslagen pad terug.
+async function uploadBonnetje(bestand: File, locatieNaam: string, periode: string): Promise<string> {
+  let uploadBestand: File | Blob = bestand
+  let uploadNaam = bestand.name
+  const ext = bestand.name.split('.').pop()?.toLowerCase() ?? ''
+
+  if (ext === 'heic' || ext === 'heif') {
+    try {
+      const heic2any = (await import('heic2any')).default
+      const converted = await heic2any({ blob: bestand, toType: 'image/jpeg', quality: 0.85 })
+      uploadBestand = Array.isArray(converted) ? converted[0] : converted
+      uploadNaam = bestand.name.replace(/\.(heic|heif)$/i, '.jpg')
+    } catch {
+      console.warn('HEIC conversie mislukt bij upload, origineel gebruiken')
+    }
+  }
+
+  const pad = `${locatieNaam}/${periode}/${Date.now()}_${uploadNaam}`
+  const { error } = await getSupabase().storage.from('bonnetjes').upload(pad, uploadBestand)
+  if (error) throw new Error(error.message)
+  return pad
+}
 
 // ─── PDF Export ───────────────────────────────────────────────────────────────
 
@@ -275,6 +304,17 @@ export default function KasboekPage() {
   const [bonnetjeUrl, setBonnetjeUrl] = useState<string | null>(null)
   const [bonnetjeLaden, setBonnetjeLaden] = useState(false)
 
+  // Boeking bewerken
+  const [bewerkEntry, setBewerkEntry] = useState<KasboekEntry | null>(null)
+  const [bewerkType, setBewerkType] = useState<'inkomst' | 'uitgave'>('inkomst')
+  const [bewerkBedrag, setBewerkBedrag] = useState('')
+  const [bewerkCategorie, setBewerkCategorie] = useState('')
+  const [bewerkOmschrijving, setBewerkOmschrijving] = useState('')
+  const [bewerkBonnetjeBestand, setBewerkBonnetjeBestand] = useState<File | null>(null)
+  const [bewerkBonnetjeWeg, setBewerkBonnetjeWeg] = useState(false)
+  const [bewerkOpslaan, setBewerkOpslaan] = useState(false)
+  const [bewerkFout, setBewerkFout] = useState<string | null>(null)
+
   // ── Locaties ophalen + toegang filteren ────────────────────────────────────
   const haalLocatiesOp = useCallback(async () => {
     if (!profiel) return
@@ -409,28 +449,13 @@ export default function KasboekPage() {
     // Upload bonnetje indien aanwezig
     let bonnetje_pad: string | null = null
     if (bonnetjeBestand) {
-      // Converteer HEIC/HEIF naar JPEG voor upload
-      let uploadBestand: File | Blob = bonnetjeBestand
-      let uploadNaam = bonnetjeBestand.name
-      const ext = bonnetjeBestand.name.split('.').pop()?.toLowerCase() ?? ''
-      if (ext === 'heic' || ext === 'heif') {
-        try {
-          const heic2any = (await import('heic2any')).default
-          const converted = await heic2any({ blob: bonnetjeBestand, toType: 'image/jpeg', quality: 0.85 })
-          uploadBestand = Array.isArray(converted) ? converted[0] : converted
-          uploadNaam = bonnetjeBestand.name.replace(/\.(heic|heif)$/i, '.jpg')
-        } catch (e) {
-          console.warn('HEIC conversie mislukt bij upload, origineel gebruiken')
-        }
-      }
-      const pad = `${actieveLocatie.naam}/${huidigePeriode}/${Date.now()}_${uploadNaam}`
-      const { error: uploadError } = await supabase.storage.from('bonnetjes').upload(pad, uploadBestand)
-      if (uploadError) {
-        setFout('Bonnetje uploaden mislukt: ' + uploadError.message)
+      try {
+        bonnetje_pad = await uploadBonnetje(bonnetjeBestand, actieveLocatie.naam, huidigePeriode)
+      } catch (err) {
+        setFout('Bonnetje uploaden mislukt: ' + (err as Error).message)
         setOpslaan(false)
         return
       }
-      bonnetje_pad = pad
     }
 
     const { error } = await supabase.from('kasboek_entries').insert({
@@ -506,6 +531,72 @@ export default function KasboekPage() {
       setBonnetjeUrl('ERROR:Kon bestand niet laden')
       setBonnetjeLaden(false)
     }
+  }
+
+  // ── Boeking bewerken ────────────────────────────────────────────────────────
+  function startBewerken(entry: KasboekEntry) {
+    setBewerkEntry(entry)
+    setBewerkType(entry.type)
+    setBewerkBedrag(String(entry.bedrag))
+    setBewerkCategorie(entry.categorie ?? '')
+    setBewerkOmschrijving(entry.omschrijving ?? '')
+    setBewerkBonnetjeBestand(null)
+    setBewerkBonnetjeWeg(false)
+    setBewerkFout(null)
+  }
+
+  function sluitBewerken() {
+    setBewerkEntry(null)
+    setBewerkBonnetjeBestand(null)
+    setBewerkBonnetjeWeg(false)
+    setBewerkFout(null)
+  }
+
+  async function handleBewerken(e: React.FormEvent) {
+    e.preventDefault()
+    if (!bewerkEntry || !bewerkBedrag) return
+    setBewerkOpslaan(true)
+    setBewerkFout(null)
+    const supabase = getSupabase()
+
+    // Nieuw bonnetje uploaden, bestaande behouden of verwijderen
+    let bonnetje_pad = bewerkEntry.bonnetje_pad
+    if (bewerkBonnetjeBestand) {
+      try {
+        bonnetje_pad = await uploadBonnetje(bewerkBonnetjeBestand, bewerkEntry.locatie, bewerkEntry.periode)
+      } catch (err) {
+        setBewerkFout('Bonnetje uploaden mislukt: ' + (err as Error).message)
+        setBewerkOpslaan(false)
+        return
+      }
+    } else if (bewerkBonnetjeWeg) {
+      bonnetje_pad = null
+    }
+
+    const { error } = await supabase.from('kasboek_entries').update({
+      type: bewerkType,
+      bedrag: parseFloat(bewerkBedrag.replace(',', '.')),
+      categorie: bewerkCategorie || null,
+      omschrijving: bewerkOmschrijving || null,
+      bonnetje_pad,
+    }).eq('id', bewerkEntry.id)
+
+    if (error) {
+      setBewerkFout('Opslaan mislukt: ' + error.message)
+      setBewerkOpslaan(false)
+      return
+    }
+
+    // Oud bonnetje pas opruimen als de boeking succesvol is bijgewerkt
+    const oudPad = bewerkEntry.bonnetje_pad
+    if (oudPad && oudPad !== bonnetje_pad) {
+      await supabase.storage.from('bonnetjes').remove([oudPad])
+    }
+
+    setToast({ bericht: 'Boeking bijgewerkt!', type: 'success' })
+    sluitBewerken()
+    setBewerkOpslaan(false)
+    await haalOp()
   }
 
   // ── Boeking verwijderen ─────────────────────────────────────────────────────
@@ -881,15 +972,28 @@ export default function KasboekPage() {
                               <Paperclip size={12} />
                             </span>
                           )}
-                          <button
-                            onClick={() => verwijder(entry.id)}
-                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '4px 6px', borderRadius: 6, display: 'flex', alignItems: 'center', opacity: 0.4, transition: 'opacity 0.1s' }}
-                            onMouseEnter={e => (e.currentTarget.style.opacity = '1')}
-                            onMouseLeave={e => (e.currentTarget.style.opacity = '0.4')}
-                            title="Verwijderen"
-                          >
-                            <Trash2 size={14} />
-                          </button>
+                          {magBewerkenKasboek && (
+                            <>
+                              <button
+                                onClick={() => startBewerken(entry)}
+                                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '4px 6px', borderRadius: 6, display: 'flex', alignItems: 'center', opacity: 0.4, transition: 'opacity 0.1s' }}
+                                onMouseEnter={e => (e.currentTarget.style.opacity = '1')}
+                                onMouseLeave={e => (e.currentTarget.style.opacity = '0.4')}
+                                title="Bewerken"
+                              >
+                                <Pencil size={14} />
+                              </button>
+                              <button
+                                onClick={() => verwijder(entry.id)}
+                                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '4px 6px', borderRadius: 6, display: 'flex', alignItems: 'center', opacity: 0.4, transition: 'opacity 0.1s' }}
+                                onMouseEnter={e => (e.currentTarget.style.opacity = '1')}
+                                onMouseLeave={e => (e.currentTarget.style.opacity = '0.4')}
+                                title="Verwijderen"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </>
+                          )}
                         </div>
                       </div>
                     ))}
@@ -1043,6 +1147,171 @@ export default function KasboekPage() {
               <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
                 <button className="btn btn-primary" onClick={() => setLocatieBeheerOpen(false)}>Klaar</button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── Boeking bewerken modal ────────────────────────────────────────────── */}
+      {bewerkEntry && (
+        <div className="modal-backdrop" onClick={sluitBewerken}>
+          <div className="modal-box" style={{ maxWidth: 440 }} onClick={e => e.stopPropagation()}>
+            <div className="card-header">
+              <span className="card-title">Boeking bewerken</span>
+              <button onClick={sluitBewerken} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex' }}>
+                <X size={18} />
+              </button>
+            </div>
+            <div className="card-body">
+              <form onSubmit={handleBewerken} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+
+                {/* Type toggle */}
+                <div style={{ display: 'flex', gap: 4, background: 'var(--bg)', borderRadius: 9, padding: 4 }}>
+                  {(['inkomst', 'uitgave'] as const).map(t => (
+                    <button
+                      key={t} type="button" onClick={() => setBewerkType(t)}
+                      style={{
+                        flex: 1, padding: '7px 0', borderRadius: 7, border: 'none',
+                        fontSize: 13, fontWeight: 600, cursor: 'pointer', transition: 'all 0.12s',
+                        background: bewerkType === t ? (t === 'inkomst' ? 'var(--success)' : 'var(--danger)') : 'transparent',
+                        color: bewerkType === t ? '#fff' : 'var(--text-muted)',
+                      }}
+                    >{t === 'inkomst' ? '↑ Inkomst' : '↓ Uitgave'}</button>
+                  ))}
+                </div>
+
+                <div>
+                  <label className="form-label">Bedrag *</label>
+                  <div style={{ position: 'relative' }}>
+                    <span style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', fontWeight: 500 }}>€</span>
+                    <input
+                      type="number" step="0.01" min="0"
+                      className="form-input" style={{ paddingLeft: 28 }}
+                      value={bewerkBedrag} onChange={e => setBewerkBedrag(e.target.value)}
+                      placeholder="0,00" required
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="form-label">Categorie</label>
+                  <select className="form-select" value={bewerkCategorie} onChange={e => setBewerkCategorie(e.target.value)}>
+                    <option value="">— Geen categorie —</option>
+                    {/* Ook een inmiddels verwijderde categorie blijft zichtbaar */}
+                    {Array.from(new Set(bewerkEntry.categorie ? [...categorieen, bewerkEntry.categorie] : categorieen))
+                      .map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="form-label">Omschrijving</label>
+                  <input
+                    type="text" className="form-input"
+                    value={bewerkOmschrijving} onChange={e => setBewerkOmschrijving(e.target.value)}
+                    placeholder="Optionele toelichting"
+                  />
+                </div>
+
+                <div>
+                  <label className="form-label">Bonnetje</label>
+
+                  {/* Huidig bonnetje — alleen als het niet vervangen of verwijderd wordt */}
+                  {bewerkEntry.bonnetje_pad && !bewerkBonnetjeBestand && !bewerkBonnetjeWeg && (
+                    <div style={{
+                      display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8,
+                      padding: '8px 12px', borderRadius: 8, background: 'var(--primary-xlight)',
+                      border: '1px solid var(--border-dark)', fontSize: 13,
+                    }}>
+                      <Paperclip size={14} style={{ color: 'var(--primary)', flexShrink: 0 }} />
+                      <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {bonnetjeNaam(bewerkEntry.bonnetje_pad)}
+                      </span>
+                      {(isSuperadmin || profiel?.rol === 'directie') && (
+                        <button
+                          type="button"
+                          onClick={() => openBonnetje(bewerkEntry)}
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--primary)', display: 'flex', alignItems: 'center', padding: 2 }}
+                          title="Bekijken"
+                        >
+                          <Eye size={14} />
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => setBewerkBonnetjeWeg(true)}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', padding: 2 }}
+                        title="Bonnetje verwijderen"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Verwijderd — nog terug te draaien tot je opslaat */}
+                  {bewerkEntry.bonnetje_pad && bewerkBonnetjeWeg && !bewerkBonnetjeBestand && (
+                    <div style={{
+                      display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8,
+                      padding: '8px 12px', borderRadius: 8, background: 'var(--bg)',
+                      border: '1px solid var(--border)', fontSize: 13, color: 'var(--text-muted)',
+                    }}>
+                      <span style={{ flex: 1 }}>Bonnetje wordt verwijderd bij opslaan</span>
+                      <button
+                        type="button"
+                        onClick={() => setBewerkBonnetjeWeg(false)}
+                        className="btn btn-sm"
+                        style={{ fontSize: 11, padding: '3px 10px' }}
+                      >Toch behouden</button>
+                    </div>
+                  )}
+
+                  <div style={{ position: 'relative' }}>
+                    <input
+                      type="file"
+                      accept="image/*,.pdf"
+                      onChange={e => { setBewerkBonnetjeBestand(e.target.files?.[0] ?? null); setBewerkBonnetjeWeg(false) }}
+                      style={{ display: 'none' }}
+                      id="bonnetje-bewerken"
+                    />
+                    <label
+                      htmlFor="bonnetje-bewerken"
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 8,
+                        padding: '8px 12px', borderRadius: 8, border: '1px dashed var(--border-dark)',
+                        cursor: 'pointer', fontSize: 13, color: 'var(--text-muted)',
+                        background: bewerkBonnetjeBestand ? 'var(--primary-xlight)' : 'var(--bg)',
+                        transition: 'all 0.12s',
+                      }}
+                    >
+                      <Paperclip size={14} />
+                      {bewerkBonnetjeBestand
+                        ? bewerkBonnetjeBestand.name
+                        : bewerkEntry.bonnetje_pad && !bewerkBonnetjeWeg
+                          ? 'Bonnetje vervangen (foto of PDF)'
+                          : 'Bonnetje toevoegen (foto of PDF)'}
+                    </label>
+                    {bewerkBonnetjeBestand && (
+                      <button
+                        type="button"
+                        onClick={() => setBewerkBonnetjeBestand(null)}
+                        style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex' }}
+                      ><X size={14} /></button>
+                    )}
+                  </div>
+                </div>
+
+                {bewerkFout && (
+                  <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 8, padding: '8px 12px', fontSize: 13, color: '#991B1B' }}>
+                    {bewerkFout}
+                  </div>
+                )}
+
+                <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                  <button type="button" className="btn" onClick={sluitBewerken}>Annuleren</button>
+                  <button type="submit" className="btn btn-primary" disabled={bewerkOpslaan || !bewerkBedrag}>
+                    {bewerkOpslaan ? 'Opslaan...' : 'Wijzigingen opslaan'}
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
         </div>
