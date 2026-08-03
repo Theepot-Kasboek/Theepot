@@ -5,6 +5,7 @@ import { getSupabase } from '@/lib/supabase'
 import { useAuth } from '@/components/AuthProvider'
 import Topbar from '@/components/Topbar'
 import Toast from '@/components/Toast'
+import GeenToegang from '@/components/GeenToegang'
 import {
   Plus, X, Trash2, Pencil, Download, Upload,
   FileText, MapPin, CheckCircle2, Circle, Clock,
@@ -138,6 +139,7 @@ async function exportPlanningPDF(planning: VePlanning, taken: VeTaakTemplate[], 
 
 export default function VePlanningPage() {
   const { profiel, isSuperadmin, rechten } = useAuth()
+  const magZien = isSuperadmin || rechten.pagina_ve_planning === 'lezen' || rechten.pagina_ve_planning === 'bewerken'
   const magBewerken = isSuperadmin || rechten.pagina_ve_planning === 'bewerken'
 
   const [actieveTab, setActieveTab] = useState<'documenten' | 'planningen'>('documenten')
@@ -147,6 +149,7 @@ export default function VePlanningPage() {
   const [toast, setToast] = useState<{ bericht: string; type: 'success' | 'error' } | null>(null)
 
   useEffect(() => {
+    if (!magZien || !profiel) return
     async function laadLocaties() {
       const supabase = getSupabase()
       const { data: alleData } = await supabase.from('kasboek_locaties').select('naam').eq('actief', true).order('naam')
@@ -166,7 +169,9 @@ export default function VePlanningPage() {
       .then(({ data }) => setMedewerkers((data ?? []) as Profiel[]))
     getSupabase().from('ve_taken_template').select('*').order('volgorde')
       .then(({ data }) => setTaken((data ?? []) as VeTaakTemplate[]))
-  }, [])
+  }, [magZien, profiel, isSuperadmin])
+
+  if (!magZien) return <GeenToegang titel="VE Planning" beschrijving="Je hebt geen toegang tot de VE Planning." />
 
   return (
     <>

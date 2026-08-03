@@ -16,6 +16,8 @@ interface Props {
   onDelete: () => void
   onToast: (msg: string) => void
   onAfbeeldingGewijzigd?: () => void
+  magBewerken?: boolean
+  magVerwijderen?: boolean
 }
 
 function maakKopieerTekst(a: Activiteit): string {
@@ -26,7 +28,7 @@ function maakKopieerTekst(a: Activiteit): string {
   return regels.join('\n')
 }
 
-export default function ActiviteitModal({ activiteit, onClose, onEdit, onDelete, onToast, onAfbeeldingGewijzigd }: Props) {
+export default function ActiviteitModal({ activiteit, onClose, onEdit, onDelete, onToast, onAfbeeldingGewijzigd, magBewerken = true, magVerwijderen = true }: Props) {
   const [pdfLoading, setPdfLoading] = useState(false)
   const [bevestigVerwijder, setBevestigVerwijder] = useState(false)
   const [afbeeldingUrl, setAfbeeldingUrl] = useState<string | null>(null)
@@ -126,9 +128,9 @@ export default function ActiviteitModal({ activiteit, onClose, onEdit, onDelete,
           <div style={{ display: 'flex', gap: 8, margin: '16px 0 0', flexWrap: 'wrap', alignItems: 'center' }}>
             <button className="btn btn-primary btn-sm" onClick={kopieer}><Copy size={13} /> Kopiëren</button>
             <button className="btn btn-sm" onClick={handlePDF} disabled={pdfLoading}><Download size={13} /> {pdfLoading ? 'Laden...' : 'Export PDF'}</button>
-            <button className="btn btn-sm" onClick={onEdit}><Edit2 size={13} /> Bewerken</button>
+            {magBewerken && <button className="btn btn-sm" onClick={onEdit}><Edit2 size={13} /> Bewerken</button>}
             <div style={{ marginLeft: 'auto' }}>
-              {!bevestigVerwijder ? (
+              {!magVerwijderen ? null : !bevestigVerwijder ? (
                 <button className="btn btn-sm" onClick={() => setBevestigVerwijder(true)} style={{ color: '#DC2626', borderColor: '#FECACA' }}>
                   <Trash2 size={13} /> Verwijderen
                 </button>
@@ -233,7 +235,7 @@ export default function ActiviteitModal({ activiteit, onClose, onEdit, onDelete,
 
           {/* Bijlagen */}
           <div style={{ borderTop: '1px solid var(--border)', paddingTop: 16 }}>
-            <ActiviteitBijlagen activiteitId={activiteit.id} magBewerken={true} />
+            <ActiviteitBijlagen activiteitId={activiteit.id} magBewerken={magBewerken} />
           </div>
         </div>
       </div>

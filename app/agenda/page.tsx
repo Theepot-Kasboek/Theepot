@@ -6,6 +6,7 @@ import { datumSleutel } from '@/lib/datum'
 import { useAuth } from '@/components/AuthProvider'
 import Topbar from '@/components/Topbar'
 import Toast from '@/components/Toast'
+import GeenToegang from '@/components/GeenToegang'
 import {
   ChevronLeft, ChevronRight, Plus, X, Calendar,
   Clock, AlignLeft, Users, Pencil, Trash2, Share2, Eye, Upload, Bell, Link2
@@ -103,6 +104,16 @@ function localToISO(local: string) {
 export default function AgendaPage() {
   const { profiel, isSuperadmin, rechten } = useAuth()
 
+  const magZien = isSuperadmin || rechten.pagina_agenda === 'lezen' || rechten.pagina_agenda === 'bewerken'
+  // Persoonlijke agenda's van collega's inzien
+  const magPersoneelInzien = isSuperadmin || rechten.agenda_personeel_inzien === true
+  // Afspraken in gedeelde/algemene kalenders toevoegen of wijzigen
+  const magAlgemeenBewerken = isSuperadmin || rechten.agenda_algemeen_bewerken === true
+  // Rollen die alle algemene kalenders zien; persoonlijke agenda's van collega's
+  // vereisen daarnaast het recht agenda_personeel_inzien
+  const magAlleKalendersZien = isSuperadmin || profiel?.rol === 'directie' || profiel?.rol === 'leidinggevende'
+  const magAllePersoonlijkZien = magAlleKalendersZien && magPersoneelInzien
+
   const [weergave, setWeergave] = useState<Weergave>('maand')
   const [notificaties, setNotificaties] = useState<{ afspraak: Afspraak; kalender: Kalender; dagenOver: number }[]>([])
   const [notificatieBanner, setNotificatieBanner] = useState(true)
@@ -137,9 +148,7 @@ export default function AgendaPage() {
     if (!profiel) return
     const supabase = getSupabase()
 
-    // Rollen die alle kalenders mogen inzien
-    const magAllesZien = isSuperadmin || profiel.rol === 'directie' || profiel.rol === 'leidinggevende'
-    const magAllesBewerken = isSuperadmin
+    const magAllesZien = magAlleKalendersZien
 
     // Eigen persoonlijke kalender
     const { data: persoonlijk } = await supabase
@@ -150,7 +159,7 @@ export default function AgendaPage() {
 
     // Alle persoonlijke kalenders voor bevoorrechte rollen
     let allePersoonlijk: Kalender[] = persoonlijk ?? []
-    if (magAllesZien) {
+    if (magAllePersoonlijkZien) {
       const { data } = await supabase
         .from('agenda_kalenders')
         .select('*')
@@ -190,9 +199,9 @@ export default function AgendaPage() {
       alles.forEach(k => nieuweIds.add(k.id))
       return nieuweIds
     })
-  }, [profiel, isSuperadmin])
+  }, [profiel, magAlleKalendersZien, magAllePersoonlijkZien])
 
-  useEffect(() => { haalKalendersOp() }, [haalKalendersOp])
+  useEffect(() => { if (magZien) haalKalendersOp() }, [haalKalendersOp, magZien])
 
   // ── Afspraken ophalen ───────────────────────────────────────────────────────
   const haalAfsprakenOp = useCallback(async () => {
@@ -226,6 +235,10 @@ export default function AgendaPage() {
 
   // ── Afspraak opslaan ────────────────────────────────────────────────────────
   async function slaAfspraakOp(data: Partial<Afspraak> & { kalender_id: string; titel: string; start_tijd: string; eind_tijd: string }) {
+    if (!magBewerken || !bewerkbareKalenders.some(k => k.id === data.kalender_id)) {
+      setToast({ bericht: 'Je hebt geen rechten om in deze kalender te schrijven.', type: 'error' })
+      return
+    }
     const supabase = getSupabase()
     if (bewerkAfspraak) {
       const { error } = await supabase.from('agenda_afspraken').update(data).eq('id', bewerkAfspraak.id)
@@ -243,6 +256,11 @@ export default function AgendaPage() {
   }
 
   async function verwijderAfspraak(id: string) {
+    const afspraak = afspraken.find(a => a.id === id)
+    if (!magBewerken || (afspraak && !bewerkbareKalenders.some(k => k.id === afspraak.kalender_id))) {
+      setToast({ bericht: 'Je hebt geen rechten om deze afspraak te verwijderen.', type: 'error' })
+      return
+    }
     await getSupabase().from('agenda_afspraken').delete().eq('id', id)
     setDetailAfspraak(null)
     setToast({ bericht: 'Afspraak verwijderd.', type: 'success' })
@@ -251,6 +269,7 @@ export default function AgendaPage() {
 
   // ── Nieuwe kalender ─────────────────────────────────────────────────────────
   async function maakKalender(naam: string, kleur: string) {
+    if (!magAlgemeenBewerken) { setToast({ bericht: 'Je mag geen algemene kalenders aanmaken.', type: 'error' }); return }
     const { data, error } = await getSupabase().from('agenda_kalenders').insert({
       naam, type: 'algemeen', eigenaar_id: profiel?.id, kleur
     }).select().single()
@@ -277,10 +296,14 @@ export default function AgendaPage() {
     })
   }
 
-  // Bewerk rechten: superadmin en leidinggevende mogen alles, directie alleen lezen
-  // Iedereen mag hun eigen persoonlijke agenda bewerken
-  // De modal filtert automatisch op beschikbare kalenders per gebruiker
-  const magBewerken = true
+  // Iedereen met agendatoegang mag zijn eigen persoonlijke agenda bewerken.
+  // Alleen met 'bewerken' op de agendapagina én het recht "algemene agenda
+  // bewerken" mag je in gedeelde kalenders schrijven; de kalenderlijst in de
+  // modal wordt daarop gefilterd.
+  const magBewerken = isSuperadmin || rechten.pagina_agenda === 'bewerken'
+  const bewerkbareKalenders = alleKalenders.filter(k =>
+    k.eigenaar_id === profiel?.id || (k.type === 'algemeen' && magAlgemeenBewerken)
+  )
 
   function openNieuw(dag?: Date) {
     if (!magBewerken) return
@@ -532,7 +555,9 @@ export default function AgendaPage() {
 
   const eigneKalender = alleKalenders.find(k => k.type === 'persoonlijk' && k.eigenaar_id === profiel?.id)
   const algemeenKalenders = alleKalenders.filter(k => k.type === 'algemeen')
-  const anderePersoneelKalenders = isSuperadmin ? alleKalenders.filter(k => k.type === 'persoonlijk' && k.eigenaar_id !== profiel?.id) : []
+  const anderePersoneelKalenders = magAllePersoonlijkZien ? alleKalenders.filter(k => k.type === 'persoonlijk' && k.eigenaar_id !== profiel?.id) : []
+
+  if (!magZien) return <GeenToegang titel="Agenda" beschrijving="Je hebt geen toegang tot de agenda." />
 
   return (
     <>
@@ -560,11 +585,11 @@ export default function AgendaPage() {
             <button className="btn" style={{ padding: '6px 8px' }} onClick={() => setHuidigeDatum(d => navigeer(weergave, d, 1))}><ChevronRight size={16} /></button>
             {/* Kalenders + Nieuw */}
             <button className="btn" onClick={() => setKalenderPanelOpen(true)}><Calendar size={14} /> Kalenders</button>
-            <button className="btn" onClick={() => setIcsModal(true)}><Upload size={14} /> ICS</button>
+            {magBewerken && <button className="btn" onClick={() => setIcsModal(true)}><Upload size={14} /> ICS</button>}
             {magAbonneren && (
               <button className="btn" onClick={() => setAbonneerModal(true)}><Link2 size={14} /> Abonneer</button>
             )}
-            <button className="btn btn-primary" onClick={() => openNieuw()}><Plus size={14} /> Afspraak</button>
+            {magBewerken && <button className="btn btn-primary" onClick={() => openNieuw()}><Plus size={14} /> Afspraak</button>}
           </div>
         }
       />
@@ -735,7 +760,7 @@ export default function AgendaPage() {
       {nieuwModal && (
         <AfspraakFormModal
           afspraak={bewerkAfspraak}
-          kalenders={alleKalenders.filter(k => k.type === 'algemeen' || k.eigenaar_id === profiel?.id)}
+          kalenders={bewerkbareKalenders}
           defaultKalenderId={eigneKalender?.id}
           defaultDatum={klikDatum}
           onSave={slaAfspraakOp}
@@ -763,7 +788,7 @@ export default function AgendaPage() {
       {/* ICS Import modal */}
       {icsModal && (
         <IcsImportModal
-          kalenders={alleKalenders.filter(k => k.type === 'algemeen' || k.eigenaar_id === profiel?.id)}
+          kalenders={bewerkbareKalenders}
           defaultKalenderId={alleKalenders.find(k => k.type === 'persoonlijk' && k.eigenaar_id === profiel?.id)?.id}
           onImport={async (afspraken) => {
             const supabase = getSupabase()

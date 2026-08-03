@@ -175,16 +175,16 @@ export default function Sidebar({ isOpen, onClose }: { isOpen?: boolean; onClose
     {
       label: 'Kind administratie',
       items: [
-        { href: '/gesprekken', label: '10-minutengesprekken', icon: <MessageCircle size={16} /> },
+        { href: '/gesprekken', label: '10-minutengesprekken', icon: <MessageCircle size={16} />, vereistRecht: 'pagina_gesprekken' as const },
       ],
     },
     {
       label: 'Activiteiten',
       items: [
-        { href: '/vakantieplanningen', label: 'Vakantieplanningen', icon: <Map size={16} /> },
-        { href: '/weekplanningen', label: 'Weekplanningen', icon: <Scissors size={16} /> },
-        { href: '/activiteiten', label: 'Activiteitenbeheer', icon: <BookOpen size={16} /> },
-        { href: '/ve-planning', label: 'VE Planning', icon: <Layers size={16} /> },
+        { href: '/vakantieplanningen', label: 'Vakantieplanningen', icon: <Map size={16} />, vereistRecht: 'pagina_vakantieplanningen' as const },
+        { href: '/weekplanningen', label: 'Weekplanningen', icon: <Scissors size={16} />, vereistRecht: 'pagina_weekplanningen' as const },
+        { href: '/activiteiten', label: 'Activiteitenbeheer', icon: <BookOpen size={16} />, vereistRecht: 'pagina_activiteiten' as const },
+        { href: '/ve-planning', label: 'VE Planning', icon: <Layers size={16} />, vereistRecht: 'pagina_ve_planning' as const },
         { href: '/competitie', label: 'Competitie Activiteiten', icon: <Trophy size={16} />, superadminOnly: true },
       ],
     },
@@ -238,8 +238,9 @@ export default function Sidebar({ isOpen, onClose }: { isOpen?: boolean; onClose
             (item) => {
               if (item.superadminOnly && !isSuperadmin) return false
               if (item.vereistRecht && !isSuperadmin) {
+                // Fail-closed: alleen 'lezen' of 'bewerken' geeft toegang
                 const toegang = (rechten as unknown as Record<string, string>)[item.vereistRecht]
-                if (toegang === 'geen') return false
+                if (toegang !== 'lezen' && toegang !== 'bewerken') return false
               }
               return true
             }

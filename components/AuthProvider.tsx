@@ -38,6 +38,8 @@ interface Rechten {
   agenda_algemeen_bewerken: boolean
   agenda_personeel_inzien: boolean
   vakantie_exporteren: boolean
+  weekplanning_exporteren: boolean
+  gesprekken_exporteren: boolean
   chat_starten: boolean
   maaltijdlijst_kind_toevoegen: boolean
 }
@@ -53,7 +55,8 @@ const SUPERADMIN_RECHTEN: Rechten = {
   kasboek_export: true, kasboek_bonnetjes_inzien: true,
   activiteiten_importeren: true, activiteiten_verwijderen: true,
   agenda_algemeen_bewerken: true, agenda_personeel_inzien: true,
-  vakantie_exporteren: true, chat_starten: true,
+  vakantie_exporteren: true, weekplanning_exporteren: true, gesprekken_exporteren: true,
+  chat_starten: true,
   maaltijdlijst_kind_toevoegen: true,
 }
 
@@ -68,8 +71,31 @@ const GEEN_RECHTEN: Rechten = {
   kasboek_export: false, kasboek_bonnetjes_inzien: false,
   activiteiten_importeren: false, activiteiten_verwijderen: false,
   agenda_algemeen_bewerken: false, agenda_personeel_inzien: false,
-  vakantie_exporteren: false, chat_starten: false,
+  vakantie_exporteren: false, weekplanning_exporteren: false, gesprekken_exporteren: false,
+  chat_starten: false,
   maaltijdlijst_kind_toevoegen: false,
+}
+
+// Rechten uit de database kunnen kolommen missen (nieuwe rechten die nog niet in de
+// tabel staan) of null zijn. Zonder deze normalisatie wordt zo'n waarde `undefined`,
+// en dan slaagt een check als `recht !== 'geen'` alsnog: toegang terwijl het uit staat.
+// Daarom vallen ontbrekende/ongeldige waarden altijd terug op GEEN_RECHTEN.
+const GELDIGE_TOEGANG: Toegang[] = ['geen', 'lezen', 'bewerken']
+
+function normaliseerRechten(ruw: unknown): Rechten {
+  if (!ruw || typeof ruw !== 'object') return GEEN_RECHTEN
+  const bron = ruw as Record<string, unknown>
+  const resultaat = { ...GEEN_RECHTEN }
+
+  for (const sleutel of Object.keys(GEEN_RECHTEN) as (keyof Rechten)[]) {
+    const waarde = bron[sleutel]
+    if (typeof GEEN_RECHTEN[sleutel] === 'boolean') {
+      if (typeof waarde === 'boolean') (resultaat[sleutel] as boolean) = waarde
+    } else if (GELDIGE_TOEGANG.includes(waarde as Toegang)) {
+      (resultaat[sleutel] as Toegang) = waarde as Toegang
+    }
+  }
+  return resultaat
 }
 
 interface AuthContextType {
@@ -124,8 +150,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         supabase.from('locatie_toegang').select('*').eq('profiel_id', userId),
       ])
 
-      const basis = (accountRecht ?? rolRecht ?? GEEN_RECHTEN) as Rechten
-      setRechten(basis)
+      // Accountrechten overschrijven de rolrechten volledig
+      setRechten(normaliseerRechten(accountRecht ?? rolRecht))
       setLocatieToegang((ltData ?? []) as LocatieToegang[])
     } catch {
       setProfiel(null)

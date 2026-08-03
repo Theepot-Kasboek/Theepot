@@ -6,6 +6,7 @@ import { vandaagLokaal } from '@/lib/datum'
 import { useAuth } from '@/components/AuthProvider'
 import Topbar from '@/components/Topbar'
 import Toast from '@/components/Toast'
+import GeenToegang from '@/components/GeenToegang'
 import {
   Plus, X, Folder, FolderOpen, FileText, Trash2,
   Pencil, Download, ChevronRight, ChevronDown,
@@ -193,7 +194,9 @@ async function exportFormulierPDF(formulier: Formulier, mentorNaam: string, loca
 // ─── Hoofd pagina ─────────────────────────────────────────────────────────────
 
 export default function GesprekkenPage() {
-  const { profiel, isSuperadmin } = useAuth()
+  const { profiel, isSuperadmin, rechten } = useAuth()
+  const magZien = isSuperadmin || rechten.pagina_gesprekken === 'lezen' || rechten.pagina_gesprekken === 'bewerken'
+  const magExporteren = isSuperadmin || rechten.gesprekken_exporteren === true
 
   async function getToegankelijkeLocaties(alleLocaties: string[]): Promise<string[]> {
     const magAllesZien = isSuperadmin || profiel?.rol === 'directie' || profiel?.rol === 'leidinggevende'
@@ -332,6 +335,8 @@ export default function GesprekkenPage() {
   }
 
   // ─── RENDER ─────────────────────────────────────────────────────────────────
+
+  if (!magZien) return <GeenToegang titel="10-minutengesprekken" beschrijving="Je hebt geen toegang tot de 10-minutengesprekken." />
 
   return (
     <>
@@ -478,6 +483,7 @@ export default function GesprekkenPage() {
                             </div>
                           </div>
                           <div style={{ display: 'flex', gap: 6 }}>
+                            {magExporteren && (
                             <button
                               onClick={async e => { e.stopPropagation(); await exportFormulierPDF(f, actieveMap.mentor_naam, actieveLocatie); if (autoVerwijderNaPDF) { await verwijderFormulier(f.id) } }}
                               className="btn btn-sm"
@@ -485,6 +491,7 @@ export default function GesprekkenPage() {
                             >
                               <Download size={13} />
                             </button>
+                            )}
                             <button
                               onClick={e => { e.stopPropagation(); setFormulierModal({ map: actieveMap, formulier: f }) }}
                               className="btn btn-sm"
@@ -540,7 +547,9 @@ export default function GesprekkenPage() {
           locatieNaam={actieveLocatie}
           onBewerk={() => { setFormulierModal({ map: detailFormulier.map, formulier: detailFormulier.formulier }); setDetailFormulier(null) }}
           onVerwijder={() => verwijderFormulier(detailFormulier.formulier.id)}
+          magExporteren={magExporteren}
           onExport={async () => {
+            if (!magExporteren) return
             await exportFormulierPDF(detailFormulier.formulier, detailFormulier.map.mentor_naam, actieveLocatie)
             if (autoVerwijderNaPDF) {
               await verwijderFormulier(detailFormulier.formulier.id)
@@ -761,7 +770,8 @@ function FormulierModal({ map, formulier, onSave, onClose }: {
   )
 }
 
-function DetailModal({ formulier, map, locatieNaam, onBewerk, onVerwijder, onExport, onClose }: {
+function DetailModal({ formulier, map, locatieNaam, onBewerk, onVerwijder, onExport, onClose, magExporteren = true }: {
+  magExporteren?: boolean
   formulier: Formulier
   map: Map
   locatieNaam: string
@@ -809,7 +819,7 @@ function DetailModal({ formulier, map, locatieNaam, onBewerk, onVerwijder, onExp
             <Trash2 size={13} /> Verwijderen
           </button>
           <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
-            <button className="btn btn-sm" onClick={onExport}><Download size={13} /> PDF</button>
+            {magExporteren && <button className="btn btn-sm" onClick={onExport}><Download size={13} /> PDF</button>}
             <button className="btn btn-primary btn-sm" onClick={onBewerk}><Pencil size={13} /> Bewerken</button>
           </div>
         </div>

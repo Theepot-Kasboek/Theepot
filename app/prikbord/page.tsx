@@ -33,7 +33,7 @@ function fmtDatum(iso: string) {
 
 export default function PrikbordPage() {
   const { profiel, isSuperadmin, rechten } = useAuth()
-  const magZien = isSuperadmin || rechten.pagina_prikbord !== 'geen'
+  const magZien = isSuperadmin || rechten.pagina_prikbord === 'lezen' || rechten.pagina_prikbord === 'bewerken'
   const magBewerken = isSuperadmin || rechten.pagina_prikbord === 'bewerken'
   const magToevoegen = isSuperadmin || rechten.prikbord_toevoegen === true
   const magAllesZien = isSuperadmin || profiel?.rol === 'directie' || profiel?.rol === 'leidinggevende'

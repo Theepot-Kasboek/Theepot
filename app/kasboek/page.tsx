@@ -5,6 +5,7 @@ import { getSupabase, type KasboekEntry } from '@/lib/supabase'
 import { useAuth } from '@/components/AuthProvider'
 import Topbar from '@/components/Topbar'
 import Toast from '@/components/Toast'
+import GeenToegang from '@/components/GeenToegang'
 import {
   ChevronLeft, ChevronRight, Plus, Trash2,
   MapPin, Settings, X, Building2, Tag, Paperclip, Download, Eye, Pencil
@@ -262,7 +263,10 @@ async function exportKasboekPDF(
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function KasboekPage() {
-  const { profiel, isSuperadmin, kasboekToegang } = useAuth()
+  const { profiel, isSuperadmin, rechten, kasboekToegang } = useAuth()
+  const magZien = isSuperadmin || rechten.pagina_kasboek === 'lezen' || rechten.pagina_kasboek === 'bewerken'
+  const magExporteren = isSuperadmin || rechten.kasboek_export === true
+  const magBonnetjesInzien = isSuperadmin || rechten.kasboek_bonnetjes_inzien === true
   const [toegestaneLocaties, setToegestaneLocaties] = useState<{naam: string; toegang: string}[]>([])
 
   // Navigatie
@@ -483,7 +487,7 @@ export default function KasboekPage() {
 
   // ── Bonnetje inzien ─────────────────────────────────────────────────────────
   async function openBonnetje(entry: KasboekEntry) {
-    if (!entry.bonnetje_pad) return
+    if (!entry.bonnetje_pad || !magBonnetjesInzien) return
     setBonnetjeModal(entry)
     setBonnetjeUrl(null)
     setBonnetjeLaden(true)
@@ -644,6 +648,8 @@ export default function KasboekPage() {
     perCategorie[cat][e.type] += e.bedrag
   })
 
+  if (!magZien) return <GeenToegang titel="Kasboek" beschrijving="Je hebt geen toegang tot het kasboek." />
+
   return (
     <>
       <Topbar
@@ -676,7 +682,7 @@ export default function KasboekPage() {
               <ChevronRight size={16} />
             </button>
             {/* Export knop */}
-            {actieveLocatie && (isSuperadmin || (actieveLocatie && kasboekToegang(actieveLocatie.naam) !== 'geen')) && (
+            {actieveLocatie && magExporteren && kasboekToegang(actieveLocatie.naam) !== 'geen' && (
               <button
                 className="btn"
                 onClick={() => exportKasboekPDF(
@@ -958,7 +964,7 @@ export default function KasboekPage() {
                           </div>
                         </div>
                         <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-                          {entry.bonnetje_pad && (isSuperadmin || profiel?.rol === 'directie') && (
+                          {entry.bonnetje_pad && magBonnetjesInzien && (
                             <button
                               onClick={() => openBonnetje(entry)}
                               style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--primary)', padding: '4px 6px', borderRadius: 6, display: 'flex', alignItems: 'center' }}
@@ -967,7 +973,7 @@ export default function KasboekPage() {
                               <Paperclip size={14} />
                             </button>
                           )}
-                          {entry.bonnetje_pad && !isSuperadmin && profiel?.rol !== 'directie' && (
+                          {entry.bonnetje_pad && !magBonnetjesInzien && (
                             <span title="Bonnetje aanwezig" style={{ color: 'var(--primary)', display: 'flex', alignItems: 'center', padding: '4px 6px' }}>
                               <Paperclip size={12} />
                             </span>
@@ -1226,7 +1232,7 @@ export default function KasboekPage() {
                       <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {bonnetjeNaam(bewerkEntry.bonnetje_pad)}
                       </span>
-                      {(isSuperadmin || profiel?.rol === 'directie') && (
+                      {magBonnetjesInzien && (
                         <button
                           type="button"
                           onClick={() => openBonnetje(bewerkEntry)}

@@ -10,6 +10,8 @@ import ActiviteitModal from '@/components/ActiviteitModal'
 import ActiviteitFormModal from '@/components/ActiviteitFormModal'
 import Toast from '@/components/Toast'
 import Topbar from '@/components/Topbar'
+import GeenToegang from '@/components/GeenToegang'
+import { useAuth } from '@/components/AuthProvider'
 
 // ─── Standaard AI prompt ───────────────────────────────────────────────────────
 
@@ -286,6 +288,12 @@ function ActiviteitenPage() {
   const themaParam = searchParams.get('thema')
   const categorieParam = searchParams.get('categorie')
 
+  const { isSuperadmin, rechten } = useAuth()
+  const magZien = isSuperadmin || rechten.pagina_activiteiten === 'lezen' || rechten.pagina_activiteiten === 'bewerken'
+  const magBewerken = isSuperadmin || rechten.pagina_activiteiten === 'bewerken'
+  const magImporteren = magBewerken && (isSuperadmin || rechten.activiteiten_importeren === true)
+  const magVerwijderen = magBewerken && (isSuperadmin || rechten.activiteiten_verwijderen === true)
+
   const [activiteiten, setActiviteiten] = useState<Activiteit[]>([])
   const [loading, setLoading] = useState(true)
   const [zoekterm, setZoekterm] = useState('')
@@ -390,6 +398,7 @@ function ActiviteitenPage() {
   })
 
   async function slaOp(data: Omit<Activiteit, 'id' | 'created_at'>) {
+    if (!magBewerken) return
     const supabase = getSupabase()
 
     // Als er een tijdelijk pad is (tmp_...), sla eerst op en verplaats dan de foto
@@ -420,7 +429,7 @@ function ActiviteitenPage() {
   }
 
   async function slaBewerking(data: Omit<Activiteit, 'id' | 'created_at'>) {
-    if (!bewerkActiviteit) return
+    if (!bewerkActiviteit || !magBewerken) return
     const { error } = await getSupabase()
       .from('activiteiten')
       .update(data)
@@ -433,13 +442,14 @@ function ActiviteitenPage() {
   }
 
   async function verwijderActiviteit() {
-    if (!geselecteerd) return
+    if (!geselecteerd || !magVerwijderen) return
     const { error } = await getSupabase().from('activiteiten').delete().eq('id', geselecteerd.id)
     if (!error) { await laadActiviteiten(); setGeselecteerd(null); setToast({ bericht: 'Verwijderd!', type: 'success' }) }
   }
 
   async function uploadAfbeeldingVanKaart(a: Activiteit, bestand: File, e: React.MouseEvent) {
     e.stopPropagation()
+    if (!magBewerken) return
     const supabase = getSupabase()
     const ext = bestand.name.split('.').pop()
     const pad = `${a.id}.${ext}`
@@ -487,6 +497,8 @@ function ActiviteitenPage() {
     setToast({ bericht: msg, type: msg.includes('mislukt') || msg.includes('Fout') ? 'error' : 'success' })
   }
 
+  if (!magZien) return <GeenToegang titel="Activiteitenbeheer" beschrijving="Je hebt geen toegang tot het activiteitenbeheer." />
+
   return (
     <>
       <Topbar
@@ -494,12 +506,16 @@ function ActiviteitenPage() {
         subtitel={`${activiteiten.length} activiteiten`}
         acties={
           <>
-            <button className="btn" onClick={() => setImportOpen(true)}>
-              <Upload size={14} /> AI Import
-            </button>
-            <button className="btn btn-primary" onClick={() => setToevoegen(true)}>
-              <Plus size={14} /> Toevoegen
-            </button>
+            {magImporteren && (
+              <button className="btn" onClick={() => setImportOpen(true)}>
+                <Upload size={14} /> AI Import
+              </button>
+            )}
+            {magBewerken && (
+              <button className="btn btn-primary" onClick={() => setToevoegen(true)}>
+                <Plus size={14} /> Toevoegen
+              </button>
+            )}
           </>
         }
       />
@@ -644,12 +660,14 @@ function ActiviteitenPage() {
                         <button onClick={e => kopieerKaart(a, e)} className="btn btn-sm" style={{ padding: '4px 8px' }} title="Kopieer als tekst"><Copy size={11} /></button>
                         <button onClick={e => exportKaart(a, e)} className="btn btn-sm" style={{ padding: '4px 8px' }} title="PDF exporteren"><Download size={11} /></button>
                         <button onClick={e => kopieerAlsJSON(a, e)} className="btn btn-sm" style={{ padding: '4px 8px' }} title="Kopieer als JSON"><span style={{ fontSize: 9, fontWeight: 700, fontFamily: 'monospace' }}>JSON</span></button>
-                        <label onClick={e => e.stopPropagation()} title="Afbeelding toevoegen" style={{ cursor: 'pointer' }}>
-                          <div className="btn btn-sm" style={{ padding: '4px 8px', color: a.afbeelding_pad ? 'var(--primary)' : 'var(--text-muted)' }}>
-                            <ImageIcon size={11} />
-                          </div>
-                          <input type="file" accept="image/*" style={{ display: 'none' }} onChange={e => e.target.files?.[0] && uploadAfbeeldingVanKaart(a, e.target.files[0], e as unknown as React.MouseEvent)} />
-                        </label>
+                        {magBewerken && (
+                          <label onClick={e => e.stopPropagation()} title="Afbeelding toevoegen" style={{ cursor: 'pointer' }}>
+                            <div className="btn btn-sm" style={{ padding: '4px 8px', color: a.afbeelding_pad ? 'var(--primary)' : 'var(--text-muted)' }}>
+                              <ImageIcon size={11} />
+                            </div>
+                            <input type="file" accept="image/*" style={{ display: 'none' }} onChange={e => e.target.files?.[0] && uploadAfbeeldingVanKaart(a, e.target.files[0], e as unknown as React.MouseEvent)} />
+                          </label>
+                        )}
                       </div>
                     </div>
                     <p style={{ fontSize: 12.5, color: 'var(--text-muted)', lineHeight: 1.55, marginBottom: 12, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
@@ -673,7 +691,7 @@ function ActiviteitenPage() {
         )}
       </div>
 
-      {importOpen && (
+      {importOpen && magImporteren && (
         <JsonImportModal
           onClose={() => setImportOpen(false)}
           onSuccess={async (aantal) => {
@@ -684,9 +702,9 @@ function ActiviteitenPage() {
       )}
 
       {geselecteerd && !bewerkActiviteit && (
-        <ActiviteitModal activiteit={geselecteerd} onClose={() => setGeselecteerd(null)} onEdit={() => setBewerkActiviteit(geselecteerd)} onDelete={verwijderActiviteit} onToast={handleToast} onAfbeeldingGewijzigd={laadActiviteiten} />
+        <ActiviteitModal activiteit={geselecteerd} onClose={() => setGeselecteerd(null)} onEdit={() => setBewerkActiviteit(geselecteerd)} onDelete={verwijderActiviteit} onToast={handleToast} onAfbeeldingGewijzigd={laadActiviteiten} magBewerken={magBewerken} magVerwijderen={magVerwijderen} />
       )}
-      {(toevoegen || bewerkActiviteit) && (
+      {(toevoegen || bewerkActiviteit) && magBewerken && (
         <ActiviteitFormModal activiteit={bewerkActiviteit || undefined} onSave={bewerkActiviteit ? slaBewerking : slaOp} onClose={() => { setToevoegen(false); setBewerkActiviteit(null) }} />
       )}
       {toast && <Toast bericht={toast.bericht} type={toast.type} onClose={() => setToast(null)} />}

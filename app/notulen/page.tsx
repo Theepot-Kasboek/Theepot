@@ -145,7 +145,7 @@ export default function NotulenPage() {
   const { profiel, isSuperadmin, rechten } = useAuth()
 
   // Notulen opstellen: alleen superadmin/directie
-  const magZien = isSuperadmin || profiel?.rol === 'directie' || (rechten as any).pagina_notulen !== 'geen'
+  const magZien = isSuperadmin || profiel?.rol === 'directie' || rechten.pagina_notulen === 'lezen' || rechten.pagina_notulen === 'bewerken'
   const magBewerken = isSuperadmin || profiel?.rol === 'directie'
 
   const [notulenLijst, setNotulenLijst] = useState<Notulen[]>([])

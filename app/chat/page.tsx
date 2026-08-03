@@ -5,6 +5,7 @@ import { getSupabase, type Profiel } from '@/lib/supabase'
 import { useAuth } from '@/components/AuthProvider'
 import Topbar from '@/components/Topbar'
 import Toast from '@/components/Toast'
+import GeenToegang from '@/components/GeenToegang'
 import { Plus, X, Send, Users, User, MessageSquare, Search, Check, CheckCheck, Paperclip, Download, FileText } from 'lucide-react'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -59,7 +60,10 @@ function initialen(naam: string) {
 
 export default function ChatPage() {
   const { profiel, rechten, isSuperadmin } = useAuth()
-  const magStarten = isSuperadmin || rechten.chat_starten
+  const magZien = isSuperadmin || rechten.pagina_chat === 'lezen' || rechten.pagina_chat === 'bewerken'
+  // Alleen met 'bewerken' mag je berichten sturen; 'lezen' is meekijken
+  const magSturen = isSuperadmin || rechten.pagina_chat === 'bewerken'
+  const magStarten = magSturen && (isSuperadmin || rechten.chat_starten === true)
 
   const [gesprekken, setGesprekken] = useState<Gesprek[]>([])
   const [actiefGesprek, setActiefGesprek] = useState<Gesprek | null>(null)
@@ -182,7 +186,7 @@ export default function ChatPage() {
 
   async function verstuurBericht(e: React.FormEvent) {
     e.preventDefault()
-    if (!nieuwBericht.trim() || !actiefGesprek || !profiel) return
+    if (!nieuwBericht.trim() || !actiefGesprek || !profiel || !magSturen) return
 
     const inhoud = nieuwBericht.trim()
     setNieuwBericht('')
@@ -203,7 +207,7 @@ export default function ChatPage() {
 
   // ── Bestand versturen ──────────────────────────────────────────────────────
   async function verstuurBestand(bestand: File) {
-    if (!actiefGesprek || !profiel) return
+    if (!actiefGesprek || !profiel || !magSturen) return
     const supabase = getSupabase()
     const pad = `chat/${actiefGesprek.id}/${Date.now()}_${bestand.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`
 
@@ -280,6 +284,8 @@ export default function ChatPage() {
   const supportProfiel = alleProfielen.find(p => p.rol === 'superadmin')
 
   // ─── RENDER ─────────────────────────────────────────────────────────────────
+
+  if (!magZien) return <GeenToegang titel="Chat" beschrijving="Je hebt geen toegang tot de chat." />
 
   return (
     <>
@@ -490,7 +496,12 @@ export default function ChatPage() {
                 })}
               </div>
 
-              {/* Berichtinvoer */}
+              {/* Berichtinvoer — alleen met bewerkrechten */}
+              {!magSturen ? (
+                <div style={{ padding: '12px 16px', background: 'var(--bg-card)', borderTop: '1px solid var(--border)', fontSize: 12.5, color: 'var(--text-muted)', textAlign: 'center' }}>
+                  Je kunt dit gesprek alleen lezen.
+                </div>
+              ) : (
               <div style={{ padding: '12px 16px', background: 'var(--bg-card)', borderTop: '1px solid var(--border)' }}>
                 <form onSubmit={verstuurBericht} style={{ display: 'flex', gap: 10, alignItems: 'flex-end' }}>
                   <label title="Bestand toevoegen" style={{ cursor: 'pointer', flexShrink: 0 }}>
@@ -532,13 +543,14 @@ export default function ChatPage() {
                   </button>
                 </form>
               </div>
+              )}
             </>
           )}
         </div>
       </div>
 
       {/* Nieuw gesprek modal */}
-      {nieuwGesprekModal && (
+      {nieuwGesprekModal && magStarten && (
         <NieuwGesprekModal
           profielen={alleProfielen.filter(p => p.id !== profiel?.id)}
           eigenId={profiel?.id ?? ''}

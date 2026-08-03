@@ -6,6 +6,7 @@ import { useAuth } from '@/components/AuthProvider'
 import ActiviteitBijlagen from '@/components/ActiviteitBijlagen'
 import Topbar from '@/components/Topbar'
 import Toast from '@/components/Toast'
+import GeenToegang from '@/components/GeenToegang'
 import {
   Plus, X, ChevronLeft, ChevronRight, Scissors,
   Users, Download, BookOpen, Pencil, Trash2, MapPin, Upload
@@ -226,7 +227,9 @@ async function exportPDF(planning: WeekPlanning, activiteiten: WeekActiviteit[])
 // ─── Hoofd pagina ─────────────────────────────────────────────────────────────
 
 export default function WeekplanningenPage() {
-  const { profiel, isSuperadmin } = useAuth()
+  const { profiel, isSuperadmin, rechten } = useAuth()
+  const magZien = isSuperadmin || rechten.pagina_weekplanningen === 'lezen' || rechten.pagina_weekplanningen === 'bewerken'
+  const magExporteren = isSuperadmin || rechten.weekplanning_exporteren === true
 
   async function getToegankelijkeLocaties(alleLocaties: string[]): Promise<string[]> {
     const magAllesZien = isSuperadmin || profiel?.rol === 'directie' || profiel?.rol === 'leidinggevende'
@@ -362,6 +365,8 @@ export default function WeekplanningenPage() {
 
   // ─── RENDER ─────────────────────────────────────────────────────────────────
 
+  if (!magZien) return <GeenToegang titel="Weekplanningen" beschrijving="Je hebt geen toegang tot de weekplanningen." />
+
   return (
     <>
       <Topbar
@@ -369,7 +374,7 @@ export default function WeekplanningenPage() {
         subtitel={actieveLocatie || 'Selecteer een locatie'}
         acties={
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            {planning && (
+            {planning && magExporteren && (
               <button className="btn" onClick={() => exportPDF(planning, activiteiten)}>
                 <Download size={14} /> PDF
               </button>

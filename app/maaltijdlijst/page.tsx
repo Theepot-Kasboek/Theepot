@@ -5,6 +5,7 @@ import { getSupabase } from '@/lib/supabase'
 import { useAuth } from '@/components/AuthProvider'
 import Topbar from '@/components/Topbar'
 import Toast from '@/components/Toast'
+import GeenToegang from '@/components/GeenToegang'
 import {
   Plus, X, Settings, MapPin, Trash2, Check,
   Download, ChevronLeft, ChevronRight, UserPlus,
@@ -276,7 +277,8 @@ async function exporteerPDF(
 // ─── Hoofd pagina ─────────────────────────────────────────────────────────────
 
 export default function MaaltijdlijstPage() {
-  const { profiel, isSuperadmin, maaltijdToegang } = useAuth()
+  const { profiel, isSuperadmin, rechten, maaltijdToegang } = useAuth()
+  const magZien = isSuperadmin || rechten.pagina_maaltijdlijst === 'lezen' || rechten.pagina_maaltijdlijst === 'bewerken'
   const [toegestaneLocaties, setToegestaneLocaties] = useState<{naam: string; toegang: string}[]>([])
 
   const [locaties, setLocaties] = useState<Locatie[]>([])
@@ -437,7 +439,7 @@ export default function MaaltijdlijstPage() {
 
   // ── Extra kind toevoegen ────────────────────────────────────────────────────
   async function voegExtraToe(dag: Dag, naam: string, bijzonderheden: string) {
-    if (!week) return
+    if (!week || !magKindToevoegen) return
     const dagRegs = registraties.filter(r => r.dag === dag)
     const { data } = await getSupabase().from('maaltijd_registraties').insert({
       week_id: week.id, dag, naam, bijzonderheden: bijzonderheden || null,
@@ -469,9 +471,11 @@ export default function MaaltijdlijstPage() {
 
   const isHuidigeWeek = huidigWeekStart === toDateStr(maandaagVanWeek(new Date()))
   const magBewerken = isSuperadmin || (actieveLocatie ? maaltijdToegang(actieveLocatie.naam) === 'bewerken' : false)
-  const magKindToevoegen = magBewerken
+  const magKindToevoegen = magBewerken && (isSuperadmin || rechten.maaltijdlijst_kind_toevoegen === true)
 
   // ─── RENDER ──────────────────────────────────────────────────────────────────
+
+  if (!magZien) return <GeenToegang titel="Maaltijdlijst" beschrijving="Je hebt geen toegang tot de maaltijdlijst." />
 
   return (
     <>
@@ -695,7 +699,7 @@ export default function MaaltijdlijstPage() {
       )}
 
       {/* Extra kind */}
-      {extraModal && (
+      {extraModal && magKindToevoegen && (
         <ExtraKindModal
           dag={extraModal}
           onSave={voegExtraToe}

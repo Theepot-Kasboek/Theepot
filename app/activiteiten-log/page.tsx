@@ -40,7 +40,7 @@ export default function ActiviteitenLogPage() {
   const [filterActie, setFilterActie] = useState('')
   const PER_PAGINA = 50
 
-  const magZien = isSuperadmin || rechten.pagina_activiteiten_log !== 'geen'
+  const magZien = isSuperadmin || rechten.pagina_activiteiten_log === 'lezen' || rechten.pagina_activiteiten_log === 'bewerken'
 
   const haalOp = useCallback(async () => {
     setLaden(true)

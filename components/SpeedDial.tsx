@@ -30,9 +30,9 @@ const ALLE_ITEMS: SpeedDialItem[] = [
   { href: '/brandoefening', label: 'Brandoefening', icon: <Flame size={18} />, vereistRecht: 'pagina_brandoefening' },
   { href: '/kilometerstanden', label: 'Kilometerstanden', icon: <Gauge size={18} /> },
   { href: '/activiteiten-log', label: 'Activiteitenlog', icon: <Activity size={18} />, vereistRecht: 'pagina_activiteiten_log' },
-  { href: '/gesprekken', label: '10-minutengesprekken', icon: <MessageCircle size={18} /> },
-  { href: '/vakantieplanningen', label: 'Vakantieplanningen', icon: <Map size={18} /> },
-  { href: '/weekplanningen', label: 'Weekplanningen', icon: <Scissors size={18} /> },
+  { href: '/gesprekken', label: '10-minutengesprekken', icon: <MessageCircle size={18} />, vereistRecht: 'pagina_gesprekken' },
+  { href: '/vakantieplanningen', label: 'Vakantieplanningen', icon: <Map size={18} />, vereistRecht: 'pagina_vakantieplanningen' },
+  { href: '/weekplanningen', label: 'Weekplanningen', icon: <Scissors size={18} />, vereistRecht: 'pagina_weekplanningen' },
   { href: '/activiteiten', label: 'Activiteitenbeheer', icon: <BookOpen size={18} />, vereistRecht: 'pagina_activiteiten' },
   { href: '/ve-planning', label: 'VE Planning', icon: <Layers size={18} />, vereistRecht: 'pagina_ve_planning' },
   { href: '/agenda', label: 'Agenda', icon: <Calendar size={18} />, vereistRecht: 'pagina_agenda' },
@@ -75,9 +75,10 @@ export default function SpeedDial() {
 
   const zichtbareItems = ALLE_ITEMS.filter(item => {
     if (item.superadminOnly && !isSuperadmin) return false
-    if (item.vereistRecht) {
+    if (item.vereistRecht && !isSuperadmin) {
+      // Fail-closed: alleen 'lezen' of 'bewerken' geeft toegang
       const recht = (rechten as unknown as Record<string, string>)[item.vereistRecht]
-      if (recht === 'geen') return false
+      if (recht !== 'lezen' && recht !== 'bewerken') return false
     }
     if (item.href === pathname) return false
     return true

@@ -164,23 +164,15 @@ const PAGINAS: PaginaDef[] = [
     functies: [],
   },
   {
-    key: 'pagina_archief',
-    label: 'Archief',
-    icon: '🗂️',
-    functies: [],
-  },
-  {
     key: 'pagina_activiteiten_log',
     label: 'Activiteitenlog',
     icon: '📋',
     functies: [],
   },
-  {
-    key: 'pagina_medewerkers',
-    label: 'Medewerkers',
-    icon: '👥',
-    functies: [],
-  },
+  // Niet in deze lijst (bewust):
+  // - pagina_archief: er bestaat geen archiefpagina, dit recht deed niets
+  // - pagina_medewerkers: medewerkersbeheer is altijd superadmin-only
+  // De kolommen blijven in de database staan, ze worden alleen niet meer getoond.
 ]
 
 const TOEGANG_OPTIES: { waarde: Toegang; label: string; kleur: string; bg: string }[] = [

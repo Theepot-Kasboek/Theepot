@@ -32,7 +32,15 @@ const TYPE_CONFIG: Record<string, { label: string; kleur: string; icoon: React.R
 }
 
 export default function ZoekenPage() {
-  const { profiel, isSuperadmin } = useAuth()
+  const { profiel, isSuperadmin, rechten } = useAuth()
+
+  // Zoekresultaten mogen nooit meer prijsgeven dan de gebruiker in de module
+  // zelf zou zien: per categorie eerst het paginarecht controleren.
+  const magZien = useCallback(
+    (recht: keyof typeof rechten) =>
+      isSuperadmin || rechten[recht] === 'lezen' || rechten[recht] === 'bewerken',
+    [isSuperadmin, rechten]
+  )
   const [zoek, setZoek] = useState('')
   const [resultaten, setResultaten] = useState<Resultaat[]>([])
   const [laden, setLaden] = useState(false)
@@ -47,36 +55,50 @@ export default function ZoekenPage() {
     const resultatenLijst: Resultaat[] = []
 
     // Activiteiten
+    if (magZien('pagina_activiteiten')) {
     const { data: acts } = await supabase.from('activiteiten').select('id,naam,categorie,beschrijving').ilike('naam', `%${q}%`).limit(8)
     for (const a of acts ?? []) resultatenLijst.push({ id: a.id, type: 'activiteit', titel: a.naam, subtitel: a.categorie, url: `/activiteiten?zoek=${encodeURIComponent(a.naam)}`, datum: undefined })
+    }
 
     // Nieuwsbrieven
+    if (magZien('pagina_nieuwsbrieven')) {
     const { data: brieven } = await supabase.from('nieuwsbrieven').select('id,titel,datum,format,nummer').ilike('titel', `%${q}%`).limit(6)
     for (const b of brieven ?? []) resultatenLijst.push({ id: b.id, type: 'nieuwsbrief', titel: b.titel || `${b.format} Nr. ${b.nummer}`, subtitel: b.format, url: `/archief`, datum: b.datum })
+    }
 
     // Beleid
+    if (magZien('pagina_beleid')) {
     const { data: beleid } = await supabase.from('beleidsstukken').select('id,naam,bestandsnaam,aangemaakt_op').ilike('naam', `%${q}%`).limit(6)
     for (const b of beleid ?? []) resultatenLijst.push({ id: b.id, type: 'beleid', titel: b.naam, subtitel: b.bestandsnaam, url: `/beleid`, datum: b.aangemaakt_op })
+    }
 
     // Weekplanningen
+    if (magZien('pagina_weekplanningen')) {
     const { data: wplanningen } = await supabase.from('week_planningen').select('id,thema,locatie_naam,week_start').ilike('thema', `%${q}%`).limit(6)
     for (const w of wplanningen ?? []) resultatenLijst.push({ id: w.id, type: 'weekplanning', titel: w.thema, subtitel: w.locatie_naam, url: `/weekplanningen`, datum: w.week_start })
+    }
 
     // Vakantieplanningen
+    if (magZien('pagina_vakantieplanningen')) {
     const { data: vplanningen } = await supabase.from('vakantie_planningen').select('id,naam,thema,aangemaakt_op').ilike('thema', `%${q}%`).limit(6)
     for (const v of vplanningen ?? []) resultatenLijst.push({ id: v.id, type: 'vakantie', titel: v.naam, subtitel: v.thema, url: `/vakantieplanningen`, datum: v.aangemaakt_op })
+    }
 
     // Prikbord
+    if (magZien('pagina_prikbord')) {
     const { data: prikbord } = await supabase.from('prikbord_berichten').select('id,titel,inhoud,aangemaakt_op').ilike('titel', `%${q}%`).limit(6)
     for (const p of prikbord ?? []) resultatenLijst.push({ id: p.id, type: 'prikbord', titel: p.titel, subtitel: p.inhoud?.substring(0, 60) + '...', url: `/prikbord`, datum: p.aangemaakt_op })
+    }
 
     // Thema archief
+    if (magZien('pagina_activiteiten')) {
     const { data: archief } = await supabase.from('thema_archief').select('id,naam,seizoen,jaar,aangemaakt_op').ilike('naam', `%${q}%`).limit(6)
     for (const a of archief ?? []) resultatenLijst.push({ id: a.id, type: 'thema_archief', titel: a.naam, subtitel: a.seizoen ? `${a.seizoen} ${a.jaar ?? ''}` : String(a.jaar ?? ''), url: `/archief`, datum: a.aangemaakt_op })
+    }
 
     setResultaten(resultatenLijst)
     setLaden(false)
-  }, [])
+  }, [magZien])
 
   return (
     <>

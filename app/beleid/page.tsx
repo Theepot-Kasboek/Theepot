@@ -55,7 +55,7 @@ const CATEGORIEEN = ['Beleid', 'Protocol', 'Handleiding', 'Formulier', 'Overig']
 
 export default function BeleidPage() {
   const { profiel, isSuperadmin, rechten } = useAuth()
-  const magZien = isSuperadmin || rechten.pagina_beleid !== 'geen'
+  const magZien = isSuperadmin || rechten.pagina_beleid === 'lezen' || rechten.pagina_beleid === 'bewerken'
   const magBewerken = isSuperadmin || rechten.pagina_beleid === 'bewerken'
 
   const [stukken, setStukken] = useState<Beleidsstuk[]>([])

@@ -200,7 +200,7 @@ async function exportWeekPDF(week: BrandoefeningWeek, dagen: BrandoefeningDag[])
 
 export default function BrandoefeningPage() {
   const { profiel, isSuperadmin, rechten } = useAuth()
-  const magZien = isSuperadmin || rechten.pagina_brandoefening !== 'geen'
+  const magZien = isSuperadmin || rechten.pagina_brandoefening === 'lezen' || rechten.pagina_brandoefening === 'bewerken'
   const magBewerken = isSuperadmin || rechten.pagina_brandoefening === 'bewerken'
 
   const [locaties, setLocaties] = useState<string[]>([])

@@ -593,7 +593,7 @@ async function exportPDF(brief: Nieuwsbrief) {
 
 export default function NieuwsbrievenPage() {
   const { profiel, isSuperadmin, rechten } = useAuth()
-  const magZien = isSuperadmin || rechten.pagina_nieuwsbrieven !== 'geen'
+  const magZien = isSuperadmin || rechten.pagina_nieuwsbrieven === 'lezen' || rechten.pagina_nieuwsbrieven === 'bewerken'
   const magBewerken = isSuperadmin || rechten.pagina_nieuwsbrieven === 'bewerken'
 
   const [nieuwsbrieven, setNieuwsbrieven] = useState<Nieuwsbrief[]>([])

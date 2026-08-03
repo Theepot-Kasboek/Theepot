@@ -654,7 +654,7 @@ function SnelkoppelingenWidget({ rechten, isSuperadmin }: { rechten: Record<stri
     { href: '/brandoefening', label: 'Brandoefening', icon: <Flame size={18} />, recht: 'pagina_brandoefening', kleur: '#EF4444' },
     { href: '/nieuwsbrieven', label: 'Nieuwsbrieven', icon: <Newspaper size={18} />, recht: 'pagina_nieuwsbrieven', kleur: '#F59E0B' },
     { href: '/chat', label: 'Chat', icon: <MessageSquare size={18} />, recht: 'pagina_chat', kleur: '#10B981' },
-  ].filter(l => isSuperadmin || rechten[l.recht] !== 'geen')
+  ].filter(l => isSuperadmin || rechten[l.recht] === 'lezen' || rechten[l.recht] === 'bewerken')
 
   return (
     <div className="card">

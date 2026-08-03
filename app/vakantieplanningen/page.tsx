@@ -81,7 +81,8 @@ function fmtDatum(d: string) {
 export default function VakantieplanningenPage() {
   const { profiel, rechten, isSuperadmin } = useAuth()
   const magBewerken = isSuperadmin || rechten.pagina_vakantieplanningen === 'bewerken'
-  const magZien = isSuperadmin || rechten.pagina_vakantieplanningen !== 'geen'
+  const magZien = isSuperadmin || rechten.pagina_vakantieplanningen === 'lezen' || rechten.pagina_vakantieplanningen === 'bewerken'
+  const magExporteren = isSuperadmin || rechten.vakantie_exporteren === true
 
   const [planningen, setPlanningen] = useState<Planning[]>([])
   const [actievePlanning, setActievePlanning] = useState<Planning | null>(null)
@@ -564,6 +565,7 @@ export default function VakantieplanningenPage() {
             activiteiten={activiteiten}
             dagDatumStr={dagDatumStr}
             tekstGrootte={tekstGrootte}
+            magExporteren={magExporteren}
           />
         )}
       </div>
@@ -735,12 +737,13 @@ function WeekOverzicht({ week, activiteiten, planning, dagDatumStr, onNieuw, onB
 
 // ─── Document weergave ────────────────────────────────────────────────────────
 
-function DocumentWeergave({ planning, weken, activiteiten, dagDatumStr, tekstGrootte }: {
+function DocumentWeergave({ planning, weken, activiteiten, dagDatumStr, tekstGrootte, magExporteren = true }: {
   planning: Planning
   weken: Week[]
   activiteiten: VakantieActiviteit[]
   dagDatumStr: (week: Week, dag: Dag) => string
   tekstGrootte: number
+  magExporteren?: boolean
 }) {
   const [downloadenBezig, setDownloadenBezig] = useState(false)
   const [venstBreedte, setVenstBreedte] = useState(typeof window !== 'undefined' ? window.innerWidth : 1200)
@@ -758,6 +761,7 @@ function DocumentWeergave({ planning, weken, activiteiten, dagDatumStr, tekstGro
   }
 
   async function downloadAlleBijlagen() {
+    if (!magExporteren) return
     const actIds = activiteiten.filter(a => a.activiteit_id).map(a => a.activiteit_id as string)
     if (actIds.length === 0) { alert('Geen activiteiten met bijlagen in deze planning.'); return }
     setDownloadenBezig(true)
@@ -785,9 +789,11 @@ function DocumentWeergave({ planning, weken, activiteiten, dagDatumStr, tekstGro
       <div style={{ textAlign: 'center', marginBottom: 32, padding: '24px 0' }}>
         <h1 style={{ fontFamily: 'Sora, sans-serif', fontSize: 24, fontWeight: 800, marginBottom: 6 }}>{planning.naam}</h1>
         <div style={{ fontSize: 14, color: 'var(--text-muted)', marginBottom: 14 }}>{planning.vakantie} · Thema: {planning.thema} · {fmtDatum(planning.start_datum)} – {fmtDatum(planning.eind_datum)}</div>
-        <button className="btn btn-sm" onClick={downloadAlleBijlagen} disabled={downloadenBezig}>
-          <Download size={13} /> {downloadenBezig ? 'Downloaden...' : 'Alle bijlagen downloaden'}
-        </button>
+        {magExporteren && (
+          <button className="btn btn-sm" onClick={downloadAlleBijlagen} disabled={downloadenBezig}>
+            <Download size={13} /> {downloadenBezig ? 'Downloaden...' : 'Alle bijlagen downloaden'}
+          </button>
+        )}
       </div>
 
       {/* Per week */}
