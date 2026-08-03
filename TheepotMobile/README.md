@@ -50,7 +50,7 @@ juiste gesprek. Serverkant: zie `../supabase-sql/push_meldingen.sql`,
 `../app/api/push/chat/route.ts` en `../lib/push-apns.ts`.
 
 Handmatige stappen vóór dit werkt:
-- APNs Auth Key (.p8) aanmaken in de Apple Developer portal (Keys), Team ID `2ZY9W886KN`.
+- APNs Auth Key (.p8) aanmaken in de Apple Developer portal (Keys), Team ID `3TQM2TCL7T`.
 - Push Notifications-capability aanvinken op App ID `nl.bsodetheepot.mobile.dev`.
 - Testen kan alleen op een echt toestel (niet in de Simulator).
 
