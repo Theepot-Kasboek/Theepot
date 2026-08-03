@@ -30,12 +30,15 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
+import nl.bsodetheepot.mobile.data.push.MeldingRouter
 import nl.bsodetheepot.mobile.data.session.SessionViewModel
 import nl.bsodetheepot.mobile.ui.screens.account.AccountScreen
 import nl.bsodetheepot.mobile.ui.screens.chat.ChatListScreen
@@ -74,6 +77,13 @@ fun DashboardScreen(session: SessionViewModel) {
 
     LaunchedEffect(pagerState.currentPage) {
         balkState.animateScrollToItem(maxOf(0, pagerState.currentPage - 1))
+    }
+
+    // Tik op een chat-pushmelding: naar de chattab (index 1). ChatListScreen
+    // pakt de rest van de deeplink (het juiste gesprek openen) zelf op.
+    val gewenstGesprekId by MeldingRouter.gewenstGesprekId.collectAsState()
+    LaunchedEffect(gewenstGesprekId) {
+        if (gewenstGesprekId != null) pagerState.animateScrollToPage(1)
     }
 
     Scaffold(

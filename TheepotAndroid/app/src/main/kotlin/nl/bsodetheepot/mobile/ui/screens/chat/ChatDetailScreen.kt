@@ -43,6 +43,7 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import nl.bsodetheepot.mobile.data.models.ChatBericht
 import nl.bsodetheepot.mobile.data.models.ChatGesprek
+import nl.bsodetheepot.mobile.data.push.MeldingRouter
 import nl.bsodetheepot.mobile.data.services.ChatService
 import nl.bsodetheepot.mobile.data.session.SessionViewModel
 import nl.bsodetheepot.mobile.ui.theme.TheepotGroenLicht
@@ -76,9 +77,11 @@ fun ChatDetailScreen(session: SessionViewModel, gesprek: ChatGesprek, onTerug: (
             channel.subscribe()
             flow.collect { laad() }
         }
+        MeldingRouter.zetActiefGesprek(gesprek.id)
         onDispose {
             job.cancel()
             scope.launch { runCatching { channel.unsubscribe() } }
+            MeldingRouter.zetActiefGesprek(null)
         }
     }
 

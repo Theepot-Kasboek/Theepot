@@ -8,5 +8,8 @@ xcuserdata/
 # Xcode project zelf wordt gegenereerd met `xcodegen generate` uit project.yml
 TheepotMobile.xcodeproj/
 
+# Entitlements-bestand wordt door xcodegen gegenereerd vanuit project.yml (properties-key)
+TheepotMobile/TheepotMobile.entitlements
+
 # Bevat echte Supabase-sleutels — nooit committen
 TheepotMobile/Services/Secrets.swift

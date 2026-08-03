@@ -39,6 +39,7 @@ import kotlinx.coroutines.launch
 import nl.bsodetheepot.mobile.data.models.ChatGesprek
 import nl.bsodetheepot.mobile.data.models.ChatType
 import nl.bsodetheepot.mobile.data.models.Profiel
+import nl.bsodetheepot.mobile.data.push.MeldingRouter
 import nl.bsodetheepot.mobile.data.services.ChatService
 import nl.bsodetheepot.mobile.data.session.SessionViewModel
 
@@ -61,6 +62,16 @@ fun ChatListScreen(session: SessionViewModel) {
     }
 
     LaunchedEffect(profiel?.id) { laad() }
+
+    // Opent het gesprek uit een pushmelding zodra zowel de deeplink als de
+    // gesprekkenlijst binnen zijn (welke van de twee het eerst klaar is, verschilt).
+    val gewenstGesprekId by MeldingRouter.gewenstGesprekId.collectAsState()
+    LaunchedEffect(gewenstGesprekId, gesprekken) {
+        val id = gewenstGesprekId ?: return@LaunchedEffect
+        val gevonden = gesprekken.firstOrNull { it.id == id } ?: return@LaunchedEffect
+        openGesprek = gevonden
+        MeldingRouter.verwerkt()
+    }
 
     val huidig = openGesprek
     if (huidig != null) {

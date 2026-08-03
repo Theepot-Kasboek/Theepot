@@ -5,16 +5,15 @@ Zusje van `../TheepotMobile` (de iOS-versie) — geen gedeelde code, wel dezelfd
 Supabase-database en dezelfde 1-op-1 aanpak per module. Geen wrapper om de
 webapp (dat is `../ios`, de Capacitor-shell).
 
-## Belangrijk: nog niet build-geverifieerd
+## Build-status
 
-Deze code is geschreven zonder Android Studio/SDK/Gradle op de ontwikkelmachine
-beschikbaar (in tegenstelling tot de iOS-app, die met `xcodebuild` geverifieerd
-kon worden). De eerste build in Android Studio kan dus kleine fixes nodig
-hebben — met name in de Supabase Kotlin SDK-aanroepen (`ChatService.kt`,
-`KasboekService.kt`, `MaaltijdlijstService.kt`), waarvan de exacte API tussen
-supabase-kt-versies weleens wijzigt. Raadpleeg bij compile-errors de
-[supabase-kt docs](https://github.com/supabase-community/supabase-kt) voor de
-huidige API van de gebruikte versie (`bom:2.6.0` in `app/build.gradle.kts`).
+`./gradlew assembleDebug` is geverifieerd (met de JBR uit Android Studio als
+JDK — de systeem-Java was hier nog versie 8, terwijl AGP 8.11.1 Java 11+
+vereist). De Firebase-pushcode (`data/push/`) compileert alleen als
+`app/google-services.json` aanwezig is; zie "Push notificaties" hieronder.
+Gebruikte Supabase Kotlin SDK: `bom:3.6.0` in `app/build.gradle.kts` — als de
+API in een latere versie wijzigt, raadpleeg dan de
+[supabase-kt docs](https://github.com/supabase-community/supabase-kt).
 
 ## Setup
 
@@ -31,11 +30,26 @@ huidige API van de gebruikte versie (`bom:2.6.0` in `app/build.gradle.kts`).
    (Instellingen → Over de telefoon → 7x op buildnummer tikken → Ontwikkelaarsopties
    → USB-debugging), en kies het toestel als run-target in Android Studio (▶).
 
+## Push notificaties (chat)
+
+FCM v1 (Firebase Cloud Messaging), via `data/push/TheepotMessagingService.kt` +
+`data/push/PushService.kt`. Het FCM-token wordt geüpsert in `push_apparaten`
+(op `token`, niet `profiel_id + token`), en een tik op een melding deeplinkt
+via `data/push/MeldingRouter.kt` naar het juiste gesprek. Serverkant: zie
+`../supabase-sql/push_meldingen.sql`, `../app/api/push/chat/route.ts` en
+`../lib/push-fcm.ts`.
+
+Handmatige stap vóór dit werkt: een Firebase-project aanmaken met Android-app
+`nl.bsodetheepot.mobile`, en het gedownloade `google-services.json` naar
+`app/` kopiëren. Dit bestand mag (in tegenstelling tot `Secrets.kt`) wél
+gecommit worden — het zit toch al in de APK en is niet geheim. Het echt
+geheime stuk (het Firebase service-account-JSON) staat alleen in Vercel-env.
+
 ## Structuur
 
 ```
 app/src/main/kotlin/nl/bsodetheepot/mobile/
-  app/            — MainActivity (entry point)
+  app/            — MainActivity (entry point, meldingtoestemming + deeplink)
   ui/
     theme/        — Theme.kt (merkkleuren, "liquid glass" kaartstijl), TheepotLogo
     nav/          — TheepotApp.kt (root: login vs dashboard)
@@ -44,6 +58,8 @@ app/src/main/kotlin/nl/bsodetheepot/mobile/
     models/       — data classes die de Supabase-tabellen spiegelen
     services/     — SupabaseManager, Secrets, DateUtils, één service per module
     session/      — SessionViewModel (auth + rechten, spiegelt AuthProvider.tsx)
+    push/         — PushService, PushOpslag, TheepotMessagingService, Meldingen,
+                    MeldingRouter (deeplink-state)
 ```
 
 ## Modules

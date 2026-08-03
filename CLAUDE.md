@@ -34,5 +34,9 @@ Rooster, Chat, Kasboek, Activiteiten, Nieuwsbrieven, Agenda, Prikbord, VE Planni
 
 ## Belangrijk
 - Vercel env vars: `NEXT_PUBLIC_SUPABASE_URL` en `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- Push notificaties (chat, native iOS/Android apps) — Vercel env vars:
+  `PUSH_WEBHOOK_SECRET`, `APNS_TEAM_ID`, `APNS_KEY_ID`, `APNS_BUNDLE_ID`,
+  `APNS_PRIVATE_KEY_B64`, `FCM_PROJECT_ID`, `FCM_SERVICE_ACCOUNT_B64`.
+  Zie `supabase-sql/push_meldingen.sql` voor de databasekant.
 - Superadmin: Rooster@bsodetheepot.nl
 - Zip-updates altijd noemen als: Theepot-Dashboard-update.zip

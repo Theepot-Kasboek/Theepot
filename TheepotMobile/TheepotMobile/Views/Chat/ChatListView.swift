@@ -2,16 +2,18 @@ import SwiftUI
 
 struct ChatListView: View {
     @EnvironmentObject var session: SessionStore
+    @EnvironmentObject var meldingRouter: MeldingRouter
     @State private var gesprekken: [ChatGesprek] = []
     @State private var isLoading = true
     @State private var toonNieuw = false
+    @State private var pad = NavigationPath()
 
     private var magStarten: Bool {
         session.isSuperadmin || session.rechten.chatStarten
     }
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $pad) {
             Group {
                 if isLoading {
                     ProgressView()
@@ -61,6 +63,8 @@ struct ChatListView: View {
             }
         }
         .task { await laad() }
+        .onChange(of: meldingRouter.gewenstGesprekId) { _, _ in openGewenstGesprekIndienMogelijk() }
+        .onChange(of: gesprekken) { _, _ in openGewenstGesprekIndienMogelijk() }
     }
 
     private func laad() async {
@@ -68,6 +72,15 @@ struct ChatListView: View {
         isLoading = true
         gesprekken = (try? await ChatService.gesprekken(profielId: profielId)) ?? []
         isLoading = false
+    }
+
+    /// Opent het gesprek uit een pushmelding zodra zowel de deeplink als de
+    /// gesprekkenlijst binnen zijn (welke van de twee het eerst klaar is, verschilt).
+    private func openGewenstGesprekIndienMogelijk() {
+        guard let gesprekId = meldingRouter.gewenstGesprekId,
+              let gesprek = gesprekken.first(where: { $0.id == gesprekId }) else { return }
+        pad.append(gesprek)
+        meldingRouter.verwerkt()
     }
 }
 

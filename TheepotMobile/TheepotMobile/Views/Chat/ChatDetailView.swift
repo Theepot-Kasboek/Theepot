@@ -4,6 +4,7 @@ import Supabase
 
 struct ChatDetailView: View {
     @EnvironmentObject var session: SessionStore
+    @EnvironmentObject var meldingRouter: MeldingRouter
     let gesprek: ChatGesprek
 
     @State private var berichten: [ChatBericht] = []
@@ -57,12 +58,14 @@ struct ChatDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .theepotAchtergrond()
         .task {
+            meldingRouter.actiefGesprekId = gesprek.id
             await laad()
             channel = ChatService.abonneerOpBerichten(gesprekId: gesprek.id) {
                 Task { await laad() }
             }
         }
         .onDisappear {
+            if meldingRouter.actiefGesprekId == gesprek.id { meldingRouter.actiefGesprekId = nil }
             Task { await channel?.unsubscribe() }
         }
         .onChange(of: fotoItem) { _, item in
@@ -73,8 +76,15 @@ struct ChatDetailView: View {
     private func laad() async {
         berichten = (try? await ChatService.berichten(gesprekId: gesprek.id)) ?? []
         guard let profielId = session.profiel?.id.uuidString.lowercased() else { return }
+        var werdOngelezenBerichtGelezen = false
         for bericht in berichten where bericht.afzenderId != profielId && !(bericht.gelezenDoor ?? []).contains(profielId) {
             try? await ChatService.markeerGelezen(bericht: bericht, profielId: profielId)
+            werdOngelezenBerichtGelezen = true
+        }
+        // Alleen de badge verversen als er ook echt iets als gelezen is gemarkeerd
+        // (anders draait dit onnodig bij elke realtime-update in dit gesprek).
+        if werdOngelezenBerichtGelezen {
+            await PushService.shared.werkBadgeBij(profielId: profielId)
         }
     }
 

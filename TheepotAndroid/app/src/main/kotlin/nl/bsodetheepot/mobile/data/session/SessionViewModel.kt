@@ -1,6 +1,7 @@
 package nl.bsodetheepot.mobile.data.session
 
-import androidx.lifecycle.ViewModel
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.auth.providers.builtin.Email
@@ -15,14 +16,19 @@ import nl.bsodetheepot.mobile.data.models.Profiel
 import nl.bsodetheepot.mobile.data.models.Rechten
 import nl.bsodetheepot.mobile.data.models.Rol
 import nl.bsodetheepot.mobile.data.models.Toegang
+import nl.bsodetheepot.mobile.data.push.PushService
 import nl.bsodetheepot.mobile.data.services.SupabaseManager
 
 /**
  * Houdt de ingelogde gebruiker (profiel + rechten + locatietoegang) bij,
  * spiegelt components/AuthProvider.tsx. Rollen: superadmin, directie,
  * leidinggevende, locatie.
+ *
+ * AndroidViewModel (in plaats van ViewModel) omdat push-registratie een
+ * Context nodig heeft; `by viewModels()` in MainActivity ondersteunt dit
+ * automatisch via de standaard SavedStateViewModelFactory.
  */
-class SessionViewModel : ViewModel() {
+class SessionViewModel(application: Application) : AndroidViewModel(application) {
     private val _profiel = MutableStateFlow<Profiel?>(null)
     val profiel: StateFlow<Profiel?> = _profiel.asStateFlow()
 
@@ -97,6 +103,7 @@ class SessionViewModel : ViewModel() {
 
     fun signOut() {
         viewModelScope.launch {
+            PushService.afmelden(getApplication())
             try {
                 SupabaseManager.client.auth.signOut()
             } catch (_: Exception) {
@@ -119,10 +126,12 @@ class SessionViewModel : ViewModel() {
             if (profiel.rol == Rol.SUPERADMIN) {
                 _rechten.value = Rechten.SUPERADMIN
                 _locatieToegang.value = emptyList()
+                PushService.registreerEnSync(getApplication(), userId)
                 return
             }
 
             coroutineScopeLoad(userId, profiel.rol)
+            PushService.registreerEnSync(getApplication(), userId)
         } catch (e: Exception) {
             _profiel.value = null
             _rechten.value = Rechten.GEEN

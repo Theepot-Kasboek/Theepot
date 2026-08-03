@@ -65,6 +65,7 @@ private enum HoofdTab: Int, CaseIterable, Identifiable {
 
 struct DashboardView: View {
     @EnvironmentObject var session: SessionStore
+    @EnvironmentObject var meldingRouter: MeldingRouter
     @State private var tab: HoofdTab = .meldingen
 
     private let barOnderrand: CGFloat = 10
@@ -92,6 +93,11 @@ struct DashboardView: View {
                 .frame(maxWidth: 760)
                 .padding(.horizontal, 14)
                 .padding(.bottom, barOnderrand)
+        }
+        // Tik op een chat-pushmelding: naar de chattab, ChatListView pakt de
+        // rest van de deeplink (openen van het juiste gesprek) zelf op.
+        .onChange(of: meldingRouter.gewenstGesprekId) { _, gesprekId in
+            if gesprekId != nil { tab = .chat }
         }
     }
 }

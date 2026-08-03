@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Zelfde groen als TheepotGroen in ui/theme/Theme.kt -->
+    <color name="theepot_groen">#FF8CC63F</color>
+</resources>

@@ -278,32 +278,19 @@ brandoefening_dagen (week_id, dag, datum, ...)
 
 ---
 
-## Mogelijke iOS App Aanpak
+## Mobiele apps (huidige stand)
 
-### Optie 1: Native iOS (Swift/SwiftUI)
-- Directe Supabase SDK voor Swift (`supabase-swift`)
-- Meest performant, beste iOS integratie
-- Werk: geheel opnieuw bouwen
+Er zijn inmiddels twee losstaande native apps naast de webapp (dit was eerder
+een open vraag in dit document — die keuze is dus al gemaakt):
 
-### Optie 2: React Native
-- Hergebruik van veel businesslogica uit Next.js
-- Supabase JS SDK werkt ook in React Native
-- Expo voor snellere ontwikkeling
+- **`TheepotMobile/`** — native iOS-app (Swift/SwiftUI), rechtstreeks op
+  `supabase-swift`. Zie `TheepotMobile/README.md`.
+- **`TheepotAndroid/`** — native Android-app (Kotlin/Compose), rechtstreeks op
+  `supabase-kt`. Zie `TheepotAndroid/README.md`.
+- **`ios/`** — losstaande Capacitor-wrapper om de webapp zelf (niet hetzelfde
+  als `TheepotMobile/`).
 
-### Optie 3: Progressive Web App (PWA)
-- Minste werk — Next.js app uitbreiden met PWA manifest
-- Werkt op iPhone via Safari "Voeg toe aan beginscherm"
-- Beperkte iOS ondersteuning (geen push notificaties, geen offline)
-
-### Optie 4: Capacitor (Ionic)
-- Wikkelt de bestaande webapplicatie in een native shell
-- Geeft toegang tot native functies (camera, notificaties)
-- Relatief weinig extra werk
-
-### Belangrijke vragen voor iOS:
-- Welke modules zijn het meest nodig op mobiel?
-- Push notificaties gewenst (chat, agenda)?
-- Camera integratie (bonnetjes, activiteit foto's)?
-- Offline werken gewenst?
-- App Store publicatie of intern distribueren (TestFlight/MDM)?
+Beide native apps hebben pushmeldingen voor chat: APNs direct op iOS, FCM v1
+op Android. Zie `supabase-sql/push_meldingen.sql`, `app/api/push/chat/route.ts`
+en `lib/push*.ts` voor de serverkant.
 

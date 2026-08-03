@@ -26,6 +26,10 @@ targets:
           NSAllowsArbitraryLoads: false
         NSCameraUsageDescription: Theepot gebruikt de camera om bonnetjes te scannen voor het kasboek.
         NSPhotoLibraryUsageDescription: Theepot gebruikt je foto's om bestanden te versturen in de chat.
+    entitlements:
+      path: TheepotMobile/TheepotMobile.entitlements
+      properties:
+        aps-environment: $(APS_ENVIRONMENT)
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: nl.bsodetheepot.mobile.dev
@@ -34,6 +38,11 @@ targets:
         DEVELOPMENT_TEAM: "2ZY9W886KN"
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+      configs:
+        Debug:
+          APS_ENVIRONMENT: development
+        Release:
+          APS_ENVIRONMENT: production
     dependencies:
       - package: Supabase
         product: Supabase

@@ -1,3 +1,5 @@
 <resources>
     <string name="app_name">Theepot</string>
+    <string name="notificatiekanaal_chat_id" translatable="false">chat_meldingen</string>
+    <string name="notificatiekanaal_chat_naam">Chatberichten</string>
 </resources>

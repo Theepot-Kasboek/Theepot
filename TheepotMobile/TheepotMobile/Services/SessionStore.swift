@@ -56,6 +56,7 @@ final class SessionStore: ObservableObject {
     }
 
     func signOut() async {
+        await PushService.shared.afmelden()
         try? await SupabaseManager.client.auth.signOut()
         profiel = nil
         rechten = .geen
@@ -76,6 +77,7 @@ final class SessionStore: ObservableObject {
             if profiel.rol == .superadmin {
                 rechten = .superadmin
                 locatieToegang = []
+                await registreerVoorPush(profielId: profiel.id.uuidString.lowercased())
                 return
             }
 
@@ -105,10 +107,19 @@ final class SessionStore: ObservableObject {
             let (account, rol, lt) = await (accountRecht, rolRecht, ltData)
             rechten = account ?? rol ?? .geen
             locatieToegang = lt
+            await registreerVoorPush(profielId: profiel.id.uuidString.lowercased())
         } catch {
             self.profiel = nil
             self.rechten = .geen
             self.errorMessage = "Profiel kon niet worden geladen."
         }
+    }
+
+    /// Ná login (niet bij appstart) vragen we toestemming voor pushmeldingen
+    /// en koppelen we een eventueel al ontvangen devicetoken aan dit profiel.
+    private func registreerVoorPush(profielId: String) async {
+        await PushService.shared.vraagToestemmingEnRegistreer()
+        await PushService.shared.syncToken(profielId: profielId)
+        await PushService.shared.werkBadgeBij(profielId: profielId)
     }
 }

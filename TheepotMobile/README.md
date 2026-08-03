@@ -40,14 +40,29 @@ rechten/locatietoegang (`SessionStore` spiegelt `components/AuthProvider.tsx`):
 Niet meegenomen (bewust buiten scope): Agenda, Activiteitenbeheer, Beleidsstukken,
 Nieuwsbrieven, Brandoefening, Medewerkers, Rechtenbeheer, 10-minutengesprekken, VE Planning.
 
+## Push notificaties (chat)
+
+APNs direct (geen Firebase SDK), via `App/AppDelegate.swift` + `Services/PushService.swift`.
+Toestemming wordt ná login gevraagd (niet bij appstart), het devicetoken wordt
+geüpsert in `push_apparaten` (op `token`, niet `profiel_id + token`), en een
+tik op een melding deeplinkt via `Services/MeldingRouter.swift` naar het
+juiste gesprek. Serverkant: zie `../supabase-sql/push_meldingen.sql`,
+`../app/api/push/chat/route.ts` en `../lib/push-apns.ts`.
+
+Handmatige stappen vóór dit werkt:
+- APNs Auth Key (.p8) aanmaken in de Apple Developer portal (Keys), Team ID `2ZY9W886KN`.
+- Push Notifications-capability aanvinken op App ID `nl.bsodetheepot.mobile.dev`.
+- Testen kan alleen op een echt toestel (niet in de Simulator).
+
 ## Structuur
 
 ```
 TheepotMobile/
-  App/            — app entry point
+  App/            — app entry point, AppDelegate (push-registratie/deeplink)
   Views/          — SwiftUI views, één map per module + DashboardView (tabbalk + "Meer")
   Models/         — Codable modellen die de Supabase-tabellen spiegelen
-  Services/       — SupabaseManager, SessionStore (auth + rechten), één service per module
+  Services/       — SupabaseManager, SessionStore (auth + rechten), PushService,
+                    MeldingRouter (deeplink-state), één service per module
   Support/        — Theme.swift: merkkleuren, "liquid glass" kaartstijl, logo-component
   Resources/      — Info.plist, Assets.xcassets (Logo, AppIcon, AccentColor)
 ```
