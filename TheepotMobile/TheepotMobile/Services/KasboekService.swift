@@ -72,6 +72,55 @@ enum KasboekService {
             .execute()
     }
 
+    /// Past een bestaande boeking aan. Een vervangen of verwijderd bonnetje wordt pas
+    /// uit de opslag gehaald nadat de boeking succesvol is bijgewerkt.
+    static func werkBij(entry: KasboekEntry, type: KasboekType, bedrag: Double, categorie: String?, omschrijving: String?, nieuwBonnetje: Data?, bonnetjeVerwijderen: Bool) async throws {
+        var bonnetjePad = entry.bonnetjePad
+        if let data = nieuwBonnetje {
+            let pad = "\(entry.locatie)/\(entry.periode)/\(Int(Date().timeIntervalSince1970 * 1000))_bonnetje.jpg"
+            try await SupabaseManager.client.storage
+                .from("bonnetjes")
+                .upload(pad, data: data, options: FileOptions(contentType: "image/jpeg"))
+            bonnetjePad = pad
+        } else if bonnetjeVerwijderen {
+            bonnetjePad = nil
+        }
+
+        struct Update: Encodable {
+            let type: String
+            let bedrag: Double
+            let categorie: String?
+            let omschrijving: String?
+            let bonnetjePad: String?
+
+            enum CodingKeys: String, CodingKey {
+                case type, bedrag, categorie, omschrijving
+                case bonnetjePad = "bonnetje_pad"
+            }
+
+            /// Handmatig coderen omdat de standaard Codable-synthese nil-velden weglaat;
+            /// een leeggemaakt veld moet juist expliciet als null naar de database.
+            func encode(to encoder: Encoder) throws {
+                var container = encoder.container(keyedBy: CodingKeys.self)
+                try container.encode(type, forKey: .type)
+                try container.encode(bedrag, forKey: .bedrag)
+                if let categorie { try container.encode(categorie, forKey: .categorie) } else { try container.encodeNil(forKey: .categorie) }
+                if let omschrijving { try container.encode(omschrijving, forKey: .omschrijving) } else { try container.encodeNil(forKey: .omschrijving) }
+                if let bonnetjePad { try container.encode(bonnetjePad, forKey: .bonnetjePad) } else { try container.encodeNil(forKey: .bonnetjePad) }
+            }
+        }
+
+        try await SupabaseManager.client
+            .from("kasboek_entries")
+            .update(Update(type: type.rawValue, bedrag: bedrag, categorie: categorie, omschrijving: omschrijving, bonnetjePad: bonnetjePad))
+            .eq("id", value: entry.id)
+            .execute()
+
+        if let oudPad = entry.bonnetjePad, oudPad != bonnetjePad {
+            _ = try? await SupabaseManager.client.storage.from("bonnetjes").remove(paths: [oudPad])
+        }
+    }
+
     static func verwijder(id: String) async throws {
         try await SupabaseManager.client
             .from("kasboek_entries")

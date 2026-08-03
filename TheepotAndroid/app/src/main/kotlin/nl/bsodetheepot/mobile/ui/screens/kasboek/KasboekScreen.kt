@@ -5,6 +5,7 @@ import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,6 +21,7 @@ import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -73,6 +75,7 @@ fun KasboekScreen(session: SessionViewModel) {
     var entries by remember { mutableStateOf<List<KasboekEntry>>(emptyList()) }
     var beginsaldo by remember { mutableStateOf(0.0) }
     var toonNieuw by remember { mutableStateOf(false) }
+    var bewerkEntry by remember { mutableStateOf<KasboekEntry?>(null) }
     val scope = rememberCoroutineScope()
 
     LaunchedEffect(Unit) {
@@ -154,6 +157,7 @@ fun KasboekScreen(session: SessionViewModel) {
                             val kleur = if (entry.type == KasboekType.INKOMST) TheepotGroenDonker else androidx.compose.ui.graphics.Color(0xFFC62828)
                             Text("€ ${"%.2f".format(entry.bedrag)}", color = kleur)
                         },
+                        modifier = if (magBewerken) Modifier.clickable { bewerkEntry = entry } else Modifier,
                     )
                 }
             }
@@ -166,6 +170,14 @@ fun KasboekScreen(session: SessionViewModel) {
             periode = DateUtils.periodeSleutel(maand),
             aangemaaktDoor = session.profiel.collectAsState().value?.id,
             onDismiss = { toonNieuw = false },
+            onOpgeslagen = { scope.launch { laad() } },
+        )
+    }
+
+    bewerkEntry?.let { teBewerken ->
+        BoekingBewerkenDialog(
+            entry = teBewerken,
+            onDismiss = { bewerkEntry = null },
             onOpgeslagen = { scope.launch { laad() } },
         )
     }
@@ -185,6 +197,153 @@ private val Color0xFF2E7D32 = androidx.compose.ui.graphics.Color(0xFF2E7D32)
 private val Color0xFFC62828 = androidx.compose.ui.graphics.Color(0xFFC62828)
 private val Color0xFF37474F = androidx.compose.ui.graphics.Color(0xFF37474F)
 
+/**
+ * Regelt cameratoestemming plus het maken van een foto en levert de bytes van het
+ * bonnetje terug. Geeft een lambda terug die het scannen start.
+ */
+@Composable
+private fun rememberBonnetjeScanner(onGescand: (ByteArray) -> Unit): () -> Unit {
+    val context = LocalContext.current
+    val huidigeCallback by rememberUpdatedState(onGescand)
+    var fotoUri by remember { mutableStateOf<android.net.Uri?>(null) }
+
+    val cameraLauncher = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { gelukt ->
+        if (gelukt) {
+            fotoUri?.let { uri ->
+                context.contentResolver.openInputStream(uri)?.use { huidigeCallback(it.readBytes()) }
+            }
+        }
+    }
+
+    fun startCamera() {
+        val file = File.createTempFile("bonnetje_", ".jpg", context.cacheDir)
+        val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+        fotoUri = uri
+        cameraLauncher.launch(uri)
+    }
+
+    val permissieLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { verleend ->
+        if (verleend) startCamera()
+    }
+
+    return {
+        val heeftPermissie = ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
+            PackageManager.PERMISSION_GRANTED
+        if (heeftPermissie) startCamera() else permissieLauncher.launch(Manifest.permission.CAMERA)
+    }
+}
+
+@Composable
+private fun BoekingBewerkenDialog(
+    entry: KasboekEntry,
+    onDismiss: () -> Unit,
+    onOpgeslagen: () -> Unit,
+) {
+    var type by remember { mutableStateOf(entry.type) }
+    var bedragTekst by remember { mutableStateOf("%.2f".format(entry.bedrag)) }
+    var omschrijving by remember { mutableStateOf(entry.omschrijving ?: "") }
+    var categorieen by remember { mutableStateOf<List<String>>(emptyList()) }
+    var categorie by remember { mutableStateOf(entry.categorie) }
+    var nieuwBonnetje by remember { mutableStateOf<ByteArray?>(null) }
+    var bonnetjeVerwijderen by remember { mutableStateOf(false) }
+    var bezig by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+
+    LaunchedEffect(Unit) {
+        categorieen = runCatching { KasboekService.categorieen() }.getOrDefault(emptyList())
+    }
+
+    val startScan = rememberBonnetjeScanner { bytes ->
+        nieuwBonnetje = bytes
+        bonnetjeVerwijderen = false
+    }
+
+    val bedrag = bedragTekst.replace(",", ".").toDoubleOrNull()
+    val heeftBonnetje = nieuwBonnetje != null || (entry.bonnetjePad != null && !bonnetjeVerwijderen)
+
+    // Een categorie die inmiddels uit de lijst is verwijderd blijft kiesbaar,
+    // zodat hij niet ongemerkt van de boeking verdwijnt.
+    val kiesbareCategorieen = entry.categorie
+        ?.takeUnless { it in categorieen }
+        ?.let { categorieen + it }
+        ?: categorieen
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Boeking bewerken") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    KasboekType.entries.forEach { t ->
+                        Button(
+                            onClick = { type = t },
+                            colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                                containerColor = if (type == t) TheepotGroenDonker else MaterialTheme.colorScheme.surfaceVariant,
+                            ),
+                        ) { Text(if (t == KasboekType.UITGAVE) "Uitgave" else "Inkomst") }
+                    }
+                }
+                OutlinedTextField(value = bedragTekst, onValueChange = { bedragTekst = it }, label = { Text("Bedrag") })
+                OutlinedTextField(value = omschrijving, onValueChange = { omschrijving = it }, label = { Text("Omschrijving") })
+
+                DropdownVeld(
+                    label = "Categorie",
+                    huidigeTekst = categorie ?: "Geen",
+                    opties = listOf("Geen" to { categorie = null }) +
+                        kiesbareCategorieen.map { c -> c to { categorie = c } },
+                )
+
+                TextButton(onClick = startScan) {
+                    Icon(Icons.Filled.CameraAlt, contentDescription = null)
+                    Text(
+                        when {
+                            nieuwBonnetje != null -> "Nieuw bonnetje vastgelegd ✓"
+                            heeftBonnetje -> "Bonnetje vervangen"
+                            else -> "Scan bonnetje"
+                        },
+                    )
+                }
+
+                if (heeftBonnetje) {
+                    TextButton(onClick = { nieuwBonnetje = null; bonnetjeVerwijderen = true }) {
+                        Icon(Icons.Filled.Delete, contentDescription = null)
+                        Text("Bonnetje verwijderen")
+                    }
+                } else if (bonnetjeVerwijderen) {
+                    TextButton(onClick = { bonnetjeVerwijderen = false }) {
+                        Text("Bonnetje wordt verwijderd — toch behouden")
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                enabled = bedrag != null && bedrag > 0 && !bezig,
+                onClick = {
+                    bezig = true
+                    scope.launch {
+                        runCatching {
+                            KasboekService.werkBij(
+                                entry = entry,
+                                type = type,
+                                bedrag = bedrag ?: 0.0,
+                                categorie = categorie,
+                                omschrijving = omschrijving.ifBlank { null },
+                                nieuwBonnetje = nieuwBonnetje,
+                                bonnetjeVerwijderen = bonnetjeVerwijderen,
+                            )
+                        }
+                        bezig = false
+                        onOpgeslagen()
+                        onDismiss()
+                    }
+                },
+            ) { Text("Opslaan") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Annuleren") } },
+    )
+}
+
 @Composable
 private fun NieuweBoekingDialog(
     locatieNaam: String,
@@ -201,31 +360,12 @@ private fun NieuweBoekingDialog(
     var bonnetjeBytes by remember { mutableStateOf<ByteArray?>(null) }
     var bezig by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
-    val context = LocalContext.current
-    var fotoUri by remember { mutableStateOf<android.net.Uri?>(null) }
 
     LaunchedEffect(Unit) {
         categorieen = runCatching { KasboekService.categorieen() }.getOrDefault(emptyList())
     }
 
-    val cameraLauncher = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { gelukt ->
-        if (gelukt) {
-            fotoUri?.let { uri ->
-                bonnetjeBytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
-            }
-        }
-    }
-
-    fun startCamera() {
-        val file = File.createTempFile("bonnetje_", ".jpg", context.cacheDir)
-        val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
-        fotoUri = uri
-        cameraLauncher.launch(uri)
-    }
-
-    val cameraPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { verleend ->
-        if (verleend) startCamera()
-    }
+    val startScan = rememberBonnetjeScanner { bytes -> bonnetjeBytes = bytes }
 
     val bedrag = bedragTekst.replace(",", ".").toDoubleOrNull()
 
@@ -254,15 +394,7 @@ private fun NieuweBoekingDialog(
                         categorieen.map { c -> c to { categorie = c } },
                 )
 
-                TextButton(onClick = {
-                    val heeftPermissie = ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
-                        PackageManager.PERMISSION_GRANTED
-                    if (heeftPermissie) {
-                        startCamera()
-                    } else {
-                        cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
-                    }
-                }) {
+                TextButton(onClick = startScan) {
                     Icon(Icons.Filled.CameraAlt, contentDescription = null)
                     Text(if (bonnetjeBytes != null) "Bonnetje vastgelegd ✓" else "Scan bonnetje")
                 }

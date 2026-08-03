@@ -9,6 +9,7 @@ struct KasboekView: View {
     @State private var beginsaldo: Double = 0
     @State private var isLoading = true
     @State private var toonNieuw = false
+    @State private var bewerkEntry: KasboekEntry?
 
     private var periode: String { KasboekService.periodeSleutel(maand) }
 
@@ -62,7 +63,12 @@ struct KasboekView: View {
                     ContentUnavailableView("Geen boekingen", systemImage: "eurosign.circle")
                 } else {
                     List(entries) { entry in
-                        KasboekRow(entry: entry)
+                        if magBewerken {
+                            Button { bewerkEntry = entry } label: { KasboekRow(entry: entry) }
+                                .buttonStyle(.plain)
+                        } else {
+                            KasboekRow(entry: entry)
+                        }
                     }
                     .listStyle(.insetGrouped)
                     .refreshable { await laad() }
@@ -83,6 +89,9 @@ struct KasboekView: View {
                 if let actieveLocatie {
                     NieuweBoekingView(locatieNaam: actieveLocatie.naam, periode: periode) { await laad() }
                 }
+            }
+            .sheet(item: $bewerkEntry) { entry in
+                BoekingBewerkenView(entry: entry) { await laad() }
             }
         }
         .task { await laadLocaties() }
@@ -232,6 +241,136 @@ private struct NieuweBoekingView: View {
             aangemaaktDoor: profielId, bonnetjeData: bonnetjeData,
             bonnetjeBestandsnaam: bonnetjeData != nil ? "bonnetje.jpg" : nil
         )
+        await onKlaar()
+        dismiss()
+    }
+}
+
+private struct BoekingBewerkenView: View {
+    @Environment(\.dismiss) private var dismiss
+    let entry: KasboekEntry
+    let onKlaar: () async -> Void
+
+    @State private var type: KasboekType = .uitgave
+    @State private var bedragTekst = ""
+    @State private var omschrijving = ""
+    @State private var categorie: String?
+    @State private var categorieen: [String] = []
+    @State private var nieuwBonnetje: Data?
+    @State private var bonnetjeVerwijderen = false
+    @State private var toonScanner = false
+    @State private var bezig = false
+    @State private var fout: String?
+
+    /// Een categorie die inmiddels uit de lijst is verwijderd blijft kiesbaar,
+    /// zodat hij niet ongemerkt van de boeking verdwijnt.
+    private var kiesbareCategorieen: [String] {
+        guard let eigen = entry.categorie, !categorieen.contains(eigen) else { return categorieen }
+        return categorieen + [eigen]
+    }
+
+    private var heeftBonnetje: Bool {
+        nieuwBonnetje != nil || (entry.bonnetjePad != nil && !bonnetjeVerwijderen)
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Picker("Type", selection: $type) {
+                    Text("Uitgave").tag(KasboekType.uitgave)
+                    Text("Inkomst").tag(KasboekType.inkomst)
+                }
+                .pickerStyle(.segmented)
+
+                TextField("Bedrag (€)", text: $bedragTekst)
+                    .keyboardType(.decimalPad)
+                TextField("Omschrijving", text: $omschrijving)
+                Picker("Categorie", selection: $categorie) {
+                    Text("Geen").tag(String?.none)
+                    ForEach(kiesbareCategorieen, id: \.self) { (naam: String) in
+                        Text(naam).tag(Optional(naam))
+                    }
+                }
+
+                Section("Bonnetje") {
+                    if nieuwBonnetje != nil {
+                        Label("Nieuw bonnetje gescand", systemImage: "checkmark.circle.fill")
+                            .foregroundStyle(Color.theepotGroenDonker)
+                    } else if entry.bonnetjePad != nil && !bonnetjeVerwijderen {
+                        Label("Bonnetje toegevoegd", systemImage: "paperclip")
+                            .foregroundStyle(.secondary)
+                    } else if bonnetjeVerwijderen {
+                        Label("Wordt verwijderd bij opslaan", systemImage: "trash")
+                            .foregroundStyle(.red)
+                    }
+
+                    Button {
+                        toonScanner = true
+                    } label: {
+                        Label(heeftBonnetje ? "Opnieuw scannen" : "Scan bonnetje", systemImage: "doc.viewfinder")
+                            .foregroundStyle(Color.theepotGroenDonker)
+                    }
+
+                    if heeftBonnetje {
+                        Button(role: .destructive) {
+                            nieuwBonnetje = nil
+                            bonnetjeVerwijderen = true
+                        } label: {
+                            Label("Bonnetje verwijderen", systemImage: "trash")
+                        }
+                    } else if bonnetjeVerwijderen {
+                        Button("Toch behouden") { bonnetjeVerwijderen = false }
+                    }
+                }
+
+                if let fout {
+                    Section { Text(fout).foregroundStyle(.red).font(.footnote) }
+                }
+            }
+            .navigationTitle("Boeking bewerken")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Annuleren") { dismiss() } }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Opslaan") { Task { await opslaan() } }
+                        .disabled(bedrag == nil || bezig)
+                }
+            }
+            .fullScreenCover(isPresented: $toonScanner) {
+                DocumentScannerView { data in
+                    nieuwBonnetje = data
+                    bonnetjeVerwijderen = false
+                }
+                .ignoresSafeArea()
+            }
+        }
+        .task {
+            type = entry.type
+            bedragTekst = String(format: "%.2f", entry.bedrag)
+            omschrijving = entry.omschrijving ?? ""
+            categorie = entry.categorie
+            categorieen = (try? await KasboekService.categorieen()) ?? KasboekCategorieen.standaard
+        }
+    }
+
+    private var bedrag: Double? {
+        Double(bedragTekst.replacingOccurrences(of: ",", with: "."))
+    }
+
+    private func opslaan() async {
+        guard let bedrag else { return }
+        bezig = true
+        defer { bezig = false }
+        do {
+            try await KasboekService.werkBij(
+                entry: entry, type: type, bedrag: bedrag, categorie: categorie,
+                omschrijving: omschrijving.isEmpty ? nil : omschrijving,
+                nieuwBonnetje: nieuwBonnetje, bonnetjeVerwijderen: bonnetjeVerwijderen
+            )
+        } catch {
+            fout = "Opslaan mislukt: \(error.localizedDescription)"
+            return
+        }
         await onKlaar()
         dismiss()
     }

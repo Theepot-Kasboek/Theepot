@@ -85,6 +85,49 @@ object KasboekService {
         )
     }
 
+    @Serializable
+    private data class EntryUpdate(
+        val type: String,
+        val bedrag: Double,
+        val categorie: String?,
+        val omschrijving: String?,
+        val bonnetje_pad: String?,
+    )
+
+    /**
+     * Past een bestaande boeking aan. Een vervangen of verwijderd bonnetje wordt pas
+     * uit de opslag gehaald nadat de boeking succesvol is bijgewerkt.
+     */
+    suspend fun werkBij(
+        entry: KasboekEntry,
+        type: KasboekType,
+        bedrag: Double,
+        categorie: String?,
+        omschrijving: String?,
+        nieuwBonnetje: ByteArray?,
+        bonnetjeVerwijderen: Boolean,
+    ) {
+        var bonnetjePad = entry.bonnetjePad
+        if (nieuwBonnetje != null) {
+            val pad = "${entry.locatie}/${entry.periode}/${System.currentTimeMillis()}_bonnetje.jpg"
+            SupabaseManager.client.storage["bonnetjes"].upload(pad, nieuwBonnetje)
+            bonnetjePad = pad
+        } else if (bonnetjeVerwijderen) {
+            bonnetjePad = null
+        }
+
+        SupabaseManager.client.postgrest["kasboek_entries"].update(
+            EntryUpdate(type.name.lowercase(), bedrag, categorie, omschrijving, bonnetjePad),
+        ) {
+            filter { eq("id", entry.id) }
+        }
+
+        val oudPad = entry.bonnetjePad
+        if (oudPad != null && oudPad != bonnetjePad) {
+            runCatching { SupabaseManager.client.storage["bonnetjes"].delete(oudPad) }
+        }
+    }
+
     suspend fun verwijder(id: String) {
         SupabaseManager.client.postgrest["kasboek_entries"].delete { filter { eq("id", id) } }
     }
