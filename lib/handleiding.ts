@@ -17,10 +17,10 @@ export interface Hoofdstuk {
   blokken: Blok[]
 }
 
-export const HANDLEIDING_VERSIE = 'versie 1 augustus 2026'
+export const HANDLEIDING_VERSIE = 'versie 3 augustus 2026'
 
 export const HANDLEIDING_INLEIDING =
-  'Deze handleiding legt uit hoe je negen onderdelen van het dashboard in je dagelijkse werk gebruikt, ' +
+  'Deze handleiding legt uit hoe je tien onderdelen van het dashboard in je dagelijkse werk gebruikt, ' +
   'en hoe de app op je telefoon werkt. Houd hem ernaast als naslagwerk.'
 
 export const HANDLEIDING_SLOT =
@@ -323,8 +323,72 @@ export const HOOFDSTUKKEN: Hoofdstuk[] = [
     ],
   },
   {
-    id: 'app-op-je-telefoon',
+    id: 'kilometerstanden',
     nummer: 'X',
+    titel: 'Kilometerstanden',
+    intro:
+      "Voor het bijhouden van de kilometerstanden van de auto's en bussen, zodat je per periode ziet " +
+      'hoeveel er gereden is.',
+    blokken: [
+      {
+        soort: 'stappen',
+        kop: 'Zo gebruik je het',
+        stappen: [
+          'Open Kilometerstanden. Links staan alle voertuigen met hun kenteken, de omschrijving en hoe vaak de stand ingevuld moet worden.',
+          'Klik op een voertuig. Rechts zie je de huidige stand, hoeveel er in de laatste periode is gereden, en de hele geschiedenis.',
+          'Klik op "Stand invoeren" om een nieuwe kilometerstand vast te leggen.',
+          'Vul de kilometerstand in. De vorige stand staat er boven, en zodra je een hoger getal invult zie je meteen hoeveel kilometer erbij is gekomen.',
+          'De datum staat al op vandaag. Pas hem aan als je de stand op een eerdere dag hebt afgelezen.',
+          'Voeg eventueel een notitie toe, bijvoorbeeld "na grote beurt" of "tankbeurt".',
+          'Sla op — de stand komt bovenaan de geschiedenis te staan, met de datum en jouw naam erbij.',
+        ],
+        chips: ['Kilometerstand — verplicht', 'Datum', 'Notitie'],
+      },
+      {
+        soort: 'uitleg',
+        label: 'Het gekleurde streepje bij een voertuig',
+        tekst:
+          'Elk voertuig heeft een kleur die aangeeft of de stand weer ingevuld moet worden. Die wordt ' +
+          'berekend vanaf de laatste registratie plus de ingestelde regelmaat (bijvoorbeeld elke maand). ' +
+          '**Groen** betekent dat je nog even hebt, **oranje** dat het voertuig binnen twee weken aan de ' +
+          'beurt is, en **rood** dat de datum al voorbij is — dan staat er ook "Te laat" bij het voertuig. ' +
+          'Is er nog nooit een stand ingevuld, dan is er niets te berekenen en staat er "Nog geen registraties".',
+      },
+      {
+        soort: 'weetje',
+        label: 'Goed om te weten',
+        tekst:
+          'Een nieuwe stand moet altijd hoger zijn dan de vorige. Vul je een lager getal in, dan krijg je ' +
+          'een melding en wordt er niets opgeslagen — een teller loopt immers niet terug. Voertuigen ' +
+          'toevoegen, aanpassen of verwijderen, en een verkeerd ingevoerde registratie weghalen, kan ' +
+          'alleen de beheerder. Zie je een fout in de lijst staan? Geef dat door.',
+      },
+      {
+        soort: 'stappen',
+        kop: 'Op de telefoon',
+        stappen: [
+          'Open de app en tik onderin op **Kilometers**. Staat de tab niet in beeld, veeg de balk onderin dan opzij.',
+          'Kies bovenaan het voertuig. In de app staan alleen de voertuigen die actief zijn.',
+          'Daaronder staat de laatst bekende stand. Vergelijk die met wat je op de teller ziet, zodat je zeker weet dat je het goede voertuig te pakken hebt.',
+          'Vul bij "Kilometerstand" de nieuwe stand in — alleen cijfers, dus zonder punt of komma.',
+          'Controleer de datum. Op de iPhone kies je die met de datumkiezer en staat hij al op vandaag; op Android typ je hem als jjjj-mm-dd.',
+          'Voeg eventueel nog een notitie toe en tik op "Opslaan".',
+          'Je krijgt de melding "Kilometerstand opgeslagen" te zien, en de laatst bekende stand springt naar het getal dat je net invulde. Is je stand niet hoger dan de vorige, dan verschijnt er in plaats daarvan een rode melding.',
+        ],
+      },
+      {
+        soort: 'weetje',
+        label: 'Verschil met het dashboard',
+        tekst:
+          'In de app vul je alleen een nieuwe stand in. De geschiedenis, het aantal gereden kilometers per ' +
+          'periode en de kleur die aangeeft wanneer een voertuig weer aan de beurt is, zie je in het ' +
+          'dashboard in de browser.',
+      },
+    ],
+  },
+  {
+    id: 'app-op-je-telefoon',
+    nummer: 'XI',
     titel: 'De app op je telefoon',
     intro:
       'Naast het dashboard in de browser is er een aparte app voor de iPhone en voor Android. Het is geen ' +
@@ -337,10 +401,10 @@ export const HOOFDSTUKKEN: Hoofdstuk[] = [
           'De app staat niet in de App Store of de Play Store. Wil je hem op de locatietelefoon? Neem contact op met Lucas — hij zet de app op het toestel.',
           'Log in met hetzelfde e-mailadres en wachtwoord als in het dashboard. Je hoeft geen apart account aan te maken.',
           'Je rol en je locatietoegang gelden ook in de app: je ziet dezelfde locaties, en waar je in het dashboard alleen mag kijken, kun je in de app ook niets aanpassen.',
-          'Op de **iPhone** staan onderin vier hoofdmodules — Meldingen, Chat, Taken en Kasboek — plus een knop "Meer" voor Maaltijdlijst, Vakantieplanningen, Weekplanningen, Kilometerstanden en je account.',
-          'Op **Android** staan alle modules naast elkaar in één balk onderin. Veeg de balk of het scherm naar links of rechts om verder te bladeren.',
+          'Onderin staat op beide toestellen één balk met alle modules naast elkaar: Meldingen, Chat, Taken, Kasboek, Maaltijden, Vakantie, Weekplan, Kilometers en Account.',
+          'Past de balk niet op je scherm? Veeg hem dan naar links of rechts om de rest te zien. De module waar je in zit schuift vanzelf in beeld.',
           'Wat je in de app invult staat direct in het dashboard, en andersom. Het is dezelfde database, geen aparte kopie die je later nog moet overzetten.',
-          'Uitloggen doe je op de iPhone via "Meer" en op Android via "Account".',
+          'Uitloggen doe je via de tab "Account", helemaal rechts in de balk.',
         ],
       },
       {
@@ -402,7 +466,8 @@ export const HOOFDSTUKKEN: Hoofdstuk[] = [
             naam: 'Kilometerstanden',
             tekst:
               'Een nieuwe kilometerstand invullen bij een voertuig, met de laatst bekende stand erbij zodat ' +
-              'je kunt controleren of je goed zit. Voertuigen beheren doe je in het dashboard.',
+              'je kunt controleren of je goed zit. De geschiedenis en het voertuigbeheer blijven in het ' +
+              'dashboard. Stap voor stap staat het in hoofdstuk X.',
           },
         ],
       },
