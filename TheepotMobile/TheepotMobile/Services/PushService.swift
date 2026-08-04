@@ -21,6 +21,11 @@ final class PushService {
         set { UserDefaults.standard.set(newValue, forKey: tokenSleutel) }
     }
 
+    /// Profiel van de huidige sessie, bewaard zodat `ontvangenToken` de sync
+    /// alsnog kan starten zodra het devicetoken binnenkomt — dat gebeurt
+    /// asynchroon (via AppDelegate) en vaak pas ná `syncToken(profielId:)`.
+    private var actieveProfielId: String?
+
     private var omgeving: String {
         #if DEBUG
         return "sandbox"
@@ -32,18 +37,31 @@ final class PushService {
     /// Vraagt toestemming en registreert voor remote notifications. Wordt ná
     /// login aangeroepen (niet bij appstart) — iOS geeft maar één kans om het
     /// te vragen, dus vragen op het moment dat de gebruiker de context snapt.
-    func vraagToestemmingEnRegistreer() async {
+    func vraagToestemmingEnRegistreer(profielId: String) async {
+        actieveProfielId = profielId
         let center = UNUserNotificationCenter.current()
-        guard let toegestaan = try? await center.requestAuthorization(options: [.alert, .badge, .sound]),
-              toegestaan else { return }
-        UIApplication.shared.registerForRemoteNotifications()
+        do {
+            let toegestaan = try await center.requestAuthorization(options: [.alert, .badge, .sound])
+            guard toegestaan else {
+                print("[Push] Gebruiker heeft pushtoestemming geweigerd")
+                return
+            }
+            print("[Push] Toestemming verleend, registreert voor remote notifications")
+            UIApplication.shared.registerForRemoteNotifications()
+        } catch {
+            print("[Push] requestAuthorization gaf een fout: \(error.localizedDescription)")
+        }
     }
 
-    /// Aangeroepen door AppDelegate zodra het devicetoken binnenkomt. Het
-    /// token kan binnenkomen vóórdat het profiel geladen is, dus eerst alleen
-    /// bewaren; `syncToken(profielId:)` haalt hem later alsnog op.
+    /// Aangeroepen door AppDelegate zodra het devicetoken binnenkomt. Dit
+    /// gebeurt asynchroon en meestal ná `vraagToestemmingEnRegistreer` +
+    /// `syncToken(profielId:)` al zijn afgerond — dus sync hier opnieuw als
+    /// we een actief profiel kennen, anders blijft `push_apparaten` leeg.
     func ontvangenToken(_ token: String) async {
         opgeslagenToken = token
+        if let profielId = actieveProfielId {
+            await syncToken(profielId: profielId)
+        }
     }
 
     private struct NieuwApparaat: Encodable {
@@ -68,7 +86,10 @@ final class PushService {
     /// een apparaat, niet een gebruiker. Zo blijven meldingen van een vorige
     /// gebruiker op hetzelfde toestel niet hangen.
     func syncToken(profielId: String) async {
-        guard let token = opgeslagenToken else { return }
+        guard let token = opgeslagenToken else {
+            print("[Push] syncToken overgeslagen: nog geen devicetoken ontvangen van APNs")
+            return
+        }
         let apparaat = NieuwApparaat(
             profielId: profielId,
             token: token,
@@ -78,10 +99,15 @@ final class PushService {
             appVersie: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String,
             apparaatNaam: await UIDevice.current.name
         )
-        try? await SupabaseManager.client
-            .from("push_apparaten")
-            .upsert(apparaat, onConflict: "token")
-            .execute()
+        do {
+            try await SupabaseManager.client
+                .from("push_apparaten")
+                .upsert(apparaat, onConflict: "token")
+                .execute()
+            print("[Push] Token succesvol weggeschreven naar push_apparaten voor profiel \(profielId)")
+        } catch {
+            print("[Push] Upsert naar push_apparaten MISLUKT: \(error)")
+        }
     }
 
     /// Verwijdert de rij bij uitloggen. Bewust NIET
@@ -89,11 +115,15 @@ final class PushService {
     /// en moet werken voor de volgende gebruiker die op dit toestel inlogt.
     func afmelden() async {
         guard let token = opgeslagenToken else { return }
-        try? await SupabaseManager.client
-            .from("push_apparaten")
-            .delete()
-            .eq("token", value: token)
-            .execute()
+        do {
+            try await SupabaseManager.client
+                .from("push_apparaten")
+                .delete()
+                .eq("token", value: token)
+                .execute()
+        } catch {
+            print("[Push] Verwijderen uit push_apparaten MISLUKT: \(error)")
+        }
     }
 
     private struct BadgeParams: Encodable {

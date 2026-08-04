@@ -15,11 +15,14 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
 
     func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
         let token = deviceToken.map { String(format: "%02.2hhx", $0) }.joined()
+        print("[Push] APNs-registratie geslaagd, token: \(token)")
         Task { await PushService.shared.ontvangenToken(token) }
     }
 
     func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: Error) {
-        // Stil falen: geen pushtoken betekent geen meldingen, de rest van de app blijft werken.
+        // Geen pushtoken betekent geen meldingen, de rest van de app blijft werken —
+        // maar we loggen wel, anders is dit onmogelijk te diagnosticeren.
+        print("[Push] APNs-registratie MISLUKT: \(error.localizedDescription)")
     }
 
     /// Onderdrukt de banner als de gebruiker het gesprek al open heeft staan.

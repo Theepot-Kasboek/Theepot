@@ -118,7 +118,10 @@ final class SessionStore: ObservableObject {
     /// Ná login (niet bij appstart) vragen we toestemming voor pushmeldingen
     /// en koppelen we een eventueel al ontvangen devicetoken aan dit profiel.
     private func registreerVoorPush(profielId: String) async {
-        await PushService.shared.vraagToestemmingEnRegistreer()
+        await PushService.shared.vraagToestemmingEnRegistreer(profielId: profielId)
+        // Vangt het geval op dat het devicetoken al bekend was vóór deze login
+        // (bv. app-herstart); als het token nog moet binnenkomen doet
+        // `PushService.ontvangenToken` de sync zelf zodra het zover is.
         await PushService.shared.syncToken(profielId: profielId)
         await PushService.shared.werkBadgeBij(profielId: profielId)
     }
