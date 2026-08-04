@@ -2,11 +2,14 @@ package nl.bsodetheepot.mobile.data.push
 
 import android.content.Context
 import android.os.Build
+import android.util.Log
 import com.google.firebase.messaging.FirebaseMessaging
 import io.github.jan.supabase.postgrest.postgrest
 import kotlinx.coroutines.tasks.await
 import nl.bsodetheepot.mobile.data.models.PushApparaat
 import nl.bsodetheepot.mobile.data.services.SupabaseManager
+
+private const val TAG = "Push"
 
 /**
  * Beheert het FCM-devicetoken en de rij in `push_apparaten`. Analoog aan
@@ -20,7 +23,13 @@ object PushService {
     /** Haalt (of genereert) het FCM-token op en koppelt het aan dit profiel. */
     suspend fun registreerEnSync(context: Context, profielId: String) {
         PushOpslag.bewaarProfielId(context, profielId)
-        val token = runCatching { FirebaseMessaging.getInstance().token.await() }.getOrNull() ?: return
+        val token = runCatching { FirebaseMessaging.getInstance().token.await() }
+            .onFailure { Log.e(TAG, "FCM-tokenophaal MISLUKT", it) }
+            .getOrNull()
+        if (token == null) {
+            Log.d(TAG, "syncToken overgeslagen: nog geen FCM-token beschikbaar")
+            return
+        }
         PushOpslag.bewaarToken(context, token)
         syncToken(context, profielId, token)
     }
@@ -30,6 +39,8 @@ object PushService {
         val apparaat = PushApparaat(
             profielId = profielId,
             token = token,
+            platform = "android",
+            omgeving = "productie",
             bundelId = context.packageName,
             appVersie = runCatching {
                 @Suppress("DEPRECATION")
@@ -39,6 +50,10 @@ object PushService {
         )
         runCatching {
             SupabaseManager.client.postgrest["push_apparaten"].upsert(apparaat) { onConflict = "token" }
+        }.onSuccess {
+            Log.d(TAG, "Token succesvol weggeschreven naar push_apparaten voor profiel $profielId")
+        }.onFailure {
+            Log.e(TAG, "Upsert naar push_apparaten MISLUKT", it)
         }
     }
 
@@ -52,6 +67,8 @@ object PushService {
         if (token != null) {
             runCatching {
                 SupabaseManager.client.postgrest["push_apparaten"].delete { filter { eq("token", token) } }
+            }.onFailure {
+                Log.e(TAG, "Verwijderen uit push_apparaten MISLUKT", it)
             }
         }
         PushOpslag.bewaarProfielId(context, null)

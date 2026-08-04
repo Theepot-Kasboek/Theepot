@@ -13,8 +13,12 @@ import kotlinx.serialization.Serializable
 data class PushApparaat(
     @SerialName("profiel_id") val profielId: String,
     val token: String,
-    val platform: String = "android",
-    val omgeving: String = "productie",
+    // Geen default-waarde: kotlinx.serialization slaat velden met een
+    // default over bij het serialiseren (encodeDefaults staat niet aan),
+    // waardoor `platform` ontbrak in de insert en de NOT NULL-constraint
+    // in de database faalde. Altijd expliciet meegeven bij constructie.
+    val platform: String,
+    val omgeving: String,
     @SerialName("bundel_id") val bundelId: String? = null,
     @SerialName("app_versie") val appVersie: String? = null,
     @SerialName("apparaat_naam") val apparaatNaam: String? = null,

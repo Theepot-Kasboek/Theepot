@@ -13,3 +13,6 @@
 
 # Bevat echte Supabase-sleutels, nooit committen.
 **/Secrets.kt
+
+# Bevat Firebase-projectconfig (FCM), nooit committen.
+/app/google-services.json
