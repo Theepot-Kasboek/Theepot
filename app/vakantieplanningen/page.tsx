@@ -27,15 +27,18 @@ interface Planning {
   aangemaakt_op: string
   start_datum_noord: string | null
   eind_datum_noord: string | null
+  subthema_modus: SubthemaModus
 }
 
 type Regio = 'midden' | 'noord'
+type SubthemaModus = 'week' | 'dag'
 
 interface Week {
   id: string
   planning_id: string
   week_nummer: number
   naam: string
+  dag_subthemas: Partial<Record<Dag, string>> | null
 }
 
 interface VakantieActiviteit {
@@ -212,6 +215,12 @@ export default function VakantieplanningenPage() {
     if (error) { setToast({ bericht: 'Mislukt: ' + error.message, type: 'error' }); return }
     setNieuweWeekModal(false)
     setToast({ bericht: `Week ${weekNr} toegevoegd!`, type: 'success' })
+    await haalWekenOp(actievePlanning.id)
+  }
+
+  async function bewerkWeekSubthema(weekId: string, data: { naam?: string; dag_subthemas?: Partial<Record<Dag, string>> }) {
+    if (!actievePlanning) return
+    await getSupabase().from('vakantie_weken').update(data).eq('id', weekId)
     await haalWekenOp(actievePlanning.id)
   }
 
@@ -554,6 +563,7 @@ export default function VakantieplanningenPage() {
             onBewerk={(a) => { setBewerkActiviteit(a); setActiviteitModal({ weekId: a.week_id, dag: a.dag }) }}
             onVerwijder={verwijderActiviteit}
             onJsonImport={(dag) => setJsonImportModal({ weekId: actieveWeekObj.id, dag })}
+            onSubthemaOp={bewerkWeekSubthema}
             bibliotheek={bibliotheek}
           />
         )}
@@ -602,11 +612,11 @@ export default function VakantieplanningenPage() {
           vakanties={vakanties}
           onVakantieToevoegen={voegVakantieTypeToe}
           planning={actievePlanning}
-          onSave={async (nieuwThema, nieuweVakantie, startNoord, eindNoord) => {
-            await getSupabase().from('vakantie_planningen').update({ thema: nieuwThema, vakantie: nieuweVakantie, start_datum_noord: startNoord, eind_datum_noord: eindNoord }).eq('id', actievePlanning.id)
-            setActievePlanning({ ...actievePlanning, thema: nieuwThema, vakantie: nieuweVakantie, start_datum_noord: startNoord, eind_datum_noord: eindNoord })
+          onSave={async (nieuwThema, nieuweVakantie, startNoord, eindNoord, subthemaModus) => {
+            await getSupabase().from('vakantie_planningen').update({ thema: nieuwThema, vakantie: nieuweVakantie, start_datum_noord: startNoord, eind_datum_noord: eindNoord, subthema_modus: subthemaModus }).eq('id', actievePlanning.id)
+            setActievePlanning({ ...actievePlanning, thema: nieuwThema, vakantie: nieuweVakantie, start_datum_noord: startNoord, eind_datum_noord: eindNoord, subthema_modus: subthemaModus })
             setInstellingenModal(false)
-            setToast({ bericht: 'Thema bijgewerkt!', type: 'success' })
+            setToast({ bericht: 'Instellingen bijgewerkt!', type: 'success' })
             await haalPlanningenOp()
           }}
           onClose={() => setInstellingenModal(false)}
@@ -620,7 +630,7 @@ export default function VakantieplanningenPage() {
 
 // ─── Week Overzicht tabel ─────────────────────────────────────────────────────
 
-function WeekOverzicht({ week, activiteiten, planning, dagDatumStr, onNieuw, onBewerk, onVerwijder, onJsonImport, bibliotheek }: {
+function WeekOverzicht({ week, activiteiten, planning, dagDatumStr, onNieuw, onBewerk, onVerwijder, onJsonImport, onSubthemaOp, bibliotheek }: {
   week: Week
   activiteiten: VakantieActiviteit[]
   planning: Planning
@@ -629,8 +639,16 @@ function WeekOverzicht({ week, activiteiten, planning, dagDatumStr, onNieuw, onB
   onBewerk: (a: VakantieActiviteit) => void
   onVerwijder: (id: string) => void
   onJsonImport: (dag: Dag) => void
+  onSubthemaOp: (weekId: string, data: { naam?: string; dag_subthemas?: Partial<Record<Dag, string>> }) => void
   bibliotheek: BibliotheekActiviteit[]
 }) {
+  const perDag = planning.subthema_modus === 'dag'
+  const [weekNaamInput, setWeekNaamInput] = useState(week.naam)
+  const [dagInputs, setDagInputs] = useState<Partial<Record<Dag, string>>>(week.dag_subthemas ?? {})
+
+  useEffect(() => { setWeekNaamInput(week.naam) }, [week.id, week.naam])
+  useEffect(() => { setDagInputs(week.dag_subthemas ?? {}) }, [week.id, week.dag_subthemas])
+
   function activiteitenVan(dag: Dag) {
     return activiteiten.filter(a => a.week_id === week.id && a.dag === dag).sort((a, b) => a.volgorde - b.volgorde)
   }
@@ -641,10 +659,22 @@ function WeekOverzicht({ week, activiteiten, planning, dagDatumStr, onNieuw, onB
     <div>
       {/* Week header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-        <div>
-          <h2 style={{ fontFamily: 'Sora, sans-serif', fontSize: 18, fontWeight: 700, marginBottom: 2 }}>
-            Week {week.week_nummer} — {week.naam}
-          </h2>
+        <div style={{ flex: 1 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
+            <h2 style={{ fontFamily: 'Sora, sans-serif', fontSize: 18, fontWeight: 700, margin: 0 }}>
+              Week {week.week_nummer}
+            </h2>
+            {!perDag && (
+              <input
+                className="form-input"
+                value={weekNaamInput}
+                onChange={e => setWeekNaamInput(e.target.value)}
+                onBlur={() => weekNaamInput.trim() && weekNaamInput !== week.naam && onSubthemaOp(week.id, { naam: weekNaamInput.trim() })}
+                placeholder="Subthema van de week..."
+                style={{ maxWidth: 260, fontSize: 15, fontWeight: 600, padding: '5px 10px' }}
+              />
+            )}
+          </div>
           <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
             {planning.thema} · {planning.vakantie}
           </div>
@@ -664,6 +694,26 @@ function WeekOverzicht({ week, activiteiten, planning, dagDatumStr, onNieuw, onB
                 </th>
               ))}
             </tr>
+            {perDag && (
+              <tr>
+                {DAGEN.map(dag => (
+                  <th key={dag} style={{ padding: '6px 8px', background: 'var(--bg-card)', border: '1px solid var(--border)', fontWeight: 400 }}>
+                    <input
+                      className="form-input"
+                      value={dagInputs[dag] ?? ''}
+                      onChange={e => setDagInputs(prev => ({ ...prev, [dag]: e.target.value }))}
+                      onBlur={() => {
+                        if ((dagInputs[dag] ?? '') !== (week.dag_subthemas?.[dag] ?? '')) {
+                          onSubthemaOp(week.id, { dag_subthemas: { ...(week.dag_subthemas ?? {}), [dag]: dagInputs[dag] ?? '' } })
+                        }
+                      }}
+                      placeholder="Subthema..."
+                      style={{ width: '100%', fontSize: 12, padding: '4px 8px', fontWeight: 500 }}
+                    />
+                  </th>
+                ))}
+              </tr>
+            )}
           </thead>
           <tbody>
             {Array.from({ length: maxRijen }).map((_, rijIdx) => {
@@ -756,6 +806,8 @@ function DocumentWeergave({ planning, weken, activiteiten, dagDatumStr, tekstGro
     return () => window.removeEventListener('resize', onResize)
   }, [])
 
+  const perDag = planning.subthema_modus === 'dag'
+
   function activiteitenVan(weekId: string, dag: Dag) {
     return activiteiten.filter(a => a.week_id === weekId && a.dag === dag).sort((a, b) => a.volgorde - b.volgorde)
   }
@@ -803,7 +855,7 @@ function DocumentWeergave({ planning, weken, activiteiten, dagDatumStr, tekstGro
           <div key={week.id} style={{ marginBottom: 48 }}>
             {/* Week titel */}
             <h2 style={{ fontFamily: 'Sora, sans-serif', fontSize: 18, fontWeight: 700, textAlign: 'center', marginBottom: 14 }}>
-              Week {week.week_nummer} — {week.naam}
+              Week {week.week_nummer}{!perDag && week.naam ? ` — ${week.naam}` : ''}
             </h2>
 
             {/* Tabel */}
@@ -818,6 +870,9 @@ function DocumentWeergave({ planning, weken, activiteiten, dagDatumStr, tekstGro
                           {DAG_LABEL[dag]}
                         </a>
                         <div style={{ fontSize: 11, fontWeight: 400, opacity: 0.85 }}>{dagDatumStr(week, dag)}</div>
+                        {perDag && week.dag_subthemas?.[dag] && (
+                          <div style={{ fontSize: 11, fontWeight: 600, opacity: 0.95, marginTop: 2 }}>{week.dag_subthemas[dag]}</div>
+                        )}
                       </th>
                     ))}
                   </tr>
@@ -854,8 +909,8 @@ function DocumentWeergave({ planning, weken, activiteiten, dagDatumStr, tekstGro
                 if (dagActs.length === 0) return null
                 return (
                   <div key={dag} id={`week-${week.week_nummer}-${dag}`}>
-                    <div style={{ fontFamily: 'Sora, sans-serif', fontSize: 15, fontWeight: 700, padding: '8px 14px', background: 'var(--primary)', color: '#fff', borderRadius: '8px 8px 0 0', display: 'flex', justifyContent: 'space-between' }}>
-                      <span>{DAG_LABEL[dag]}</span>
+                    <div style={{ fontFamily: 'Sora, sans-serif', fontSize: 15, fontWeight: 700, padding: '8px 14px', background: 'var(--primary)', color: '#fff', borderRadius: '8px 8px 0 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span>{DAG_LABEL[dag]}{perDag && week.dag_subthemas?.[dag] ? ` — ${week.dag_subthemas[dag]}` : ''}</span>
                       <span style={{ fontWeight: 400, fontSize: 13, opacity: 0.9 }}>{dagDatumStr(week, dag)}</span>
                     </div>
                     <div style={{ border: '1px solid var(--border)', borderTop: 'none', borderRadius: '0 0 8px 8px', overflow: 'hidden' }}>
@@ -1023,7 +1078,7 @@ function NieuwePlanningModal({ onSave, onClose, vakanties = STANDAARD_VAKANTIES,
           </div>
           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
             <button className="btn" onClick={onClose}>Annuleren</button>
-            <button className="btn btn-primary" onClick={() => naam && thema && startDatum && eindDatum && onSave({ naam, vakantie, thema, start_datum: startDatum, eind_datum: eindDatum, start_datum_noord: null, eind_datum_noord: null, gepubliceerd: false })} disabled={!naam || !thema || !startDatum || !eindDatum}>
+            <button className="btn btn-primary" onClick={() => naam && thema && startDatum && eindDatum && onSave({ naam, vakantie, thema, start_datum: startDatum, eind_datum: eindDatum, start_datum_noord: null, eind_datum_noord: null, gepubliceerd: false, subthema_modus: 'week' })} disabled={!naam || !thema || !startDatum || !eindDatum}>
               Aanmaken
             </button>
           </div>
@@ -1319,7 +1374,7 @@ function JsonDagImportModal({ dag, onImport, onClose }: { dag: Dag; onImport: (j
 
 function InstellingenModal({ planning, onSave, onClose, vakanties, onVakantieToevoegen }: {
   planning: Planning
-  onSave: (thema: string, vakantie: string, startNoord: string | null, eindNoord: string | null) => void
+  onSave: (thema: string, vakantie: string, startNoord: string | null, eindNoord: string | null, subthemaModus: SubthemaModus) => void
   onClose: () => void
   vakanties: string[]
   onVakantieToevoegen: (naam: string) => void
@@ -1330,6 +1385,7 @@ function InstellingenModal({ planning, onSave, onClose, vakanties, onVakantieToe
   const [eindNoord, setEindNoord] = useState(planning.eind_datum_noord ?? '')
   const [nieuwVakantieNaam, setNieuwVakantieNaam] = useState('')
   const [toonNieuw, setToonNieuw] = useState(false)
+  const [subthemaModus, setSubthemaModus] = useState<SubthemaModus>(planning.subthema_modus ?? 'week')
 
   return (
     <div className="modal-backdrop" onClick={e => { if (e.target === e.currentTarget) onClose() }}>
@@ -1366,6 +1422,35 @@ function InstellingenModal({ planning, onSave, onClose, vakanties, onVakantieToe
             <div>
               <label className="form-label">Thema</label>
               <input className="form-input" value={thema} onChange={e => setThema(e.target.value)} placeholder="Bijv. Jungle, Ruimte, Natuur..." autoFocus />
+            </div>
+            <div>
+              <label className="form-label">Subthema&apos;s invullen per</label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span style={{ fontSize: 12, fontWeight: 600, color: subthemaModus === 'week' ? 'var(--primary-text)' : 'var(--text-muted)' }}>Week</span>
+                <button
+                  type="button"
+                  onClick={() => setSubthemaModus(m => m === 'week' ? 'dag' : 'week')}
+                  style={{
+                    position: 'relative', width: 42, height: 24, borderRadius: 999, border: 'none', cursor: 'pointer',
+                    background: 'var(--primary)', flexShrink: 0, padding: 0, transition: 'background 0.15s',
+                  }}
+                  role="switch"
+                  aria-checked={subthemaModus === 'dag'}
+                  aria-label="Subthema per dag of per week"
+                >
+                  <span style={{
+                    position: 'absolute', top: 3, left: subthemaModus === 'dag' ? 21 : 3,
+                    width: 18, height: 18, borderRadius: '50%', background: '#fff',
+                    transition: 'left 0.15s', boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
+                  }} />
+                </button>
+                <span style={{ fontSize: 12, fontWeight: 600, color: subthemaModus === 'dag' ? 'var(--primary-text)' : 'var(--text-muted)' }}>Dag</span>
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
+                {subthemaModus === 'week'
+                  ? 'Eén subthema per week, geldt voor alle dagen.'
+                  : 'Een eigen subthema per dag, per week.'}
+              </div>
             </div>
           </div>
 
@@ -1406,7 +1491,7 @@ function InstellingenModal({ planning, onSave, onClose, vakanties, onVakantieToe
 
           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
             <button className="btn" onClick={onClose}>Annuleren</button>
-            <button className="btn btn-primary" onClick={() => thema.trim() && onSave(thema.trim(), vakantie, startNoord || null, eindNoord || null)} disabled={!thema.trim()}>
+            <button className="btn btn-primary" onClick={() => thema.trim() && onSave(thema.trim(), vakantie, startNoord || null, eindNoord || null, subthemaModus)} disabled={!thema.trim()}>
               Opslaan
             </button>
           </div>
