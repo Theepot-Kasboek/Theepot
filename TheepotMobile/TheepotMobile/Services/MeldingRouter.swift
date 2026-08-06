@@ -8,6 +8,9 @@ import Foundation
 final class MeldingRouter: ObservableObject {
     @Published var gewenstGesprekId: String?
     @Published var actiefGesprekId: String?
+    /// Zelfde patroon als `gewenstGesprekId`, maar voor een tik op een
+    /// agenda-herinnering: AppDelegate zet dit, AgendaView pakt het op.
+    @Published var gewenstAfspraakId: String?
 
     func open(gesprekId: String) {
         gewenstGesprekId = gesprekId
@@ -15,5 +18,13 @@ final class MeldingRouter: ObservableObject {
 
     func verwerkt() {
         gewenstGesprekId = nil
+    }
+
+    func open(afspraakId: String) {
+        gewenstAfspraakId = afspraakId
+    }
+
+    func verwerktAfspraak() {
+        gewenstAfspraakId = nil
     }
 }

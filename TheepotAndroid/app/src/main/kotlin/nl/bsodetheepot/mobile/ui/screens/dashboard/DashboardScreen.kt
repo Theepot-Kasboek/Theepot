@@ -19,6 +19,7 @@ import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.Checklist
 import androidx.compose.material.icons.filled.Chat
 import androidx.compose.material.icons.filled.DirectionsCar
+import androidx.compose.material.icons.filled.Event
 import androidx.compose.material.icons.filled.EuroSymbol
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Restaurant
@@ -41,6 +42,7 @@ import kotlinx.coroutines.launch
 import nl.bsodetheepot.mobile.data.push.MeldingRouter
 import nl.bsodetheepot.mobile.data.session.SessionViewModel
 import nl.bsodetheepot.mobile.ui.screens.account.AccountScreen
+import nl.bsodetheepot.mobile.ui.screens.agenda.AgendaScreen
 import nl.bsodetheepot.mobile.ui.screens.chat.ChatListScreen
 import nl.bsodetheepot.mobile.ui.screens.kasboek.KasboekScreen
 import nl.bsodetheepot.mobile.ui.screens.kilometerstanden.KilometerstandenScreen
@@ -55,6 +57,7 @@ private data class Tab(val label: String, val icon: ImageVector)
 private val tabs = listOf(
     Tab("Meldingen", Icons.Filled.PushPin),
     Tab("Chat", Icons.Filled.Chat),
+    Tab("Agenda", Icons.Filled.Event),
     Tab("Taken", Icons.Filled.Checklist),
     Tab("Kasboek", Icons.Filled.EuroSymbol),
     Tab("Maaltijdlijst", Icons.Filled.Restaurant),
@@ -84,6 +87,13 @@ fun DashboardScreen(session: SessionViewModel) {
     val gewenstGesprekId by MeldingRouter.gewenstGesprekId.collectAsState()
     LaunchedEffect(gewenstGesprekId) {
         if (gewenstGesprekId != null) pagerState.animateScrollToPage(1)
+    }
+
+    // Tik op een agenda-herinnering: naar de agendatab (index 2). AgendaScreen
+    // pakt de rest van de deeplink (de juiste afspraak openen) zelf op.
+    val gewenstAfspraakId by MeldingRouter.gewenstAfspraakId.collectAsState()
+    LaunchedEffect(gewenstAfspraakId) {
+        if (gewenstAfspraakId != null) pagerState.animateScrollToPage(2)
     }
 
     Scaffold(
@@ -121,12 +131,13 @@ fun DashboardScreen(session: SessionViewModel) {
             when (page) {
                 0 -> PrikbordScreen(session = session)
                 1 -> ChatListScreen(session = session)
-                2 -> TakenScreen(session = session)
-                3 -> KasboekScreen(session = session)
-                4 -> MaaltijdlijstScreen(session = session)
-                5 -> VakantieplanningenScreen(session = session)
-                6 -> WeekplanningenScreen(session = session)
-                7 -> KilometerstandenScreen(session = session)
+                2 -> AgendaScreen(session = session)
+                3 -> TakenScreen(session = session)
+                4 -> KasboekScreen(session = session)
+                5 -> MaaltijdlijstScreen(session = session)
+                6 -> VakantieplanningenScreen(session = session)
+                7 -> WeekplanningenScreen(session = session)
+                8 -> KilometerstandenScreen(session = session)
                 else -> AccountScreen(session = session)
             }
         }

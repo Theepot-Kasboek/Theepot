@@ -2,4 +2,6 @@
     <string name="app_name">Theepot</string>
     <string name="notificatiekanaal_chat_id" translatable="false">chat_meldingen</string>
     <string name="notificatiekanaal_chat_naam">Chatberichten</string>
+    <string name="notificatiekanaal_agenda_id" translatable="false">agenda_herinneringen</string>
+    <string name="notificatiekanaal_agenda_naam">Agenda-herinneringen</string>
 </resources>

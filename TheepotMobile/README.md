@@ -36,18 +36,23 @@ rechten/locatietoegang (`SessionStore` spiegelt `components/AuthProvider.tsx`):
   slimme weergaves (Vandaag/Gepland)
 - **Kilometerstanden** — alleen nieuwe stand invullen (met validatie t.o.v. laatste stand);
   geen voertuigbeheer
+- **Agenda** — persoonlijke + algemene kalenders bekijken, afspraken aanmaken/bewerken/
+  verwijderen, per-afspraak herinnering (of kalenderdefault) die een pushmelding stuurt;
+  geen maand/week/dag-grid (lijstweergave), geen ICS-import/-abonneren
 
-Niet meegenomen (bewust buiten scope): Agenda, Activiteitenbeheer, Beleidsstukken,
+Niet meegenomen (bewust buiten scope): Activiteitenbeheer, Beleidsstukken,
 Nieuwsbrieven, Brandoefening, Medewerkers, Rechtenbeheer, 10-minutengesprekken, VE Planning.
 
-## Push notificaties (chat)
+## Push notificaties (chat + agenda)
 
 APNs direct (geen Firebase SDK), via `App/AppDelegate.swift` + `Services/PushService.swift`.
 Toestemming wordt ná login gevraagd (niet bij appstart), het devicetoken wordt
 geüpsert in `push_apparaten` (op `token`, niet `profiel_id + token`), en een
 tik op een melding deeplinkt via `Services/MeldingRouter.swift` naar het
-juiste gesprek. Serverkant: zie `../supabase-sql/push_meldingen.sql`,
-`../app/api/push/chat/route.ts` en `../lib/push-apns.ts`.
+juiste gesprek (chat) of de juiste afspraak (agenda). Serverkant: zie
+`../supabase-sql/push_meldingen.sql`, `../app/api/push/chat/route.ts` en
+`../lib/push-apns.ts` voor chat; `../supabase-sql/agenda.sql` (bevat de
+`pg_cron`-job) en `../app/api/push/agenda/route.ts` voor agenda-herinneringen.
 
 Handmatige stappen vóór dit werkt:
 - APNs Auth Key (.p8) aanmaken in de Apple Developer portal (Keys), Team ID `3TQM2TCL7T`.

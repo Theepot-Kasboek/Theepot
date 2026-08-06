@@ -46,9 +46,12 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
         withCompletionHandler completionHandler: @escaping () -> Void
     ) {
         let userInfo = response.notification.request.content.userInfo
-        if let type = userInfo["type"] as? String, type == "chat",
-           let gesprekId = userInfo["gesprek_id"] as? String {
-            meldingRouter?.open(gesprekId: gesprekId)
+        if let type = userInfo["type"] as? String {
+            if type == "chat", let gesprekId = userInfo["gesprek_id"] as? String {
+                meldingRouter?.open(gesprekId: gesprekId)
+            } else if type == "agenda", let afspraakId = userInfo["afspraak_id"] as? String {
+                meldingRouter?.open(afspraakId: afspraakId)
+            }
         }
         completionHandler()
     }

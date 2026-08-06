@@ -49,10 +49,12 @@ class MainActivity : ComponentActivity() {
         if (!heeftToestemming) meldingToestemming.launch(Manifest.permission.POST_NOTIFICATIONS)
     }
 
-    /** Tik op een pushmelding (of cold start via de intent-extra's) → naar het juiste gesprek. */
+    /** Tik op een pushmelding (of cold start via de intent-extra's) → naar het juiste gesprek/afspraak. */
     private fun verwerkDeeplink(intent: Intent?) {
         val type = intent?.getStringExtra("type")
         val gesprekId = intent?.getStringExtra("gesprek_id")
+        val afspraakId = intent?.getStringExtra("afspraak_id")
         if (type == "chat" && gesprekId != null) MeldingRouter.open(gesprekId)
+        if (type == "agenda" && afspraakId != null) MeldingRouter.openAfspraak(afspraakId)
     }
 }

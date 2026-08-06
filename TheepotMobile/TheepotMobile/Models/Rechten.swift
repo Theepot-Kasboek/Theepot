@@ -25,8 +25,11 @@ struct Rechten: Codable {
     var paginaMaaltijdlijst: Toegang = .geen
     var paginaWeekplanningen: Toegang = .geen
     var paginaGesprekken: Toegang = .geen
+    var paginaAgenda: Toegang = .geen
     var prikbordToevoegen: Bool = false
     var chatStarten: Bool = false
+    var agendaAlgemeenBewerken: Bool = false
+    var agendaPersoneelInzien: Bool = false
 
     enum CodingKeys: String, CodingKey {
         case paginaKasboek = "pagina_kasboek"
@@ -36,15 +39,20 @@ struct Rechten: Codable {
         case paginaMaaltijdlijst = "pagina_maaltijdlijst"
         case paginaWeekplanningen = "pagina_weekplanningen"
         case paginaGesprekken = "pagina_gesprekken"
+        case paginaAgenda = "pagina_agenda"
         case prikbordToevoegen = "prikbord_toevoegen"
         case chatStarten = "chat_starten"
+        case agendaAlgemeenBewerken = "agenda_algemeen_bewerken"
+        case agendaPersoneelInzien = "agenda_personeel_inzien"
     }
 
     static let superadmin = Rechten(
         paginaKasboek: .bewerken, paginaVakantieplanningen: .bewerken,
         paginaChat: .bewerken, paginaPrikbord: .bewerken,
         paginaMaaltijdlijst: .bewerken, paginaWeekplanningen: .bewerken,
-        paginaGesprekken: .bewerken, prikbordToevoegen: true, chatStarten: true
+        paginaGesprekken: .bewerken, paginaAgenda: .bewerken,
+        prikbordToevoegen: true, chatStarten: true,
+        agendaAlgemeenBewerken: true, agendaPersoneelInzien: true
     )
 
     static let geen = Rechten()

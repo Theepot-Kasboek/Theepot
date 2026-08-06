@@ -30,14 +30,16 @@ API in een latere versie wijzigt, raadpleeg dan de
    (Instellingen → Over de telefoon → 7x op buildnummer tikken → Ontwikkelaarsopties
    → USB-debugging), en kies het toestel als run-target in Android Studio (▶).
 
-## Push notificaties (chat)
+## Push notificaties (chat + agenda)
 
 FCM v1 (Firebase Cloud Messaging), via `data/push/TheepotMessagingService.kt` +
 `data/push/PushService.kt`. Het FCM-token wordt geüpsert in `push_apparaten`
 (op `token`, niet `profiel_id + token`), en een tik op een melding deeplinkt
-via `data/push/MeldingRouter.kt` naar het juiste gesprek. Serverkant: zie
-`../supabase-sql/push_meldingen.sql`, `../app/api/push/chat/route.ts` en
-`../lib/push-fcm.ts`.
+via `data/push/MeldingRouter.kt` naar het juiste gesprek (chat) of de juiste
+afspraak (agenda). Serverkant: zie `../supabase-sql/push_meldingen.sql`,
+`../app/api/push/chat/route.ts` en `../lib/push-fcm.ts` voor chat;
+`../supabase-sql/agenda.sql` (bevat de `pg_cron`-job) en
+`../app/api/push/agenda/route.ts` voor agenda-herinneringen.
 
 Handmatige stap vóór dit werkt: een Firebase-project aanmaken met Android-app
 `nl.bsodetheepot.mobile`, en het gedownloade `google-services.json` naar
@@ -65,10 +67,10 @@ app/src/main/kotlin/nl/bsodetheepot/mobile/
 ## Modules
 
 Zelfde scope als de iOS-app (zie `../TheepotMobile/README.md` voor de volledige
-per-module beschrijving): Meldingen (Prikbord), Chat, Taken & Notities,
+per-module beschrijving): Meldingen (Prikbord), Chat, Agenda, Taken & Notities,
 Kasboek, Maaltijdlijst, Vakantieplanningen, Weekplanningen, Kilometerstanden.
 
-Bewust weggelaten: Agenda, Activiteitenbeheer, Beleidsstukken, Nieuwsbrieven,
+Bewust weggelaten: Activiteitenbeheer, Beleidsstukken, Nieuwsbrieven,
 Brandoefening, Medewerkers, Rechtenbeheer, 10-minutengesprekken, VE Planning.
 
 ## Verschillen met de iOS-versie (bewuste vereenvoudigingen)
@@ -78,7 +80,9 @@ Brandoefening, Medewerkers, Rechtenbeheer, 10-minutengesprekken, VE Planning.
   (`ACTION_IMAGE_CAPTURE`) — functioneel gelijk (foto van het bonnetje wordt
   geüpload), maar zonder automatische randdetectie.
 - **Vervaldatum-invoer** (Taken, Kilometerstanden): tekstveld in `jjjj-mm-dd`-
-  formaat in plaats van een native datepicker-dialoog.
+  formaat in plaats van een native datepicker-dialoog. Agenda is hierop een
+  uitzondering: die heeft wél een native Material3 datum-/tijdpicker, omdat
+  afspraken een echte start-/eindtijd nodig hebben (niet alleen een datum).
 
 ## Referentie
 

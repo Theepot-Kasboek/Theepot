@@ -27,8 +27,11 @@ data class Rechten(
     @SerialName("pagina_maaltijdlijst") val paginaMaaltijdlijst: Toegang = Toegang.GEEN,
     @SerialName("pagina_weekplanningen") val paginaWeekplanningen: Toegang = Toegang.GEEN,
     @SerialName("pagina_gesprekken") val paginaGesprekken: Toegang = Toegang.GEEN,
+    @SerialName("pagina_agenda") val paginaAgenda: Toegang = Toegang.GEEN,
     @SerialName("prikbord_toevoegen") val prikbordToevoegen: Boolean = false,
     @SerialName("chat_starten") val chatStarten: Boolean = false,
+    @SerialName("agenda_algemeen_bewerken") val agendaAlgemeenBewerken: Boolean = false,
+    @SerialName("agenda_personeel_inzien") val agendaPersoneelInzien: Boolean = false,
 ) {
     companion object {
         val SUPERADMIN = Rechten(
@@ -39,8 +42,11 @@ data class Rechten(
             paginaMaaltijdlijst = Toegang.BEWERKEN,
             paginaWeekplanningen = Toegang.BEWERKEN,
             paginaGesprekken = Toegang.BEWERKEN,
+            paginaAgenda = Toegang.BEWERKEN,
             prikbordToevoegen = true,
             chatStarten = true,
+            agendaAlgemeenBewerken = true,
+            agendaPersoneelInzien = true,
         )
         val GEEN = Rechten()
     }

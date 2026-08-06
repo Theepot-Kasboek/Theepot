@@ -20,6 +20,10 @@ object MeldingRouter {
     private val _actiefGesprekId = MutableStateFlow<String?>(null)
     val actiefGesprekId: StateFlow<String?> = _actiefGesprekId.asStateFlow()
 
+    /** Zelfde patroon als `gewenstGesprekId`, maar voor een tik op een agenda-herinnering. */
+    private val _gewenstAfspraakId = MutableStateFlow<String?>(null)
+    val gewenstAfspraakId: StateFlow<String?> = _gewenstAfspraakId.asStateFlow()
+
     fun open(gesprekId: String) {
         _gewenstGesprekId.value = gesprekId
     }
@@ -30,5 +34,13 @@ object MeldingRouter {
 
     fun zetActiefGesprek(gesprekId: String?) {
         _actiefGesprekId.value = gesprekId
+    }
+
+    fun openAfspraak(afspraakId: String) {
+        _gewenstAfspraakId.value = afspraakId
+    }
+
+    fun verwerktAfspraak() {
+        _gewenstAfspraakId.value = null
     }
 }

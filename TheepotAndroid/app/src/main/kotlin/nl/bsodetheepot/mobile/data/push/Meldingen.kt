@@ -8,6 +8,7 @@ import nl.bsodetheepot.mobile.R
 
 object Meldingen {
     const val CHAT_KANAAL_ID = "chat_meldingen"
+    const val AGENDA_KANAAL_ID = "agenda_herinneringen"
 
     /** Idempotent: mag bij elke app-start opnieuw aangeroepen worden. */
     fun maakKanalenAan(context: Context) {
@@ -18,7 +19,13 @@ object Meldingen {
             context.getString(R.string.notificatiekanaal_chat_naam),
             NotificationManager.IMPORTANCE_HIGH,
         )
+        val agendaKanaal = NotificationChannel(
+            AGENDA_KANAAL_ID,
+            context.getString(R.string.notificatiekanaal_agenda_naam),
+            NotificationManager.IMPORTANCE_HIGH,
+        )
         val manager = context.getSystemService(NotificationManager::class.java)
         manager.createNotificationChannel(kanaal)
+        manager.createNotificationChannel(agendaKanaal)
     }
 }

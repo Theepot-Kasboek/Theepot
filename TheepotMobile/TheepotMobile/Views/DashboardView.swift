@@ -5,7 +5,7 @@ import SwiftUI
 /// scherm. Rechten/locatietoegang bepalen per module wat zichtbaar/bewerkbaar is
 /// (zie SessionStore + AuthProvider.tsx).
 private enum HoofdTab: Int, CaseIterable, Identifiable {
-    case meldingen, chat, taken, kasboek, maaltijdlijst, vakantie, weekplanning, kilometers, account
+    case meldingen, chat, agenda, taken, kasboek, maaltijdlijst, vakantie, weekplanning, kilometers, account
 
     var id: Int { rawValue }
 
@@ -14,6 +14,7 @@ private enum HoofdTab: Int, CaseIterable, Identifiable {
         switch self {
         case .meldingen: return "Meldingen"
         case .chat: return "Chat"
+        case .agenda: return "Agenda"
         case .taken: return "Taken"
         case .kasboek: return "Kasboek"
         case .maaltijdlijst: return "Maaltijden"
@@ -38,6 +39,7 @@ private enum HoofdTab: Int, CaseIterable, Identifiable {
         switch self {
         case .meldingen: return "pin"
         case .chat: return "bubble.left.and.bubble.right"
+        case .agenda: return "calendar.badge.clock"
         case .taken: return "checklist"
         case .kasboek: return "eurosign.circle"
         case .maaltijdlijst: return "fork.knife.circle"
@@ -52,6 +54,7 @@ private enum HoofdTab: Int, CaseIterable, Identifiable {
         switch self {
         case .meldingen: return "pin.fill"
         case .chat: return "bubble.left.and.bubble.right.fill"
+        case .agenda: return "calendar.badge.clock"   // geen apart .fill-symbool beschikbaar voor deze glyph
         case .taken: return "checklist.checked"
         case .kasboek: return "eurosign.circle.fill"
         case .maaltijdlijst: return "fork.knife.circle.fill"
@@ -76,6 +79,7 @@ struct DashboardView: View {
                 switch tab {
                 case .meldingen: PrikbordView()
                 case .chat: ChatListView()
+                case .agenda: AgendaView()
                 case .taken: TakenView()
                 case .kasboek: KasboekView()
                 case .maaltijdlijst: MaaltijdlijstView()
@@ -98,6 +102,11 @@ struct DashboardView: View {
         // rest van de deeplink (openen van het juiste gesprek) zelf op.
         .onChange(of: meldingRouter.gewenstGesprekId) { _, gesprekId in
             if gesprekId != nil { tab = .chat }
+        }
+        // Zelfde patroon voor een agenda-herinnering: naar de agendatab, AgendaView
+        // opent daar de bijbehorende afspraak.
+        .onChange(of: meldingRouter.gewenstAfspraakId) { _, afspraakId in
+            if afspraakId != nil { tab = .agenda }
         }
     }
 }

@@ -34,6 +34,7 @@ class TheepotMessagingService : FirebaseMessagingService() {
         Log.d(TAG, "Bericht ontvangen: ${message.data}")
         val type = message.data["type"]
         val gesprekId = message.data["gesprek_id"]
+        val afspraakId = message.data["afspraak_id"]
 
         // Onderdrukt de melding als de gebruiker het gesprek al open heeft
         // staan — spiegelt willPresent in AppDelegate.swift (iOS).
@@ -41,20 +42,23 @@ class TheepotMessagingService : FirebaseMessagingService() {
 
         val titel = message.notification?.title ?: "Theepot"
         val body = message.notification?.body ?: "Nieuw bericht"
+        val kanaalId = if (type == "agenda") Meldingen.AGENDA_KANAAL_ID else Meldingen.CHAT_KANAAL_ID
+        val tag = gesprekId ?: afspraakId ?: type ?: "melding"
 
         val intent = Intent(this, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
             putExtra("type", type)
             putExtra("gesprek_id", gesprekId)
+            putExtra("afspraak_id", afspraakId)
         }
         val pendingIntent = PendingIntent.getActivity(
             this,
-            gesprekId?.hashCode() ?: 0,
+            tag.hashCode(),
             intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
 
-        val notificatie = NotificationCompat.Builder(this, Meldingen.CHAT_KANAAL_ID)
+        val notificatie = NotificationCompat.Builder(this, kanaalId)
             .setSmallIcon(R.drawable.ic_stat_melding)
             .setColor(ContextCompat.getColor(this, R.color.theepot_groen))
             .setContentTitle(titel)
@@ -63,9 +67,9 @@ class TheepotMessagingService : FirebaseMessagingService() {
             .setContentIntent(pendingIntent)
             .build()
 
-        // tag = gesprekId geeft hetzelfde collapse-gedrag als apns-collapse-id
-        // op iOS: een nieuw bericht in hetzelfde gesprek vervangt de vorige melding.
+        // tag = gesprekId/afspraakId geeft hetzelfde collapse-gedrag als
+        // apns-collapse-id op iOS: eenzelfde melding vervangt de vorige.
         val manager = getSystemService(NotificationManager::class.java)
-        manager.notify(gesprekId ?: type ?: "melding", 0, notificatie)
+        manager.notify(tag, 0, notificatie)
     }
 }

@@ -32,6 +32,7 @@ interface Afspraak {
   eind_tijd: string
   hele_dag: boolean
   aangemaakt_door: string | null
+  herinnering_minuten: number | null  // null = gebruik kalenderinstelling, 0 = geen, >0 = minuten van tevoren
 }
 
 type Weergave = 'maand' | 'week' | 'dag' | 'lijst'
@@ -234,7 +235,7 @@ export default function AgendaPage() {
   }
 
   // ── Afspraak opslaan ────────────────────────────────────────────────────────
-  async function slaAfspraakOp(data: Partial<Afspraak> & { kalender_id: string; titel: string; start_tijd: string; eind_tijd: string }) {
+  async function slaAfspraakOp(data: Partial<Afspraak> & { kalender_id: string; titel: string; start_tijd: string; eind_tijd: string; herinnering_minuten: number | null }) {
     if (!magBewerken || !bewerkbareKalenders.some(k => k.id === data.kalender_id)) {
       setToast({ bericht: 'Je hebt geen rechten om in deze kalender te schrijven.', type: 'error' })
       return
@@ -890,12 +891,22 @@ function KalenderRij({ kalender, zichtbaar, onToggle }: { kalender: Kalender; zi
   )
 }
 
+const HERINNERING_OPTIES: { label: string; waarde: string }[] = [
+  { label: 'Gebruik kalenderinstelling', waarde: 'default' },
+  { label: 'Geen herinnering', waarde: '0' },
+  { label: '15 minuten van tevoren', waarde: '15' },
+  { label: '1 uur van tevoren', waarde: '60' },
+  { label: '1 dag van tevoren', waarde: '1440' },
+  { label: '2 dagen van tevoren', waarde: '2880' },
+  { label: '1 week van tevoren', waarde: '10080' },
+]
+
 function AfspraakFormModal({ afspraak, kalenders, defaultKalenderId, defaultDatum, onSave, onClose }: {
   afspraak: Afspraak | null
   kalenders: Kalender[]
   defaultKalenderId?: string
   defaultDatum: Date | null
-  onSave: (data: Partial<Afspraak> & { kalender_id: string; titel: string; start_tijd: string; eind_tijd: string }) => void
+  onSave: (data: Partial<Afspraak> & { kalender_id: string; titel: string; start_tijd: string; eind_tijd: string; herinnering_minuten: number | null }) => void
   onClose: () => void
 }) {
   const nu = defaultDatum ?? new Date()
@@ -910,12 +921,16 @@ function AfspraakFormModal({ afspraak, kalenders, defaultKalenderId, defaultDatu
   const [start, setStart] = useState(afspraak ? toLocalInput(afspraak.start_tijd) : toInput(nu))
   const [eind, setEind] = useState(afspraak ? toLocalInput(afspraak.eind_tijd) : toInput(eindNu))
   const [heleDag, setHeleDag] = useState(afspraak?.hele_dag ?? false)
+  const [herinneringWaarde, setHerinneringWaarde] = useState(
+    afspraak ? (afspraak.herinnering_minuten === null ? 'default' : String(afspraak.herinnering_minuten)) : 'default'
+  )
   const [laden, setLaden] = useState(false)
 
   async function handleSave() {
     if (!titel.trim() || !kalenderId) return
     setLaden(true)
-    await onSave({ titel: titel.trim(), beschrijving: beschrijving.trim() || null, kalender_id: kalenderId, start_tijd: localToISO(start), eind_tijd: localToISO(eind), hele_dag: heleDag })
+    const herinneringMinuten = herinneringWaarde === 'default' ? null : parseInt(herinneringWaarde)
+    await onSave({ titel: titel.trim(), beschrijving: beschrijving.trim() || null, kalender_id: kalenderId, start_tijd: localToISO(start), eind_tijd: localToISO(eind), hele_dag: heleDag, herinnering_minuten: herinneringMinuten })
     setLaden(false)
   }
 
@@ -962,6 +977,12 @@ function AfspraakFormModal({ afspraak, kalenders, defaultKalenderId, defaultDatu
           <div>
             <label className="form-label">Beschrijving</label>
             <textarea className="form-textarea" value={beschrijving} onChange={e => setBeschrijving(e.target.value)} placeholder="Optionele toelichting" style={{ minHeight: 80 }} />
+          </div>
+          <div>
+            <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: 6 }}><Bell size={13} /> Herinnering</label>
+            <select className="form-select" value={herinneringWaarde} onChange={e => setHerinneringWaarde(e.target.value)}>
+              {HERINNERING_OPTIES.map(o => <option key={o.waarde} value={o.waarde}>{o.label}</option>)}
+            </select>
           </div>
           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
             <button className="btn" onClick={onClose}>Annuleren</button>
