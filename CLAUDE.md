@@ -38,5 +38,11 @@ Rooster, Chat, Kasboek, Activiteiten, Nieuwsbrieven, Agenda, Prikbord, VE Planni
   `PUSH_WEBHOOK_SECRET`, `APNS_TEAM_ID`, `APNS_KEY_ID`, `APNS_BUNDLE_ID`,
   `APNS_PRIVATE_KEY_B64`, `FCM_PROJECT_ID`, `FCM_SERVICE_ACCOUNT_B64`.
   Zie `supabase-sql/push_meldingen.sql` voor de databasekant.
+- Foto zoeken (Google) bij vakantieplanning-activiteiten — Vercel env vars:
+  `GOOGLE_CSE_API_KEY`, `GOOGLE_CSE_ENGINE_ID` (Google Custom Search JSON API,
+  Programmable Search Engine met "Image search" aan). Routes:
+  `app/api/afbeelding-zoeken` (zoeken) en `app/api/afbeelding-proxy` (ophalen
+  zonder CORS-issues). Zonder deze env vars toont de zoekknop een foutmelding
+  maar blijft de rest van de pagina werken.
 - Superadmin: Rooster@bsodetheepot.nl
 - Zip-updates altijd noemen als: Theepot-Dashboard-update.zip

@@ -10,7 +10,7 @@ import Toast from '@/components/Toast'
 import {
   Plus, X, ChevronDown, ChevronRight, Trash2,
   Calendar, Download, Eye, Upload, Pencil, GripVertical, Settings,
-  BookOpen, ArrowLeft, Send
+  BookOpen, ArrowLeft, Send, Search
 } from 'lucide-react'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -1137,6 +1137,13 @@ function ActiviteitToevoegenModal({ weekId, dag, activiteit, bibliotheek, volgor
   const [uploadFout, setUploadFout] = useState('')
   // ID van de gekoppelde bibliotheekactiviteit (voor foto upload)
   const [gekozenBibliotheekId, setGekozenBibliotheekId] = useState<string | null>(activiteit?.activiteit_id ?? null)
+  // Foto zoeken via Google
+  const [fotoZoekenOpen, setFotoZoekenOpen] = useState(false)
+  const [fotoZoekterm, setFotoZoekterm] = useState('')
+  const [fotoZoekBezig, setFotoZoekBezig] = useState(false)
+  const [fotoZoekFout, setFotoZoekFout] = useState('')
+  const [fotoResultaten, setFotoResultaten] = useState<{ url: string; thumbnail: string; titel: string }[]>([])
+  const [fotoOphalenBezig, setFotoOphalenBezig] = useState<string | null>(null)
 
   // Laad bestaande afbeelding — bibliotheek heeft voorrang, anders eigen pad
   useEffect(() => {
@@ -1165,6 +1172,42 @@ function ActiviteitToevoegenModal({ weekId, dag, activiteit, bibliotheek, volgor
     const reader = new FileReader()
     reader.onload = e => setAfbeeldingPreview(e.target?.result as string)
     reader.readAsDataURL(bestand)
+  }
+
+  async function zoekFotos() {
+    if (!fotoZoekterm.trim()) return
+    setFotoZoekBezig(true)
+    setFotoZoekFout('')
+    setFotoResultaten([])
+    try {
+      const res = await fetch(`/api/afbeelding-zoeken?q=${encodeURIComponent(fotoZoekterm.trim())}`)
+      const data = await res.json()
+      if (!res.ok) { setFotoZoekFout(data.error || 'Zoeken mislukt.'); return }
+      setFotoResultaten(data.resultaten ?? [])
+      if ((data.resultaten ?? []).length === 0) setFotoZoekFout('Geen resultaten gevonden.')
+    } catch {
+      setFotoZoekFout('Zoeken mislukt. Controleer je internetverbinding.')
+    } finally {
+      setFotoZoekBezig(false)
+    }
+  }
+
+  async function kiesGoogleFoto(url: string) {
+    setFotoOphalenBezig(url)
+    setUploadFout('')
+    try {
+      const res = await fetch(`/api/afbeelding-proxy?url=${encodeURIComponent(url)}`)
+      if (!res.ok) { setUploadFout('Kon deze afbeelding niet ophalen. Probeer een andere.'); return }
+      const blob = await res.blob()
+      const ext = (blob.type.split('/')[1] || 'jpg').replace('jpeg', 'jpg')
+      const bestand = new File([blob], `google-foto.${ext}`, { type: blob.type })
+      kiesAfbeelding(bestand)
+      setFotoZoekenOpen(false)
+    } catch {
+      setUploadFout('Kon deze afbeelding niet ophalen. Probeer een andere.')
+    } finally {
+      setFotoOphalenBezig(null)
+    }
   }
 
   useEffect(() => {
@@ -1283,23 +1326,79 @@ function ActiviteitToevoegenModal({ weekId, dag, activiteit, bibliotheek, volgor
                 {afbeeldingPreview ? (
                   <div style={{ position: 'relative', borderRadius: 10, overflow: 'hidden', border: '1px solid var(--border)' }}>
                     <img src={afbeeldingPreview} alt="Preview" style={{ width: '100%', maxHeight: 160, objectFit: 'cover', display: 'block' }} />
-                    <label style={{ position: 'absolute', top: 6, right: 6, cursor: 'pointer' }}>
-                      <div className="btn btn-sm" style={{ background: 'rgba(0,0,0,0.6)', color: '#fff', border: 'none' }}>Wijzigen</div>
-                      <input type="file" accept="image/jpeg,image/png,image/webp" style={{ display: 'none' }} onChange={e => e.target.files?.[0] && kiesAfbeelding(e.target.files[0])} />
-                    </label>
+                    <div style={{ position: 'absolute', top: 6, right: 6, display: 'flex', gap: 6 }}>
+                      <button type="button" className="btn btn-sm" style={{ background: 'rgba(0,0,0,0.6)', color: '#fff', border: 'none' }} onClick={() => setFotoZoekenOpen(o => !o)}>
+                        <Search size={13} /> Zoeken
+                      </button>
+                      <label style={{ cursor: 'pointer' }}>
+                        <div className="btn btn-sm" style={{ background: 'rgba(0,0,0,0.6)', color: '#fff', border: 'none' }}>Wijzigen</div>
+                        <input type="file" accept="image/jpeg,image/png,image/webp" style={{ display: 'none' }} onChange={e => e.target.files?.[0] && kiesAfbeelding(e.target.files[0])} />
+                      </label>
+                    </div>
                   </div>
                 ) : (
-                  <label style={{ cursor: 'pointer', display: 'block' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', borderRadius: 9, border: '2px dashed var(--border-dark)', background: 'var(--bg)' }}
-                      onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--primary)')}
-                      onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--border-dark)')}
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <label style={{ cursor: 'pointer', display: 'block', flex: 1 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', borderRadius: 9, border: '2px dashed var(--border-dark)', background: 'var(--bg)' }}
+                        onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--primary)')}
+                        onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--border-dark)')}
+                      >
+                        <Upload size={16} color="var(--text-muted)" style={{ opacity: 0.6, flexShrink: 0 }} />
+                        <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>Upload een foto</span>
+                      </div>
+                      <input type="file" accept="image/jpeg,image/png,image/webp" style={{ display: 'none' }} onChange={e => e.target.files?.[0] && kiesAfbeelding(e.target.files[0])} />
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => { setFotoZoekenOpen(o => !o); if (!fotoZoekterm) setFotoZoekterm(naam) }}
+                      style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 14px', borderRadius: 9, border: `2px dashed ${fotoZoekenOpen ? 'var(--primary)' : 'var(--border-dark)'}`, background: 'var(--bg)', cursor: 'pointer', flex: 1 }}
                     >
-                      <Upload size={16} color="var(--text-muted)" style={{ opacity: 0.6, flexShrink: 0 }} />
-                      <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>Klik om een foto te kiezen</span>
-                    </div>
-                    <input type="file" accept="image/jpeg,image/png,image/webp" style={{ display: 'none' }} onChange={e => e.target.files?.[0] && kiesAfbeelding(e.target.files[0])} />
-                  </label>
+                      <Search size={16} color="var(--text-muted)" style={{ opacity: 0.6, flexShrink: 0 }} />
+                      <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>Zoek foto op Google</span>
+                    </button>
+                  </div>
                 )}
+
+                {fotoZoekenOpen && (
+                  <div style={{ marginTop: 8, padding: 10, borderRadius: 9, border: '1px solid var(--border)', background: 'var(--bg)' }}>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <input
+                        className="form-input"
+                        style={{ flex: 1 }}
+                        value={fotoZoekterm}
+                        onChange={e => setFotoZoekterm(e.target.value)}
+                        onKeyDown={e => e.key === 'Enter' && zoekFotos()}
+                        placeholder="Zoekterm, bijv. 'vlinders knutselen'"
+                        autoFocus
+                      />
+                      <button className="btn btn-sm" onClick={zoekFotos} disabled={!fotoZoekterm.trim() || fotoZoekBezig}>
+                        {fotoZoekBezig ? 'Zoeken...' : <><Search size={13} /> Zoek</>}
+                      </button>
+                    </div>
+                    {fotoZoekFout && (
+                      <div style={{ marginTop: 8, fontSize: 12, color: '#DC2626' }}>{fotoZoekFout}</div>
+                    )}
+                    {fotoResultaten.length > 0 && (
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(80px, 1fr))', gap: 6, marginTop: 10, maxHeight: 220, overflowY: 'auto' }}>
+                        {fotoResultaten.map((r, i) => (
+                          <button
+                            key={i}
+                            type="button"
+                            onClick={() => kiesGoogleFoto(r.url)}
+                            disabled={fotoOphalenBezig !== null}
+                            title={r.titel}
+                            style={{ position: 'relative', padding: 0, border: '1px solid var(--border)', borderRadius: 6, overflow: 'hidden', cursor: 'pointer', aspectRatio: '1', background: 'var(--bg-card)' }}
+                            onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--primary)')}
+                            onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--border)')}
+                          >
+                            <img src={r.thumbnail} alt={r.titel} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', opacity: fotoOphalenBezig === r.url ? 0.4 : 1 }} />
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {uploadFout && (
                   <div style={{ marginTop: 6, fontSize: 12, color: '#DC2626', background: '#FEF2F2', padding: '6px 10px', borderRadius: 7 }}>{uploadFout}</div>
                 )}
