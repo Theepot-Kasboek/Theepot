@@ -4,13 +4,13 @@ import Foundation
 struct VakantiePlanning: Codable, Identifiable, Hashable {
     let id: String
     let naam: String
-    let vakantie: String
+    var vakantie: String
     var thema: String?
     let startDatum: String
     let eindDatum: String
-    let gepubliceerd: Bool
-    let startDatumNoord: String?
-    let eindDatumNoord: String?
+    var gepubliceerd: Bool
+    var startDatumNoord: String?
+    var eindDatumNoord: String?
 
     enum CodingKeys: String, CodingKey {
         case id, naam, vakantie, thema
@@ -56,5 +56,42 @@ struct VakantieActiviteit: Codable, Identifiable, Hashable {
         case dag, volgorde, categorie, naam, beschrijving, benodigdheden
         case activiteitId = "activiteit_id"
         case afbeeldingPad = "afbeelding_pad"
+    }
+}
+
+/// Tabel `activiteiten` — de activiteitenbibliotheek. Alleen gebruikt om een
+/// bestaande activiteit in een vakantieplanning te kunnen zetten; geen eigen
+/// scherm in de iOS-app.
+struct BibliotheekActiviteit: Decodable, Identifiable, Hashable {
+    let id: String
+    let naam: String
+    let categorie: String
+    let thema: [String]
+    let tijdsduur: Int?
+    let materialen: [String]?
+    let beschrijving: String?
+
+    /// `thema` staat in de database soms als losse tekst, soms als array
+    /// (zie app/activiteiten/page.tsx) — hier altijd genormaliseerd tot een lijst.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(String.self, forKey: .id)
+        naam = try c.decode(String.self, forKey: .naam)
+        categorie = try c.decode(String.self, forKey: .categorie)
+        tijdsduur = try c.decodeIfPresent(Int.self, forKey: .tijdsduur)
+        materialen = try c.decodeIfPresent([String].self, forKey: .materialen)
+        beschrijving = try c.decodeIfPresent(String.self, forKey: .beschrijving)
+
+        if let lijst = try? c.decodeIfPresent([String].self, forKey: .thema) {
+            thema = lijst
+        } else if let tekst = try? c.decodeIfPresent(String.self, forKey: .thema) {
+            thema = [tekst]
+        } else {
+            thema = []
+        }
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case id, naam, categorie, thema, tijdsduur, materialen, beschrijving
     }
 }

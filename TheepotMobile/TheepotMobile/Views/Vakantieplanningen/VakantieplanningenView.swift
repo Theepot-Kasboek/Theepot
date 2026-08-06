@@ -1,4 +1,6 @@
 import SwiftUI
+import PhotosUI
+import UIKit
 
 /// Alle layoutkeuzes in dit scherm komen uit de werkelijk beschikbare breedte,
 /// niet uit de oriëntatie of de size class. Een iPad in portret is namelijk net
@@ -61,6 +63,7 @@ struct VakantieplanningenView: View {
     @EnvironmentObject var session: SessionStore
     @State private var planningen: [VakantiePlanning] = []
     @State private var isLoading = true
+    @State private var nieuwePlanningModal = false
 
     private var magBewerken: Bool {
         session.isSuperadmin || session.rechten.paginaVakantieplanningen == .bewerken
@@ -87,6 +90,20 @@ struct VakantieplanningenView: View {
                                         PlanningKaart(planning: planning, magBewerken: magBewerken)
                                     }
                                     .buttonStyle(.plain)
+                                    .contextMenu {
+                                        if magBewerken {
+                                            Button {
+                                                Task { await togglePubliceer(planning) }
+                                            } label: {
+                                                Label(planning.gepubliceerd ? "Verbergen" : "Publiceren", systemImage: planning.gepubliceerd ? "eye.slash" : "paperplane")
+                                            }
+                                            Button(role: .destructive) {
+                                                Task { await verwijderPlanning(planning) }
+                                            } label: {
+                                                Label("Verwijderen", systemImage: "trash")
+                                            }
+                                        }
+                                    }
                                 }
                             }
                             .padding(PlanningLayout.buitenMarge)
@@ -97,15 +114,113 @@ struct VakantieplanningenView: View {
                 }
             }
             .navigationTitle("Vakantieplanningen")
+            .toolbar {
+                if magBewerken {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button { nieuwePlanningModal = true } label: {
+                            Image(systemName: "plus.circle.fill")
+                                .foregroundStyle(Color.theepotGroen)
+                        }
+                    }
+                }
+            }
             .navigationDestination(for: VakantiePlanning.self) { planning in
                 VakantiePlanningDetailView(planning: planning)
             }
+            .sheet(isPresented: $nieuwePlanningModal) {
+                NieuwePlanningFormView { nieuw in
+                    await laad()
+                    nieuwePlanningModal = false
+                    _ = nieuw
+                }
+            }
         }
-        .task {
-            planningen = (try? await VakantieplanningenService.planningen(magOnepubliceerdeZien: magBewerken)) ?? []
-            isLoading = false
+        .task { await laad() }
+    }
+
+    private func laad() async {
+        planningen = (try? await VakantieplanningenService.planningen(magOnepubliceerdeZien: magBewerken)) ?? []
+        isLoading = false
+    }
+
+    private func togglePubliceer(_ planning: VakantiePlanning) async {
+        try? await VakantieplanningenService.togglePubliceer(id: planning.id, huidig: planning.gepubliceerd)
+        await laad()
+    }
+
+    private func verwijderPlanning(_ planning: VakantiePlanning) async {
+        try? await VakantieplanningenService.verwijderPlanning(id: planning.id)
+        await laad()
+    }
+}
+
+// ─── Nieuwe planning aanmaken ───────────────────────────────────────────────
+
+private struct NieuwePlanningFormView: View {
+    @EnvironmentObject var session: SessionStore
+    @Environment(\.dismiss) private var dismiss
+    let onOpgeslagen: (VakantiePlanning) async -> Void
+
+    @State private var naam = ""
+    @State private var vakantie = STANDAARD_VAKANTIES.last ?? ""
+    @State private var thema = ""
+    @State private var startDatum = Date()
+    @State private var eindDatum = Date()
+    @State private var bezig = false
+
+    private var geldig: Bool { !naam.trimmingCharacters(in: .whitespaces).isEmpty && !thema.trimmingCharacters(in: .whitespaces).isEmpty }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("Planning") {
+                    TextField("Naam (bijv. Zomervakantie 2026)", text: $naam)
+                    Picker("Vakantie", selection: $vakantie) {
+                        ForEach(STANDAARD_VAKANTIES, id: \.self) { Text($0).tag($0) }
+                    }
+                    TextField("Thema (bijv. Jungle, Ruimte...)", text: $thema)
+                }
+                Section("Periode") {
+                    DatePicker("Startdatum", selection: $startDatum, displayedComponents: .date)
+                    DatePicker("Einddatum", selection: $eindDatum, in: startDatum..., displayedComponents: .date)
+                }
+            }
+            .navigationTitle("Nieuwe planning")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Annuleren") { dismiss() } }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Aanmaken") { Task { await opslaan() } }
+                        .disabled(!geldig || bezig)
+                }
+            }
         }
     }
+
+    private func opslaan() async {
+        guard let profielId = session.profiel?.id.uuidString.lowercased() else { return }
+        bezig = true
+        defer { bezig = false }
+        do {
+            let nieuw = try await VakantieplanningenService.maakPlanning(
+                naam: naam.trimmingCharacters(in: .whitespaces),
+                vakantie: vakantie,
+                thema: thema.trimmingCharacters(in: .whitespaces),
+                startDatum: isoDatum(startDatum),
+                eindDatum: isoDatum(eindDatum),
+                aangemaaktDoor: profielId
+            )
+            await onOpgeslagen(nieuw)
+        } catch {}
+    }
+}
+
+private let STANDAARD_VAKANTIES = ["Herfstvakantie", "Kerstvakantie", "Voorjaarsvakantie", "Meivakantie", "Zomervakantie"]
+
+private func isoDatum(_ datum: Date) -> String {
+    let f = DateFormatter()
+    f.dateFormat = "yyyy-MM-dd"
+    f.timeZone = TimeZone(identifier: "UTC")
+    return f.string(from: datum)
 }
 
 // ─── Planningkaart (lijstweergave) ─────────────────────────────────────────
@@ -155,7 +270,9 @@ private struct PlanningKaart: View {
 // ─── Detailweergave: weekoverzicht met foto's ──────────────────────────────
 
 private struct VakantiePlanningDetailView: View {
-    let planning: VakantiePlanning
+    @EnvironmentObject var session: SessionStore
+    @Environment(\.dismiss) private var dismiss
+    @State var planning: VakantiePlanning
     @State private var weken: [VakantieWeek] = []
     @State private var activiteiten: [VakantieActiviteit] = []
     @State private var actieveWeekId: String?
@@ -165,6 +282,13 @@ private struct VakantiePlanningDetailView: View {
     @State private var isLoading = true
     @State private var popupFoto: FotoItem?
     @State private var detailActiviteit: VakantieActiviteit?
+    @State private var instellingenModal = false
+    @State private var nieuweWeekModal = false
+    @State private var activiteitFormContext: ActiviteitFormContext?
+
+    private var magBewerken: Bool {
+        session.isSuperadmin || session.rechten.paginaVakantieplanningen == .bewerken
+    }
 
     private enum Regio { case midden, noord }
     private enum Weergave: String, CaseIterable {
@@ -191,7 +315,19 @@ private struct VakantiePlanningDetailView: View {
                 if isLoading {
                     ProgressView()
                 } else if weken.isEmpty {
-                    ContentUnavailableView("Nog geen weken", systemImage: "calendar")
+                    if magBewerken {
+                        ContentUnavailableView {
+                            Label("Nog geen weken", systemImage: "calendar")
+                        } description: {
+                            Text("Voeg een eerste week toe om activiteiten te kunnen plannen.")
+                        } actions: {
+                            Button("Week toevoegen") { nieuweWeekModal = true }
+                                .buttonStyle(.borderedProminent)
+                                .tint(Color.theepotGroen)
+                        }
+                    } else {
+                        ContentUnavailableView("Nog geen weken", systemImage: "calendar")
+                    }
                 } else {
                     ScrollView {
                         VStack(alignment: .leading, spacing: 18) {
@@ -229,12 +365,45 @@ private struct VakantiePlanningDetailView: View {
         }
         .navigationTitle(planning.naam)
         .navigationBarTitleDisplayMode(.inline)
-        .task {
-            weken = (try? await VakantieplanningenService.weken(planningId: planning.id)) ?? []
-            actieveWeekId = weken.first?.id
-            let ruw = (try? await VakantieplanningenService.activiteiten(weekIds: weken.map(\.id))) ?? []
-            activiteiten = await VakantieplanningenService.metBibliotheekFotos(ruw)
-            isLoading = false
+        .toolbar {
+            if magBewerken {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        Task { await togglePubliceer() }
+                    } label: {
+                        Image(systemName: planning.gepubliceerd ? "eye.slash" : "paperplane.fill")
+                    }
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button { instellingenModal = true } label: {
+                        Image(systemName: "gearshape")
+                    }
+                }
+            }
+        }
+        .task { await laad() }
+        .sheet(isPresented: $instellingenModal) {
+            PlanningInstellingenFormView(planning: planning) { bijgewerkt in
+                if let bijgewerkt {
+                    planning = bijgewerkt
+                    instellingenModal = false
+                } else {
+                    // Verwijderd — terug naar het overzicht.
+                    dismiss()
+                }
+            }
+        }
+        .sheet(isPresented: $nieuweWeekModal) {
+            NieuweWeekFormView(planningId: planning.id, volgendWeekNr: weken.count + 1) {
+                nieuweWeekModal = false
+                Task { await laad() }
+            }
+        }
+        .sheet(item: $activiteitFormContext) { context in
+            ActiviteitFormView(context: context) {
+                activiteitFormContext = nil
+                Task { await laadActiviteiten() }
+            }
         }
         .sheet(item: $detailActiviteit) { activiteit in
             NavigationStack {
@@ -329,6 +498,24 @@ private struct VakantiePlanningDetailView: View {
                             .foregroundStyle(actieveWeekId == week.id ? .white : .primary)
                             .clipShape(Capsule())
                     }
+                    .contextMenu {
+                        if magBewerken {
+                            Button(role: .destructive) {
+                                Task { await verwijderWeek(week) }
+                            } label: {
+                                Label("Week verwijderen", systemImage: "trash")
+                            }
+                        }
+                    }
+                }
+                if magBewerken {
+                    Button {
+                        nieuweWeekModal = true
+                    } label: {
+                        Image(systemName: "plus.circle.fill")
+                            .foregroundStyle(Color.theepotGroen)
+                    }
+                    .padding(.leading, 2)
                 }
             }
         }
@@ -404,7 +591,7 @@ private struct VakantiePlanningDetailView: View {
             .background(Color.theepotGroen)
             .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
 
-            if dagActiviteiten.isEmpty {
+            if dagActiviteiten.isEmpty && !magBewerken {
                 Text("—")
                     .font(.caption)
                     .foregroundStyle(.tertiary)
@@ -413,7 +600,11 @@ private struct VakantiePlanningDetailView: View {
                 VStack(spacing: ruim ? 8 : 6) {
                     ForEach(dagActiviteiten) { activiteit in
                         Button {
-                            detailActiviteit = activiteit
+                            if magBewerken {
+                                activiteitFormContext = ActiviteitFormContext(weekId: week.id, dag: dag, activiteit: activiteit)
+                            } else {
+                                detailActiviteit = activiteit
+                            }
                         } label: {
                             HStack(spacing: 6) {
                                 if activiteit.afbeeldingPad != nil {
@@ -432,6 +623,30 @@ private struct VakantiePlanningDetailView: View {
                             .padding(.horizontal, ruim ? 12 : 10).padding(.vertical, ruim ? 9 : 7)
                             .background(Color(.tertiarySystemBackground))
                             .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                        }
+                        .buttonStyle(.plain)
+                        .contextMenu {
+                            if magBewerken {
+                                Button(role: .destructive) {
+                                    Task { await verwijderActiviteit(activiteit) }
+                                } label: {
+                                    Label("Verwijderen", systemImage: "trash")
+                                }
+                            }
+                        }
+                    }
+                    if magBewerken {
+                        Button {
+                            activiteitFormContext = ActiviteitFormContext(weekId: week.id, dag: dag, activiteit: nil)
+                        } label: {
+                            HStack(spacing: 4) {
+                                Image(systemName: "plus")
+                                Text("Activiteit")
+                            }
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(Color.theepotGroenTekst)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, ruim ? 12 : 10).padding(.vertical, ruim ? 7 : 5)
                         }
                         .buttonStyle(.plain)
                     }
@@ -464,7 +679,7 @@ private struct VakantiePlanningDetailView: View {
                 let dagActiviteiten = activiteiten
                     .filter { $0.weekId == week.id && $0.dag == dag }
                     .sorted { $0.volgorde < $1.volgorde }
-                if !dagActiviteiten.isEmpty {
+                if !dagActiviteiten.isEmpty || magBewerken {
                     dagSectie(dag: dag, week: week, activiteiten: dagActiviteiten, layout: layout)
                 } else if dagFilter != nil {
                     Text("Geen activiteiten op \(dag.label.lowercased()) in deze week.")
@@ -524,10 +739,43 @@ private struct VakantiePlanningDetailView: View {
                         activiteit: activiteit,
                         kaartBreedte: layout.kaartBreedte,
                         compactScherm: layout.compactScherm,
-                        onTap: { detailActiviteit = activiteit }
+                        onTap: {
+                            if magBewerken {
+                                activiteitFormContext = ActiviteitFormContext(weekId: week.id, dag: dag, activiteit: activiteit)
+                            } else {
+                                detailActiviteit = activiteit
+                            }
+                        }
                     ) { url in
                         popupFoto = FotoItem(url: url)
                     }
+                    .contextMenu {
+                        if magBewerken {
+                            Button(role: .destructive) {
+                                Task { await verwijderActiviteit(activiteit) }
+                            } label: {
+                                Label("Verwijderen", systemImage: "trash")
+                            }
+                        }
+                    }
+                }
+                if magBewerken {
+                    Button {
+                        activiteitFormContext = ActiviteitFormContext(weekId: week.id, dag: dag, activiteit: nil)
+                    } label: {
+                        VStack(spacing: 6) {
+                            Image(systemName: "plus.circle")
+                                .font(.title2)
+                            Text("Activiteit toevoegen")
+                                .font(.caption.weight(.semibold))
+                        }
+                        .foregroundStyle(Color.theepotGroenTekst)
+                        .frame(width: layout.kaartBreedte, height: 90)
+                        .background(Color(.tertiarySystemBackground))
+                        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(Color.theepotGroen.opacity(0.4), style: StrokeStyle(lineWidth: 1.5, dash: [5])))
+                    }
+                    .buttonStyle(.plain)
                 }
             }
         }
@@ -557,6 +805,46 @@ private struct VakantiePlanningDetailView: View {
         uitvoerFormatter.dateFormat = "d MMM"
         return uitvoerFormatter.string(from: doel)
     }
+
+    // ─── Data laden en schrijfacties (alleen voor gebruikers met bewerkrecht) ─
+
+    private func laad() async {
+        weken = (try? await VakantieplanningenService.weken(planningId: planning.id)) ?? []
+        if actieveWeekId == nil || !weken.contains(where: { $0.id == actieveWeekId }) {
+            actieveWeekId = weken.first?.id
+        }
+        await laadActiviteiten()
+        isLoading = false
+    }
+
+    private func laadActiviteiten() async {
+        let ruw = (try? await VakantieplanningenService.activiteiten(weekIds: weken.map(\.id))) ?? []
+        activiteiten = await VakantieplanningenService.metBibliotheekFotos(ruw)
+    }
+
+    private func togglePubliceer() async {
+        try? await VakantieplanningenService.togglePubliceer(id: planning.id, huidig: planning.gepubliceerd)
+        planning.gepubliceerd.toggle()
+    }
+
+    private func verwijderWeek(_ week: VakantieWeek) async {
+        try? await VakantieplanningenService.verwijderWeek(id: week.id)
+        await laad()
+    }
+
+    private func verwijderActiviteit(_ activiteit: VakantieActiviteit) async {
+        try? await VakantieplanningenService.verwijderActiviteit(id: activiteit.id)
+        await laadActiviteiten()
+    }
+}
+
+/// Context voor het activiteit-formulier: welke week/dag een nieuwe activiteit
+/// krijgt, of welke bestaande activiteit wordt bewerkt.
+private struct ActiviteitFormContext: Identifiable {
+    let weekId: String
+    let dag: Dag
+    let activiteit: VakantieActiviteit?
+    var id: String { activiteit?.id ?? "nieuw-\(weekId)-\(dag.rawValue)" }
 }
 
 private struct FotoItem: Identifiable {
@@ -718,6 +1006,343 @@ private struct ActiviteitKaart: View {
             .clipped()
         }
         .buttonStyle(.plain)
+    }
+}
+
+// ─── Instellingen: thema/vakantie/regio Noord bewerken + planning verwijderen ─
+
+private struct PlanningInstellingenFormView: View {
+    @Environment(\.dismiss) private var dismiss
+    let planning: VakantiePlanning
+    /// `nil` betekent dat de planning is verwijderd; anders de bijgewerkte planning.
+    let onKlaar: (VakantiePlanning?) -> Void
+
+    @State private var vakantie: String
+    @State private var thema: String
+    @State private var regioNoordAan: Bool
+    @State private var startNoord = Date()
+    @State private var eindNoord = Date()
+    @State private var bezig = false
+
+    init(planning: VakantiePlanning, onKlaar: @escaping (VakantiePlanning?) -> Void) {
+        self.planning = planning
+        self.onKlaar = onKlaar
+        _vakantie = State(initialValue: planning.vakantie)
+        _thema = State(initialValue: planning.thema ?? "")
+        _regioNoordAan = State(initialValue: planning.startDatumNoord != nil)
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("Vakantie & thema") {
+                    Picker("Vakantie", selection: $vakantie) {
+                        ForEach(STANDAARD_VAKANTIES, id: \.self) { Text($0).tag($0) }
+                        if !STANDAARD_VAKANTIES.contains(vakantie) { Text(vakantie).tag(vakantie) }
+                    }
+                    TextField("Thema", text: $thema)
+                }
+                Section("Lisse / Hillegom (Midden)") {
+                    LabeledContent("Startdatum", value: fmtDatum(planning.startDatum))
+                    LabeledContent("Einddatum", value: fmtDatum(planning.eindDatum))
+                }
+                Section {
+                    Toggle("Lisserbroek valt in een andere week", isOn: $regioNoordAan.animation())
+                    if regioNoordAan {
+                        DatePicker("Startdatum Noord", selection: $startNoord, displayedComponents: .date)
+                        DatePicker("Einddatum Noord", selection: $eindNoord, in: startNoord..., displayedComponents: .date)
+                    }
+                } header: {
+                    Text("Lisserbroek (Noord)")
+                } footer: {
+                    Text("Alleen invullen als de vakantie op een andere week valt.")
+                }
+                Section {
+                    Button(planning.gepubliceerd ? "Verbergen" : "Publiceren") {
+                        Task { await togglePubliceer() }
+                    }
+                    Button("Planning verwijderen", role: .destructive) {
+                        Task { await verwijderen() }
+                    }
+                }
+            }
+            .navigationTitle("Instellingen")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Annuleren") { dismiss() } }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Opslaan") { Task { await opslaan() } }
+                        .disabled(thema.trimmingCharacters(in: .whitespaces).isEmpty || bezig)
+                }
+            }
+        }
+        .task {
+            if let bestaand = planning.startDatumNoord, let datum = isoNaarDatum(bestaand) { startNoord = datum }
+            if let bestaand = planning.eindDatumNoord, let datum = isoNaarDatum(bestaand) { eindNoord = datum }
+        }
+    }
+
+    private func opslaan() async {
+        bezig = true
+        defer { bezig = false }
+        let startNoordStr = regioNoordAan ? isoDatum(startNoord) : nil
+        let eindNoordStr = regioNoordAan ? isoDatum(eindNoord) : nil
+        do {
+            try await VakantieplanningenService.werkBijInstellingen(id: planning.id, thema: thema.trimmingCharacters(in: .whitespaces), vakantie: vakantie, startNoord: startNoordStr, eindNoord: eindNoordStr)
+            var bijgewerkt = planning
+            bijgewerkt.thema = thema.trimmingCharacters(in: .whitespaces)
+            bijgewerkt.vakantie = vakantie
+            bijgewerkt.startDatumNoord = startNoordStr
+            bijgewerkt.eindDatumNoord = eindNoordStr
+            onKlaar(bijgewerkt)
+        } catch {}
+    }
+
+    private func togglePubliceer() async {
+        try? await VakantieplanningenService.togglePubliceer(id: planning.id, huidig: planning.gepubliceerd)
+        var bijgewerkt = planning
+        bijgewerkt.gepubliceerd.toggle()
+        onKlaar(bijgewerkt)
+    }
+
+    private func verwijderen() async {
+        try? await VakantieplanningenService.verwijderPlanning(id: planning.id)
+        onKlaar(nil)
+    }
+}
+
+private func isoNaarDatum(_ iso: String) -> Date? {
+    let f = DateFormatter()
+    f.dateFormat = "yyyy-MM-dd"
+    f.timeZone = TimeZone(identifier: "UTC")
+    return f.date(from: String(iso.prefix(10)))
+}
+
+// ─── Nieuwe week toevoegen ──────────────────────────────────────────────────
+
+private struct NieuweWeekFormView: View {
+    @Environment(\.dismiss) private var dismiss
+    let planningId: String
+    let volgendWeekNr: Int
+    let onKlaar: () -> Void
+
+    @State private var naam = ""
+    @State private var bezig = false
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    TextField("Naam (bijv. Ridders & Kastelen)", text: $naam)
+                } header: {
+                    Text("Week \(volgendWeekNr)")
+                }
+            }
+            .navigationTitle("Week toevoegen")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Annuleren") { dismiss() } }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Toevoegen") { Task { await opslaan() } }
+                        .disabled(naam.trimmingCharacters(in: .whitespaces).isEmpty || bezig)
+                }
+            }
+        }
+    }
+
+    private func opslaan() async {
+        bezig = true
+        defer { bezig = false }
+        do {
+            try await VakantieplanningenService.maakWeek(planningId: planningId, weekNummer: volgendWeekNr, naam: naam.trimmingCharacters(in: .whitespaces))
+            onKlaar()
+        } catch {}
+    }
+}
+
+// ─── Activiteit toevoegen/bewerken, met koppeling aan de activiteitenbibliotheek ─
+
+private struct ActiviteitFormView: View {
+    @Environment(\.dismiss) private var dismiss
+    let context: ActiviteitFormContext
+    let onKlaar: () -> Void
+
+    private enum Bron: String, CaseIterable { case handmatig = "Handmatig", bibliotheek = "Uit bibliotheek" }
+
+    @State private var bron: Bron = .handmatig
+    @State private var naam = ""
+    @State private var categorie = ""
+    @State private var beschrijving = ""
+    @State private var benodigdhedenRaw = ""
+    @State private var gekozenBibliotheekId: String?
+    @State private var categorieen: [String] = []
+    @State private var bibliotheek: [BibliotheekActiviteit] = []
+    @State private var zoek = ""
+    @State private var fotoItem: PhotosPickerItem?
+    @State private var fotoPreview: Image?
+    @State private var nieuweFotoData: Data?
+    @State private var bezig = false
+
+    private var gefilterdeBibliotheek: [BibliotheekActiviteit] {
+        guard !zoek.trimmingCharacters(in: .whitespaces).isEmpty else { return bibliotheek }
+        let q = zoek.lowercased()
+        return bibliotheek.filter { $0.naam.lowercased().contains(q) || $0.categorie.lowercased().contains(q) }
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Picker("Bron", selection: $bron) {
+                    ForEach(Bron.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+                }
+                .pickerStyle(.segmented)
+                .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
+
+                if bron == .handmatig {
+                    Section("Activiteit") {
+                        TextField("Naam activiteit", text: $naam)
+                        Picker("Categorie", selection: $categorie) {
+                            ForEach(categorieen, id: \.self) { Text($0).tag($0) }
+                            if !categorieen.isEmpty && !categorieen.contains(categorie) && !categorie.isEmpty {
+                                Text(categorie).tag(categorie)
+                            }
+                        }
+                        TextField("Benodigdheden (kommagescheiden)", text: $benodigdhedenRaw)
+                        TextField("Beschrijving (optioneel)", text: $beschrijving, axis: .vertical)
+                            .lineLimit(3...6)
+                    }
+                    Section("Foto (optioneel)") {
+                        if let fotoPreview {
+                            fotoPreview
+                                .resizable()
+                                .scaledToFill()
+                                .frame(height: 140)
+                                .frame(maxWidth: .infinity)
+                                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                                .clipped()
+                        }
+                        PhotosPicker(selection: $fotoItem, matching: .any(of: [.images])) {
+                            Label(fotoPreview == nil ? "Foto kiezen" : "Foto wijzigen", systemImage: "photo")
+                        }
+                    }
+                    if gekozenBibliotheekId != nil {
+                        Section {
+                            Text("Gekoppeld aan een activiteit uit de bibliotheek. De foto wordt ook daar bijgewerkt.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    if context.activiteit != nil {
+                        Section {
+                            Button("Activiteit verwijderen", role: .destructive) {
+                                Task { await verwijderen() }
+                            }
+                        }
+                    }
+                } else {
+                    Section {
+                        TextField("Zoek op naam of categorie...", text: $zoek)
+                    }
+                    Section {
+                        if gefilterdeBibliotheek.isEmpty {
+                            Text("Geen activiteiten gevonden.")
+                                .foregroundStyle(.secondary)
+                        } else {
+                            ForEach(gefilterdeBibliotheek) { item in
+                                Button {
+                                    kiesUitBibliotheek(item)
+                                } label: {
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(item.naam).foregroundStyle(.primary)
+                                        Text([item.categorie, item.thema.first].compactMap { $0 }.joined(separator: " · "))
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            .navigationTitle(context.activiteit == nil ? "Activiteit toevoegen — \(context.dag.label)" : "Activiteit bewerken")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Annuleren") { dismiss() } }
+                if bron == .handmatig {
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button(context.activiteit == nil ? "Toevoegen" : "Opslaan") { Task { await opslaan() } }
+                            .disabled(naam.trimmingCharacters(in: .whitespaces).isEmpty || bezig)
+                    }
+                }
+            }
+        }
+        .task { await laad() }
+        .onChange(of: fotoItem) { _, nieuw in
+            Task { await verwerkFoto(nieuw) }
+        }
+    }
+
+    private func laad() async {
+        categorieen = (try? await VakantieplanningenService.vakantieCategorieen()) ?? []
+        bibliotheek = (try? await VakantieplanningenService.bibliotheekActiviteiten()) ?? []
+
+        if let bestaand = context.activiteit {
+            naam = bestaand.naam
+            categorie = bestaand.categorie
+            beschrijving = bestaand.beschrijving ?? ""
+            benodigdhedenRaw = (bestaand.benodigdheden ?? []).joined(separator: ", ")
+            gekozenBibliotheekId = bestaand.activiteitId
+        } else {
+            categorie = categorieen.first ?? "Overig"
+        }
+    }
+
+    private func kiesUitBibliotheek(_ item: BibliotheekActiviteit) {
+        naam = item.naam
+        categorie = item.categorie
+        if let beschrijvingItem = item.beschrijving, !beschrijvingItem.isEmpty { beschrijving = beschrijvingItem }
+        if let materialen = item.materialen, !materialen.isEmpty { benodigdhedenRaw = materialen.joined(separator: ", ") }
+        gekozenBibliotheekId = item.id
+        bron = .handmatig
+    }
+
+    private func verwerkFoto(_ item: PhotosPickerItem?) async {
+        guard let item, let data = try? await item.loadTransferable(type: Data.self) else { return }
+        nieuweFotoData = data
+        if let uiImage = UIImage(data: data) {
+            fotoPreview = Image(uiImage: uiImage)
+        }
+    }
+
+    private func opslaan() async {
+        bezig = true
+        defer { bezig = false }
+        let benodigdheden = benodigdhedenRaw.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+        let naamGetrimd = naam.trimmingCharacters(in: .whitespaces)
+        do {
+            if let bestaand = context.activiteit {
+                try await VakantieplanningenService.werkBijActiviteit(
+                    id: bestaand.id, categorie: categorie, naam: naamGetrimd, beschrijving: beschrijving.isEmpty ? nil : beschrijving,
+                    benodigdheden: benodigdheden, activiteitId: gekozenBibliotheekId, afbeelding: nieuweFotoData
+                )
+            } else {
+                let huidigeVolgorde = ((try? await VakantieplanningenService.activiteiten(weekIds: [context.weekId])) ?? [])
+                    .filter { $0.dag == context.dag }.count
+                try await VakantieplanningenService.voegActiviteitToe(
+                    weekId: context.weekId, dag: context.dag, volgorde: huidigeVolgorde, categorie: categorie, naam: naamGetrimd,
+                    beschrijving: beschrijving.isEmpty ? nil : beschrijving, benodigdheden: benodigdheden,
+                    activiteitId: gekozenBibliotheekId, afbeelding: nieuweFotoData
+                )
+            }
+            onKlaar()
+        } catch {}
+    }
+
+    private func verwijderen() async {
+        guard let bestaand = context.activiteit else { return }
+        try? await VakantieplanningenService.verwijderActiviteit(id: bestaand.id)
+        onKlaar()
     }
 }
 
