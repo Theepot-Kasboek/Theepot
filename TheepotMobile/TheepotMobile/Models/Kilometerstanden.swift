@@ -4,6 +4,10 @@ enum VoertuigType: String, Codable {
     case auto, bus
 }
 
+enum RegelmaatEenheid: String, Codable {
+    case week, maand, kwartaal
+}
+
 /// Tabel `km_voertuigen`.
 struct KmVoertuig: Codable, Identifiable, Hashable {
     let id: String
@@ -11,6 +15,14 @@ struct KmVoertuig: Codable, Identifiable, Hashable {
     let type: VoertuigType
     let omschrijving: String?
     let actief: Bool
+    let regelmaatAantal: Int
+    let regelmaatEenheid: RegelmaatEenheid
+
+    enum CodingKeys: String, CodingKey {
+        case id, kenteken, type, omschrijving, actief
+        case regelmaatAantal = "regelmaat_aantal"
+        case regelmaatEenheid = "regelmaat_eenheid"
+    }
 }
 
 /// Tabel `km_registraties`.

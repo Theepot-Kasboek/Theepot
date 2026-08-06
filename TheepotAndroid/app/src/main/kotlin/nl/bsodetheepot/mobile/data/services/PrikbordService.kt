@@ -5,6 +5,7 @@ import io.github.jan.supabase.postgrest.query.Columns
 import kotlinx.serialization.Serializable
 import nl.bsodetheepot.mobile.data.models.PrikbordBericht
 import nl.bsodetheepot.mobile.data.models.PrikbordPrioriteit
+import nl.bsodetheepot.mobile.data.session.SessionViewModel
 
 /**
  * Spiegelt app/prikbord/page.tsx. Zichtbaarheid/expiry wordt client-side
@@ -58,6 +59,28 @@ object PrikbordService {
     suspend fun verwijder(id: String) {
         SupabaseManager.client.postgrest["prikbord_berichten"].delete {
             filter { eq("id", id) }
+        }
+    }
+
+    /**
+     * Voor de dashboard-widget: aantal ongelezen, niet-verlopen berichten die
+     * zichtbaar zijn voor deze gebruiker. Spiegelt haalPrikbordLocaties/
+     * isZichtbaarPrikbordBericht uit lib/prikbord.ts.
+     */
+    suspend fun ongelezenAantal(session: SessionViewModel): Int {
+        val profielId = session.profiel.value?.id ?: return 0
+        val alle = berichten() // al !isVerlopen gefilterd
+
+        if (session.magAllesZien) {
+            return alle.count { profielId !in it.gelezenDoor.orEmpty() }
+        }
+        val toegankelijkeLocaties = session.locatieToegang.value
+            .filter { it.locatieType == "prikbord" && it.toegang != nl.bsodetheepot.mobile.data.models.Toegang.GEEN }
+            .map { it.locatieNaam }
+            .toSet()
+        return alle.count { bericht ->
+            val zichtbaar = bericht.locatieNaam == "alle" || bericht.locatieNaam in toegankelijkeLocaties
+            zichtbaar && profielId !in bericht.gelezenDoor.orEmpty()
         }
     }
 

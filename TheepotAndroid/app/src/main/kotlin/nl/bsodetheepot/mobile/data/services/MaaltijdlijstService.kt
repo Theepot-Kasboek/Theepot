@@ -3,9 +3,12 @@ package nl.bsodetheepot.mobile.data.services
 import io.github.jan.supabase.postgrest.postgrest
 import io.github.jan.supabase.postgrest.query.Order
 import kotlinx.serialization.Serializable
+import nl.bsodetheepot.mobile.data.models.Dag
 import nl.bsodetheepot.mobile.data.models.MaaltijdLocatie
 import nl.bsodetheepot.mobile.data.models.MaaltijdRegistratie
 import nl.bsodetheepot.mobile.data.models.MaaltijdStandaardKind
+import nl.bsodetheepot.mobile.data.models.Toegang
+import nl.bsodetheepot.mobile.data.session.SessionViewModel
 import java.time.LocalDate
 
 object MaaltijdlijstService {
@@ -83,6 +86,49 @@ object MaaltijdlijstService {
                 order("volgorde", Order.ASCENDING)
             }
             .decodeList()
+    }
+
+    /**
+     * Read-only samenvatting voor het dashboard: maakt GEEN week/registraties
+     * aan (in tegenstelling tot `registraties(locatieId, weekStart)`), zodat
+     * het enkel openen van het dashboard geen data aanmaakt voor elke locatie
+     * die de gebruiker kan zien. `null` = geen toegankelijke locatie, lege
+     * lijst = weekend, of nog geen week/registraties voor vandaag.
+     */
+    suspend fun namenVandaag(session: SessionViewModel): List<String>? {
+        val locaties = actieveLocaties()
+        val toegankelijk = locaties.filter { session.toegang(it.naam, "maaltijdlijst") != Toegang.GEEN }
+        if (toegankelijk.isEmpty()) return null
+
+        val vandaag = DateUtils.vandaag()
+        val dagVanVandaag = Dag.vanWeekdag(vandaag) ?: return emptyList()
+        val weekStartStr = DateUtils.toDateStr(DateUtils.maandaagVanWeek(vandaag))
+
+        val namen = mutableListOf<String>()
+        for (locatie in toegankelijk) {
+            val week = runCatching {
+                SupabaseManager.client.postgrest["maaltijd_weken"]
+                    .select {
+                        filter {
+                            eq("locatie_id", locatie.id)
+                            eq("week_start", weekStartStr)
+                        }
+                    }
+                    .decodeSingle<WeekRow>()
+            }.getOrNull() ?: continue // nog geen week -> overslaan, niet aanmaken
+
+            val regs = SupabaseManager.client.postgrest["maaltijd_registraties"]
+                .select {
+                    filter {
+                        eq("week_id", week.id)
+                        eq("dag", dagVanVandaag.name.lowercase())
+                        eq("aanwezig", true)
+                    }
+                }
+                .decodeList<MaaltijdRegistratie>()
+            namen.addAll(regs.map { it.naam })
+        }
+        return namen
     }
 
     @Serializable

@@ -10,7 +10,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import nl.bsodetheepot.mobile.data.session.SessionViewModel
-import nl.bsodetheepot.mobile.ui.screens.dashboard.DashboardScreen
+import nl.bsodetheepot.mobile.ui.screens.dashboard.TabScaffoldScreen
 import nl.bsodetheepot.mobile.ui.screens.login.LoginScreen
 
 /** Root van de app: kiest tussen laadscherm, inlogscherm en dashboard — spiegelt RootView.swift. */
@@ -27,7 +27,7 @@ fun TheepotApp(session: SessionViewModel) {
         isLoading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             CircularProgressIndicator()
         }
-        profiel != null -> DashboardScreen(session = session)
+        profiel != null -> TabScaffoldScreen(session = session)
         else -> LoginScreen(session = session)
     }
 }

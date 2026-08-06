@@ -4,14 +4,15 @@ import SwiftUI
 /// een sheet is op een iPad een klein zwevend venster in plaats van het volledige
 /// scherm. Rechten/locatietoegang bepalen per module wat zichtbaar/bewerkbaar is
 /// (zie SessionStore + AuthProvider.tsx).
-private enum HoofdTab: Int, CaseIterable, Identifiable {
-    case meldingen, chat, agenda, taken, kasboek, maaltijdlijst, vakantie, weekplanning, kilometers, account
+enum HoofdTab: Int, CaseIterable, Identifiable {
+    case dashboard, meldingen, chat, agenda, taken, kasboek, maaltijdlijst, vakantie, weekplanning, kilometers, account
 
     var id: Int { rawValue }
 
     /// Kort label voor onder het icoon; `volledigeTitel` is voor VoiceOver.
     var titel: String {
         switch self {
+        case .dashboard: return "Home"
         case .meldingen: return "Meldingen"
         case .chat: return "Chat"
         case .agenda: return "Agenda"
@@ -37,6 +38,7 @@ private enum HoofdTab: Int, CaseIterable, Identifiable {
 
     var icoon: String {
         switch self {
+        case .dashboard: return "square.grid.2x2"
         case .meldingen: return "pin"
         case .chat: return "bubble.left.and.bubble.right"
         case .agenda: return "calendar.badge.clock"
@@ -52,6 +54,7 @@ private enum HoofdTab: Int, CaseIterable, Identifiable {
 
     var icoonGevuld: String {
         switch self {
+        case .dashboard: return "square.grid.2x2.fill"
         case .meldingen: return "pin.fill"
         case .chat: return "bubble.left.and.bubble.right.fill"
         case .agenda: return "calendar.badge.clock"   // geen apart .fill-symbool beschikbaar voor deze glyph
@@ -69,7 +72,7 @@ private enum HoofdTab: Int, CaseIterable, Identifiable {
 struct DashboardView: View {
     @EnvironmentObject var session: SessionStore
     @EnvironmentObject var meldingRouter: MeldingRouter
-    @State private var tab: HoofdTab = .meldingen
+    @State private var tab: HoofdTab = .dashboard
 
     private let barOnderrand: CGFloat = 10
 
@@ -77,6 +80,7 @@ struct DashboardView: View {
         ZStack(alignment: .bottom) {
             Group {
                 switch tab {
+                case .dashboard: DashboardHomeView(tab: $tab)
                 case .meldingen: PrikbordView()
                 case .chat: ChatListView()
                 case .agenda: AgendaView()

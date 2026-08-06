@@ -21,6 +21,7 @@ import androidx.compose.material.icons.filled.Chat
 import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.Event
 import androidx.compose.material.icons.filled.EuroSymbol
+import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Restaurant
 import androidx.compose.material.icons.filled.WbSunny
@@ -52,20 +53,26 @@ import nl.bsodetheepot.mobile.ui.screens.taken.TakenScreen
 import nl.bsodetheepot.mobile.ui.screens.vakantieplanningen.VakantieplanningenScreen
 import nl.bsodetheepot.mobile.ui.screens.weekplanningen.WeekplanningenScreen
 
-private data class Tab(val label: String, val icon: ImageVector)
+/**
+ * Elke module is een tab (index bepaald door z'n plek in [HoofdTab.entries]).
+ * Voorheen hardcoded indices (1 voor chat, 2 voor agenda) voor de push-
+ * deeplinks — nu via de enum, zodat een nieuwe tab die niet meer laat breken.
+ */
+enum class HoofdTab(val label: String, val icon: ImageVector) {
+    HOME("Home", Icons.Filled.GridView),
+    MELDINGEN("Meldingen", Icons.Filled.PushPin),
+    CHAT("Chat", Icons.Filled.Chat),
+    AGENDA("Agenda", Icons.Filled.Event),
+    TAKEN("Taken", Icons.Filled.Checklist),
+    KASBOEK("Kasboek", Icons.Filled.EuroSymbol),
+    MAALTIJDLIJST("Maaltijdlijst", Icons.Filled.Restaurant),
+    VAKANTIE("Vakantie", Icons.Filled.WbSunny),
+    WEEKPLANNING("Weekplanning", Icons.Filled.CalendarToday),
+    KILOMETERS("Kilometers", Icons.Filled.DirectionsCar),
+    ACCOUNT("Account", Icons.Filled.AccountCircle),
+}
 
-private val tabs = listOf(
-    Tab("Meldingen", Icons.Filled.PushPin),
-    Tab("Chat", Icons.Filled.Chat),
-    Tab("Agenda", Icons.Filled.Event),
-    Tab("Taken", Icons.Filled.Checklist),
-    Tab("Kasboek", Icons.Filled.EuroSymbol),
-    Tab("Maaltijdlijst", Icons.Filled.Restaurant),
-    Tab("Vakantie", Icons.Filled.WbSunny),
-    Tab("Weekplanning", Icons.Filled.CalendarToday),
-    Tab("Kilometers", Icons.Filled.DirectionsCar),
-    Tab("Account", Icons.Filled.AccountCircle),
-)
+private val tabs = HoofdTab.entries
 
 /**
  * Eén horizontaal scrollbare tabbalk voor alle modules — swipe of scroll de
@@ -73,8 +80,11 @@ private val tabs = listOf(
  * inhoud (HorizontalPager schuift synchroon mee met de balk).
  */
 @Composable
-fun DashboardScreen(session: SessionViewModel) {
-    val pagerState = rememberPagerState(pageCount = { tabs.size })
+fun TabScaffoldScreen(session: SessionViewModel) {
+    val pagerState = rememberPagerState(
+        initialPage = tabs.indexOf(HoofdTab.HOME),
+        pageCount = { tabs.size },
+    )
     val balkState = rememberLazyListState()
     val scope = rememberCoroutineScope()
 
@@ -82,18 +92,18 @@ fun DashboardScreen(session: SessionViewModel) {
         balkState.animateScrollToItem(maxOf(0, pagerState.currentPage - 1))
     }
 
-    // Tik op een chat-pushmelding: naar de chattab (index 1). ChatListScreen
-    // pakt de rest van de deeplink (het juiste gesprek openen) zelf op.
+    // Tik op een chat-pushmelding: naar de chattab. ChatListScreen pakt de
+    // rest van de deeplink (het juiste gesprek openen) zelf op.
     val gewenstGesprekId by MeldingRouter.gewenstGesprekId.collectAsState()
     LaunchedEffect(gewenstGesprekId) {
-        if (gewenstGesprekId != null) pagerState.animateScrollToPage(1)
+        if (gewenstGesprekId != null) pagerState.animateScrollToPage(tabs.indexOf(HoofdTab.CHAT))
     }
 
-    // Tik op een agenda-herinnering: naar de agendatab (index 2). AgendaScreen
-    // pakt de rest van de deeplink (de juiste afspraak openen) zelf op.
+    // Tik op een agenda-herinnering: naar de agendatab. AgendaScreen pakt de
+    // rest van de deeplink (de juiste afspraak openen) zelf op.
     val gewenstAfspraakId by MeldingRouter.gewenstAfspraakId.collectAsState()
     LaunchedEffect(gewenstAfspraakId) {
-        if (gewenstAfspraakId != null) pagerState.animateScrollToPage(2)
+        if (gewenstAfspraakId != null) pagerState.animateScrollToPage(tabs.indexOf(HoofdTab.AGENDA))
     }
 
     Scaffold(
@@ -128,17 +138,20 @@ fun DashboardScreen(session: SessionViewModel) {
             state = pagerState,
             modifier = Modifier.fillMaxSize().padding(padding),
         ) { page ->
-            when (page) {
-                0 -> PrikbordScreen(session = session)
-                1 -> ChatListScreen(session = session)
-                2 -> AgendaScreen(session = session)
-                3 -> TakenScreen(session = session)
-                4 -> KasboekScreen(session = session)
-                5 -> MaaltijdlijstScreen(session = session)
-                6 -> VakantieplanningenScreen(session = session)
-                7 -> WeekplanningenScreen(session = session)
-                8 -> KilometerstandenScreen(session = session)
-                else -> AccountScreen(session = session)
+            when (tabs[page]) {
+                HoofdTab.HOME -> DashboardHomeScreen(session = session, naarTab = { doel ->
+                    scope.launch { pagerState.animateScrollToPage(tabs.indexOf(doel)) }
+                })
+                HoofdTab.MELDINGEN -> PrikbordScreen(session = session)
+                HoofdTab.CHAT -> ChatListScreen(session = session)
+                HoofdTab.AGENDA -> AgendaScreen(session = session)
+                HoofdTab.TAKEN -> TakenScreen(session = session)
+                HoofdTab.KASBOEK -> KasboekScreen(session = session)
+                HoofdTab.MAALTIJDLIJST -> MaaltijdlijstScreen(session = session)
+                HoofdTab.VAKANTIE -> VakantieplanningenScreen(session = session)
+                HoofdTab.WEEKPLANNING -> WeekplanningenScreen(session = session)
+                HoofdTab.KILOMETERS -> KilometerstandenScreen(session = session)
+                HoofdTab.ACCOUNT -> AccountScreen(session = session)
             }
         }
     }

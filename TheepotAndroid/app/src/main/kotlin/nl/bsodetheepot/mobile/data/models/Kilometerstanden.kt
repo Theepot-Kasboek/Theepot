@@ -9,6 +9,13 @@ enum class VoertuigType {
     @SerialName("bus") BUS,
 }
 
+@Serializable
+enum class RegelmaatEenheid {
+    @SerialName("week") WEEK,
+    @SerialName("maand") MAAND,
+    @SerialName("kwartaal") KWARTAAL,
+}
+
 /** Tabel `km_voertuigen`. */
 @Serializable
 data class KmVoertuig(
@@ -17,6 +24,8 @@ data class KmVoertuig(
     val type: VoertuigType,
     val omschrijving: String? = null,
     val actief: Boolean = true,
+    @SerialName("regelmaat_aantal") val regelmaatAantal: Int = 1,
+    @SerialName("regelmaat_eenheid") val regelmaatEenheid: RegelmaatEenheid = RegelmaatEenheid.MAAND,
 ) {
     val label: String get() = "$kenteken (${if (type == VoertuigType.BUS) "Bus" else "Auto"})"
 }

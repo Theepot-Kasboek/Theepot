@@ -58,6 +58,25 @@ enum PrikbordService {
             .execute()
     }
 
+    /// Voor de dashboard-widget: aantal ongelezen, niet-verlopen berichten die
+    /// zichtbaar zijn voor deze gebruiker. Spiegelt haalPrikbordLocaties/
+    /// isZichtbaarPrikbordBericht uit lib/prikbord.ts.
+    static func ongelezenAantal(session: SessionStore) async throws -> Int {
+        guard let profielId = await session.profiel?.id.uuidString.lowercased() else { return 0 }
+        let berichten = try await berichten() // al !isVerlopen gefilterd
+
+        if await session.magAllesZien {
+            return berichten.filter { !($0.gelezenDoor ?? []).contains(profielId) }.count
+        }
+        let toegankelijkeLocaties = Set(await session.locatieToegang
+            .filter { $0.locatieType == "prikbord" && $0.toegang != .geen }
+            .map(\.locatieNaam))
+        return berichten.filter { bericht in
+            let zichtbaar = bericht.locatieNaam == "alle" || toegankelijkeLocaties.contains(bericht.locatieNaam)
+            return zichtbaar && !(bericht.gelezenDoor ?? []).contains(profielId)
+        }.count
+    }
+
     /// Markeert bericht als gelezen door de huidige gebruiker (read-then-write,
     /// net als de webapp — race-gevoelig maar consistent met bestaand gedrag).
     static func markeerGelezen(bericht: PrikbordBericht, profielId: String) async throws {

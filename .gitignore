@@ -39,3 +39,6 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 .env*
+
+# supabase CLI (lokale link-metadata, geen geheimen maar hoort niet in git)
+supabase/.temp/

@@ -2,6 +2,8 @@ package nl.bsodetheepot.mobile.data.models
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import java.time.DayOfWeek
+import java.time.LocalDate
 
 @Serializable
 enum class Dag {
@@ -12,6 +14,18 @@ enum class Dag {
     @SerialName("vrijdag") VRIJDAG;
 
     val label: String get() = name.lowercase().replaceFirstChar { it.uppercase() }
+
+    companion object {
+        /** Mapt een datum naar de bijbehorende weekdag, of `null` in het weekend. */
+        fun vanWeekdag(datum: LocalDate): Dag? = when (datum.dayOfWeek) {
+            DayOfWeek.MONDAY -> MAANDAG
+            DayOfWeek.TUESDAY -> DINSDAG
+            DayOfWeek.WEDNESDAY -> WOENSDAG
+            DayOfWeek.THURSDAY -> DONDERDAG
+            DayOfWeek.FRIDAY -> VRIJDAG
+            else -> null
+        }
+    }
 }
 
 @Serializable

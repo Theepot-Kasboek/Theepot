@@ -92,6 +92,48 @@ enum MaaltijdlijstService {
             .value
     }
 
+    /// Read-only samenvatting voor het dashboard: maakt GEEN week/registraties
+    /// aan (in tegenstelling tot `registraties(locatieId:weekStart:)`), zodat
+    /// het enkel openen van het dashboard geen data aanmaakt voor elke locatie
+    /// die de gebruiker kan zien. `nil` = geen toegang (widget verbergen),
+    /// `[]` = in het weekend, of nog geen week/registraties voor vandaag.
+    static func namenVandaag(session: SessionStore) async throws -> [String]? {
+        let locaties = try await actieveLocaties()
+        var toegankelijk: [MaaltijdLocatie] = []
+        for locatie in locaties {
+            let toegang = await session.toegang(voorLocatie: locatie.naam, locatieType: "maaltijdlijst")
+            if toegang != .geen { toegankelijk.append(locatie) }
+        }
+        guard !toegankelijk.isEmpty else { return nil }
+
+        guard let dagVanVandaag = Dag.vanWeekdag(Date()) else { return [] }
+        let weekStartStr = toDateStr(maandaagVanWeek(Date()))
+
+        var namen: [String] = []
+        for locatie in toegankelijk {
+            let week: MaaltijdWeek? = try? await SupabaseManager.client
+                .from("maaltijd_weken")
+                .select()
+                .eq("locatie_id", value: locatie.id)
+                .eq("week_start", value: weekStartStr)
+                .single()
+                .execute()
+                .value
+            guard let week else { continue } // nog geen week -> overslaan, niet aanmaken
+
+            let regs: [MaaltijdRegistratie] = try await SupabaseManager.client
+                .from("maaltijd_registraties")
+                .select()
+                .eq("week_id", value: week.id)
+                .eq("dag", value: dagVanVandaag.rawValue)
+                .eq("aanwezig", value: true)
+                .execute()
+                .value
+            namen.append(contentsOf: regs.map(\.naam))
+        }
+        return namen
+    }
+
     static func toggleAanwezig(registratieId: String, nieuweWaarde: Bool) async throws {
         struct Update: Encodable { let aanwezig: Bool }
         try await SupabaseManager.client

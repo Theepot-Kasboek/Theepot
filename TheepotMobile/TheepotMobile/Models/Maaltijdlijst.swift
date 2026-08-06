@@ -4,6 +4,22 @@ enum Dag: String, Codable, CaseIterable {
     case maandag, dinsdag, woensdag, donderdag, vrijdag
 
     var label: String { rawValue.capitalized }
+
+    /// Mapt een Date naar de bijbehorende weekdag, of `nil` in het weekend.
+    /// Gebruikt Europe/Amsterdam net als de rest van deze service.
+    static func vanWeekdag(_ datum: Date) -> Dag? {
+        var cal = Calendar(identifier: .iso8601)
+        cal.timeZone = TimeZone(identifier: "Europe/Amsterdam")!
+        let weekdag = cal.component(.weekday, from: datum) // 1 = zondag ... 7 = zaterdag
+        switch weekdag {
+        case 2: return .maandag
+        case 3: return .dinsdag
+        case 4: return .woensdag
+        case 5: return .donderdag
+        case 6: return .vrijdag
+        default: return nil // 1 = zondag, 7 = zaterdag
+        }
+    }
 }
 
 /// Tabel `maaltijd_standaard_kinderen`.
