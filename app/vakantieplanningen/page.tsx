@@ -276,6 +276,49 @@ export default function VakantieplanningenPage() {
     setToast({ bericht: 'Verwijderd.', type: 'success' })
   }
 
+  async function verplaatsActiviteit(activiteitId: string, naarDag: Dag, naarIndex: number) {
+    const act = activiteiten.find(a => a.id === activiteitId)
+    if (!act) return
+    const vanDag = act.dag
+    const weekId = act.week_id
+    if (vanDag === naarDag) {
+      const lijst = activiteitenVan(weekId, vanDag).filter(a => a.id !== activiteitId)
+      const index = Math.max(0, Math.min(naarIndex, lijst.length))
+      lijst.splice(index, 0, act)
+      if (lijst.every((a, i) => a.volgorde === i)) return
+
+      setActiviteiten(prev => prev.map(a => {
+        const nieuweIndex = lijst.findIndex(x => x.id === a.id)
+        return nieuweIndex === -1 ? a : { ...a, volgorde: nieuweIndex }
+      }))
+      const supabase = getSupabase()
+      await Promise.all(lijst.map((a, i) => supabase.from('vakantie_activiteiten').update({ volgorde: i }).eq('id', a.id)))
+    } else {
+      const vanLijst = activiteitenVan(weekId, vanDag).filter(a => a.id !== activiteitId)
+      const naarLijst = activiteitenVan(weekId, naarDag)
+      const index = Math.max(0, Math.min(naarIndex, naarLijst.length))
+      naarLijst.splice(index, 0, act)
+
+      setActiviteiten(prev => prev.map(a => {
+        if (a.id === activiteitId) return { ...a, dag: naarDag, volgorde: index }
+        const iVan = vanLijst.findIndex(x => x.id === a.id)
+        if (iVan !== -1) return { ...a, volgorde: iVan }
+        const iNaar = naarLijst.findIndex(x => x.id === a.id)
+        if (iNaar !== -1) return { ...a, volgorde: iNaar }
+        return a
+      }))
+      const supabase = getSupabase()
+      await Promise.all([
+        supabase.from('vakantie_activiteiten').update({ dag: naarDag, volgorde: index }).eq('id', activiteitId),
+        ...vanLijst.map((a, i) => supabase.from('vakantie_activiteiten').update({ volgorde: i }).eq('id', a.id)),
+        ...naarLijst.filter(a => a.id !== activiteitId).map((a) => {
+          const i = naarLijst.findIndex(x => x.id === a.id)
+          return supabase.from('vakantie_activiteiten').update({ volgorde: i }).eq('id', a.id)
+        }),
+      ])
+    }
+  }
+
   async function importeerJsonActiviteiten(weekId: string, dag: Dag, json: string) {
     try {
       const arr = JSON.parse(json)
@@ -564,6 +607,7 @@ export default function VakantieplanningenPage() {
             onVerwijder={verwijderActiviteit}
             onJsonImport={(dag) => setJsonImportModal({ weekId: actieveWeekObj.id, dag })}
             onSubthemaOp={bewerkWeekSubthema}
+            onVerplaats={verplaatsActiviteit}
             bibliotheek={bibliotheek}
           />
         )}
@@ -630,7 +674,7 @@ export default function VakantieplanningenPage() {
 
 // ─── Week Overzicht tabel ─────────────────────────────────────────────────────
 
-function WeekOverzicht({ week, activiteiten, planning, dagDatumStr, onNieuw, onBewerk, onVerwijder, onJsonImport, onSubthemaOp, bibliotheek }: {
+function WeekOverzicht({ week, activiteiten, planning, dagDatumStr, onNieuw, onBewerk, onVerwijder, onJsonImport, onSubthemaOp, onVerplaats, bibliotheek }: {
   week: Week
   activiteiten: VakantieActiviteit[]
   planning: Planning
@@ -640,11 +684,14 @@ function WeekOverzicht({ week, activiteiten, planning, dagDatumStr, onNieuw, onB
   onVerwijder: (id: string) => void
   onJsonImport: (dag: Dag) => void
   onSubthemaOp: (weekId: string, data: { naam?: string; dag_subthemas?: Partial<Record<Dag, string>> }) => void
+  onVerplaats: (activiteitId: string, naarDag: Dag, naarIndex: number) => void
   bibliotheek: BibliotheekActiviteit[]
 }) {
   const perDag = planning.subthema_modus === 'dag'
   const [weekNaamInput, setWeekNaamInput] = useState(week.naam)
   const [dagInputs, setDagInputs] = useState<Partial<Record<Dag, string>>>(week.dag_subthemas ?? {})
+  const [gesleepteId, setGesleepteId] = useState<string | null>(null)
+  const [dropDoel, setDropDoel] = useState<{ dag: Dag; rijIdx: number } | null>(null)
 
   useEffect(() => { setWeekNaamInput(week.naam) }, [week.id, week.naam])
   useEffect(() => { setDagInputs(week.dag_subthemas ?? {}) }, [week.id, week.dag_subthemas])
@@ -724,10 +771,30 @@ function WeekOverzicht({ week, activiteiten, planning, dagDatumStr, onNieuw, onB
                   {/* Dag kolommen */}
                   {DAGEN.map(dag => {
                     const act = activiteitenVan(dag)[rijIdx]
+                    const isDropDoel = dropDoel?.dag === dag && dropDoel.rijIdx === rijIdx
                     return (
-                      <td key={dag} style={{ padding: '6px 10px', border: '1px solid var(--border)', verticalAlign: 'middle', minWidth: 140 }}>
+                      <td
+                        key={dag}
+                        style={{ padding: '6px 10px', border: '1px solid var(--border)', verticalAlign: 'middle', minWidth: 140, background: isDropDoel ? 'var(--primary-light)' : undefined, transition: 'background 0.1s' }}
+                        onDragOver={e => { if (gesleepteId) { e.preventDefault(); e.dataTransfer.dropEffect = 'move' } }}
+                        onDragEnter={e => { if (gesleepteId) { e.preventDefault(); setDropDoel({ dag, rijIdx }) } }}
+                        onDragLeave={() => setDropDoel(prev => (prev?.dag === dag && prev.rijIdx === rijIdx ? null : prev))}
+                        onDrop={e => {
+                          e.preventDefault()
+                          const id = e.dataTransfer.getData('text/plain')
+                          setGesleepteId(null)
+                          setDropDoel(null)
+                          if (id) onVerplaats(id, dag, rijIdx)
+                        }}
+                      >
                         {act ? (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <div
+                            draggable
+                            onDragStart={e => { e.dataTransfer.setData('text/plain', act.id); e.dataTransfer.effectAllowed = 'move'; setGesleepteId(act.id) }}
+                            onDragEnd={() => { setGesleepteId(null); setDropDoel(null) }}
+                            style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'grab', opacity: gesleepteId === act.id ? 0.4 : 1 }}
+                          >
+                            <GripVertical size={12} style={{ color: 'var(--text-muted)', opacity: 0.5, flexShrink: 0 }} />
                             <span
                               onClick={() => onBewerk(act)}
                               style={{ color: 'var(--primary)', textDecoration: 'underline', cursor: 'pointer', fontSize: 14, flex: 1, fontWeight: 600 }}
@@ -757,7 +824,20 @@ function WeekOverzicht({ week, activiteiten, planning, dagDatumStr, onNieuw, onB
             {/* Toevoegen rij */}
             <tr>
               {DAGEN.map(dag => (
-                <td key={dag} style={{ padding: '6px 10px', border: '1px solid var(--border)', background: 'var(--bg)' }}>
+                <td
+                  key={dag}
+                  style={{ padding: '6px 10px', border: '1px solid var(--border)', background: dropDoel?.dag === dag && dropDoel.rijIdx === -1 ? 'var(--primary-light)' : 'var(--bg)', transition: 'background 0.1s' }}
+                  onDragOver={e => { if (gesleepteId) { e.preventDefault(); e.dataTransfer.dropEffect = 'move' } }}
+                  onDragEnter={e => { if (gesleepteId) { e.preventDefault(); setDropDoel({ dag, rijIdx: -1 }) } }}
+                  onDragLeave={() => setDropDoel(prev => (prev?.dag === dag && prev.rijIdx === -1 ? null : prev))}
+                  onDrop={e => {
+                    e.preventDefault()
+                    const id = e.dataTransfer.getData('text/plain')
+                    setGesleepteId(null)
+                    setDropDoel(null)
+                    if (id) onVerplaats(id, dag, activiteitenVan(dag).length)
+                  }}
+                >
                   <div style={{ display: 'flex', gap: 4 }}>
                     <button
                       onClick={() => onNieuw(dag)}
