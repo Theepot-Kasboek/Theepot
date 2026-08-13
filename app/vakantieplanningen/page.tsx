@@ -836,7 +836,7 @@ function DocumentWeergave({ planning, weken, activiteiten, dagDatumStr, tekstGro
   }
 
   return (
-    <div style={{ maxWidth: 900, margin: '0 auto' }}>
+    <div style={{ width: '100%', maxWidth: 1600, margin: '0 auto' }}>
       {/* Titel + bulk download knop */}
       <div style={{ textAlign: 'center', marginBottom: 32, padding: '24px 0' }}>
         <h1 style={{ fontFamily: 'Sora, sans-serif', fontSize: 24, fontWeight: 800, marginBottom: 6 }}>{planning.naam}</h1>
