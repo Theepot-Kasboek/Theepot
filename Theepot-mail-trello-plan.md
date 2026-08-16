@@ -40,22 +40,22 @@ node-instantie en de nieuwe system-prompt hieronder.
 
 | Volgorde | Lijst | List ID |
 |---|---|---|
-| 1 | Roosterwijzigingen | *nog invullen* |
-| 2 | Vakantieroosters | *nog invullen* |
-| 3 | Vakantieplanningen | *nog invullen* |
-| 4 | Meldingen | *nog invullen* |
-| 5 | Basisroosters | *nog invullen* |
-| 6 | Verlofaanvragen | *nog invullen* |
-| 7 | Nieuwsbrieven | *nog invullen* |
-| 8 | Spam/Overig | *nog invullen* |
-| 9 | Handmatig configureren | *nog invullen* |
+| 1 | Roosterwijzigingen | `6a8187bcfdcdc4853077ad19` |
+| 2 | Vakantieroosters | `6a8187c29a8d7624a2fed607` |
+| 3 | Vakantieplanningen | `6a8187c5b3fef537d47f3dbb` |
+| 4 | Meldingen | `6a8187caa1542ad4e8a5dfe2` |
+| 5 | Basisroosters | `6a8187dbc3e173f211ef3dff` |
+| 6 | Verlofaanvragen | `6a8187dfaac606409503f892` |
+| 7 | Nieuwsbrieven | `6a8187d3d9731c5ac8be53b1` |
+| 8 | Spam/Overig | `6a8187d035bc7550697c1733` |
+| 9 | Handmatig configureren | `6a81884c2427667e72df1571` |
 
 | Label | ID |
 |---|---|
-| Laag | *nog invullen* |
-| Normaal | *nog invullen* |
-| Hoog | *nog invullen* |
-| Urgent | *nog invullen* |
+| Laag | `6a8188cc76b5d1d91c519805` |
+| Normaal | `6a8188d829f1c62fb6545186` |
+| Hoog | `6a8188e4f04adbd3b39d432f` |
+| Urgent | `6a8188ed9b2bd00619c88671` |
 
 ---
 
@@ -243,22 +243,22 @@ try {
 
 // Board: Theepot-mail (fsNdDIUZ)
 const LIST_IDS = {
-  'Roosterwijzigingen': 'VUL_IN',
-  'Basisroosters': 'VUL_IN',
-  'Vakantieroosters': 'VUL_IN',
-  'Vakantieplanningen': 'VUL_IN',
-  'Meldingen': 'VUL_IN',
-  'Verlofaanvragen': 'VUL_IN',
-  'Nieuwsbrieven': 'VUL_IN',
-  'Spam/Overig': 'VUL_IN',
+  'Roosterwijzigingen': '6a8187bcfdcdc4853077ad19',
+  'Basisroosters': '6a8187dbc3e173f211ef3dff',
+  'Vakantieroosters': '6a8187c29a8d7624a2fed607',
+  'Vakantieplanningen': '6a8187c5b3fef537d47f3dbb',
+  'Meldingen': '6a8187caa1542ad4e8a5dfe2',
+  'Verlofaanvragen': '6a8187dfaac606409503f892',
+  'Nieuwsbrieven': '6a8187d3d9731c5ac8be53b1',
+  'Spam/Overig': '6a8187d035bc7550697c1733',
 };
-const HANDMATIG_LIST_ID = 'VUL_IN';
+const HANDMATIG_LIST_ID = '6a81884c2427667e72df1571';
 
 const LABEL_IDS = {
-  'Laag': 'VUL_IN',
-  'Normaal': 'VUL_IN',
-  'Hoog': 'VUL_IN',
-  'Urgent': 'VUL_IN',
+  'Laag': '6a8188cc76b5d1d91c519805',
+  'Normaal': '6a8188d829f1c62fb6545186',
+  'Hoog': '6a8188e4f04adbd3b39d432f',
+  'Urgent': '6a8188ed9b2bd00619c88671',
 };
 
 const CONFIDENCE_DREMPEL = 0.6;
@@ -356,10 +356,16 @@ en werk ook de tabellen bovenaan dit document bij.
 ## Status
 
 - Board "Theepot-mail" (`fsNdDIUZ`) bestaat, is toegankelijk via Rooster@bsodetheepot.nl.
+- 9 lijsten + 4 labels zijn aangemaakt op het board; ID's zijn opgehaald en ingevuld in de tabellen
+  bovenaan en in de `LIST_IDS`/`LABEL_IDS`/`HANDMATIG_LIST_ID` van de Code-node hierboven.
+- Trello API Key + Token zijn aangemaakt (Rooster@bsodetheepot.nl). **Deze staan bewust niet in dit
+  document** — vul ze rechtstreeks in bij het aanmaken van de Trello-credential in n8n (stap 3
+  hieronder), en bewaar ze verder alleen in de n8n-credential zelf, niet los in een bestand.
 - **Nog te doen:**
-  1. 9 lijsten + 4 labels aanmaken op het board (zie tabellen bovenaan).
-  2. IDs ophalen (zie sectie hierboven) en invullen in de Code-node.
-  3. Nieuwe Trello-credential aanmaken (Rooster@bsodetheepot.nl).
+  1. Anthropic-node bouwen met de system-prompt hierboven (Node 1).
+  2. Code-node bouwen met de nu ingevulde ID's (Node 2).
+  3. Nieuwe Trello-credential aanmaken in n8n (Rooster@bsodetheepot.nl, Key + Token die al zijn
+     opgehaald) en Node 3 bouwen.
   4. IMAP-trigger koppelen aan de Theepot-roostermailbox, exacte veldnamen bevestigen (`textPlain` e.d.).
-  5. Alle 3 nodes bouwen en los testen, daarna end-to-end met een paar voorbeeldmails (incl. een
+  5. Alle 3 nodes los testen, daarna end-to-end met een paar voorbeeldmails (incl. een
      prompt-injection-test en een dubbelzinnige mail om de "Handmatig configureren"-lijst te checken).
