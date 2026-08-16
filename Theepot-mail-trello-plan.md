@@ -353,19 +353,52 @@ en werk ook de tabellen bovenaan dit document bij.
 
 ---
 
-## Status
+## Eerste testmail (mock data)
+
+Als mock data op de IMAP Trigger-node zetten om de hele keten in één keer te testen:
+
+```json
+[
+  {
+    "subject": "Kun je mijn dienst van donderdag omzetten?",
+    "from": "Lucas Molenkamp <lucas@bsodetheepot.nl>",
+    "date": "Mon, 17 Aug 2026 09:15:00 +0200",
+    "textPlain": "Hoi,\n\nIk sta donderdag ingepland op de Zonnegroep, maar ik heb die dag een afspraak die ik niet kan verzetten. Kan iemand mijn dienst overnemen, of kan ik hem ruilen met een collega? Het gaat om donderdag 20 augustus, ochtenddienst.\n\nGroet,\nLucas"
+  }
+]
+```
+
+Verwachte classificatie: categorie `Roosterwijzigingen` (ad-hoc, eenmalige wijziging), type_afzender
+`Medewerker`, kind_of_groep `Zonnegroep`, prioriteit vermoedelijk `Hoog`.
+
+---
+
+## Status (2026-08-16)
 
 - Board "Theepot-mail" (`fsNdDIUZ`) bestaat, is toegankelijk via Rooster@bsodetheepot.nl.
 - 9 lijsten + 4 labels zijn aangemaakt op het board; ID's zijn opgehaald en ingevuld in de tabellen
   bovenaan en in de `LIST_IDS`/`LABEL_IDS`/`HANDMATIG_LIST_ID` van de Code-node hierboven.
 - Trello API Key + Token zijn aangemaakt (Rooster@bsodetheepot.nl). **Deze staan bewust niet in dit
-  document** — vul ze rechtstreeks in bij het aanmaken van de Trello-credential in n8n (stap 3
-  hieronder), en bewaar ze verder alleen in de n8n-credential zelf, niet los in een bestand.
-- **Nog te doen:**
-  1. Anthropic-node bouwen met de system-prompt hierboven (Node 1).
-  2. Code-node bouwen met de nu ingevulde ID's (Node 2).
-  3. Nieuwe Trello-credential aanmaken in n8n (Rooster@bsodetheepot.nl, Key + Token die al zijn
-     opgehaald) en Node 3 bouwen.
-  4. IMAP-trigger koppelen aan de Theepot-roostermailbox, exacte veldnamen bevestigen (`textPlain` e.d.).
-  5. Alle 3 nodes los testen, daarna end-to-end met een paar voorbeeldmails (incl. een
-     prompt-injection-test en een dubbelzinnige mail om de "Handmatig configureren"-lijst te checken).
+  document** — alleen bewaard in de n8n Trello-credential zelf, niet los in een bestand.
+- **IMAP Trigger** stond al klaar (hergebruikt, niet apart aangemaakt voor deze workflow).
+- **Node 1 — "Anthropic - Theepot Mail Analyseren"**: gebouwd door de bestaande Anthropic-node van de
+  testworkflow te dupliceren en alleen het System Message te vervangen door de nieuwe Theepot-prompt.
+  Gecontroleerd en akkoord: model `claude-sonnet-5`, user-prompt met `subject`/`from`/`date`/`textPlain`,
+  Max Tokens `4096`, geen Temperature-optie, "Simplify Output" aan.
+- **Node 2 — "Verwerk & Routeer - Theepot"**: Code-node klaargezet, mode "Run Once for Each Item",
+  JavaScript-code (met alle List/Label-ID's al ingevuld) geplakt zoals in dit document.
+- **Node 3 — "Trello - Theepot Kaart aanmaken"**: node klaargezet, nieuwe Trello-credential aangemaakt
+  met de Rooster@bsodetheepot.nl Key/Token, List ID / Name / Description / Due Date / Label IDs
+  ingesteld als expressions zoals in dit document.
+- Testmail voorbereid (Lucas Molenkamp, roosterwijziging Zonnegroep, donderdag 20 augustus) — nog niet
+  daadwerkelijk door de keten gestuurd.
+
+**Nog te doen:**
+1. Testmail als mock data op de IMAP Trigger zetten en "Execute workflow" draaien (alle 3 nodes in één
+   keer testen).
+2. Output controleren: juiste categorie (Roosterwijzigingen), juiste lijst/label in Trello, nette
+   kaarttitel via `actie_kort`.
+3. Na een geslaagde losse test: bredere test met meerdere mails per categorie (incl. een
+   prompt-injection-poging en een dubbelzinnige mail, om de "Handmatig configureren"-lijst te checken).
+4. Na elke test: **"Unpin"** op de IMAP Trigger-node, zodat de workflow weer op echte inkomende mail
+   reageert i.p.v. de gepinde testdata.
