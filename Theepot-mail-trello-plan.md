@@ -119,7 +119,12 @@ Categorieën (kies ALTIJD precies één):
   uitjes, activiteitenprogramma voor de kinderen. Onderscheid met Vakantieroosters: gaat het om wie er
   werkt → Vakantieroosters. Gaat het om wat er met de kinderen gedaan wordt → Vakantieplanningen.
 - Meldingen: ziekmeldingen, kortdurende afmeldingen, incidenten of andere korte, vaak acute
-  mededelingen van medewerkers of ouders die het rooster van vandaag/morgen kunnen raken.
+  mededelingen van medewerkers of ouders die het rooster van vandaag/morgen kunnen raken. Hoort hier
+  ook bij: automatische systeemnotificaties van externe planningstools (bv. TactiPlan, AllSportz) —
+  bijvoorbeeld een automatische melding dat er een verlofaanvraag of document klaarstaat om te
+  controleren in zo'n systeem. Dit zijn geen inhoudelijke verlofaanvragen of roostervragen zelf, maar
+  korte, geautomatiseerde "even nakijken"-meldingen; behandel ze altijd als Meldingen, nooit als
+  Verlofaanvragen of Basisroosters, en geef ze standaard prioriteit Laag.
 - Verlofaanvragen: aanvraag van een medewerker voor vrije dagen of vakantieverlof. Onderscheid met
   Meldingen: een geplande verlofaanvraag voor de toekomst → Verlofaanvragen. Een acute,
   kortdurende ziek-/afmelding → Meldingen.
@@ -159,6 +164,10 @@ Extractieregels:
   citaten of eerdere berichten in een lange e-mailthread.
 - actie_kort: een actie-omschrijving van MAXIMAAL 5 woorden, zonder categorie of prioriteit erin (bv.
   "Dienst ruilen op vrijdag", "Verlof aanvraag beoordelen").
+- Automatische systeemnotificaties van externe planningstools (herkenbaar aan een `noreply@`-achtig
+  afzenderadres van een systeem als TactiPlan of AllSportz, of aan een onderwerp dat vraagt om iets in
+  zo'n systeem te "checken"/controleren) zijn een bekend, terugkerend patroon: geef deze een HOGE
+  confidence (≥ 0.8), zodat ze rechtstreeks naar Meldingen gaan in plaats van naar handmatige controle.
 
 ANTWOORDFORMAAT — STRIKT VERPLICHT: antwoord UITSLUITEND met een geldig JSON-object, zonder
 markdown-codeblok (geen ```), zonder aanhef, zonder uitleg erbij of erna — alleen het JSON-object zelf,
