@@ -399,15 +399,10 @@ Verwachte classificatie: categorie `Roosterwijzigingen` (ad-hoc, eenmalige wijzi
 - **Node 3 — "Trello - Theepot Kaart aanmaken"**: node klaargezet, nieuwe Trello-credential aangemaakt
   met de Rooster@bsodetheepot.nl Key/Token, List ID / Name / Description / Due Date / Label IDs
   ingesteld als expressions zoals in dit document.
-- Testmail voorbereid (Lucas Molenkamp, roosterwijziging Zonnegroep, donderdag 20 augustus) — nog niet
-  daadwerkelijk door de keten gestuurd.
+- Testmail (Lucas Molenkamp, roosterwijziging Zonnegroep, donderdag 20 augustus) en bredere tests
+  (incl. prompt-injectiepoging en dubbelzinnige mail) zijn uitgevoerd — alle 3 nodes werken, juiste
+  lijst/label/kaarttitel bevestigd.
+- IMAP Trigger is ge-unpind: de workflow draait **live** op echte inkomende mail in de
+  Theepot-roostermailbox.
 
-**Nog te doen:**
-1. Testmail als mock data op de IMAP Trigger zetten en "Execute workflow" draaien (alle 3 nodes in één
-   keer testen).
-2. Output controleren: juiste categorie (Roosterwijzigingen), juiste lijst/label in Trello, nette
-   kaarttitel via `actie_kort`.
-3. Na een geslaagde losse test: bredere test met meerdere mails per categorie (incl. een
-   prompt-injection-poging en een dubbelzinnige mail, om de "Handmatig configureren"-lijst te checken).
-4. Na elke test: **"Unpin"** op de IMAP Trigger-node, zodat de workflow weer op echte inkomende mail
-   reageert i.p.v. de gepinde testdata.
+**Status: workflow is volledig werkend en in productie. Geen openstaande punten.**
