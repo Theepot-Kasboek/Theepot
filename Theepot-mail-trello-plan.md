@@ -293,9 +293,7 @@ const cardTitle = `${data.actie_kort || data.categorie || 'Onbekend'} — ${wie}
 // LET OP: dit is GEEN echte "Beantwoorden" — mailto: kent geen In-Reply-To/References-headers,
 // dus het wordt een nieuw conceptbericht (niet gekoppeld aan de oorspronkelijke mailthread),
 // maar wel voorgevuld met ontvanger, onderwerp ("Re: ...") en een korte quote als aanhef.
-// Vervang 'IMAP Trigger — Theepot roostermailbox' hieronder door de EXACTE naam van jouw
-// IMAP-trigger-node als die anders heet in jouw n8n-canvas.
-const trigger = $('IMAP Trigger — Theepot roostermailbox').item.json;
+const trigger = $('Email Trigger (IMAP)').item.json;
 const origineelOnderwerp = trigger.subject || '';
 const afzenderNaamVoorQuote = data.afzender_naam || trigger.from || 'de afzender';
 const datumVoorQuote = trigger.date || '';
@@ -427,15 +425,20 @@ Verwachte classificatie: categorie `Roosterwijzigingen` (ad-hoc, eenmalige wijzi
 
 **Status: workflow is volledig werkend en in productie.**
 
-**Openstaand punt (toegevoegd 2026-08-18):** een `mailto:`-link is toegevoegd aan `cardDescription`
-in Node 2 (regel `**Reageren:** [Antwoord opstellen](...)`), om vanuit de Trello-kaart snel een reactie
-naar de afzender te kunnen opstellen. Dit is bewust géén echte "Beantwoorden"-link — `mailto:` kent geen
-`In-Reply-To`/`References`-headers, dus het opent altijd een nieuw, los conceptbericht (in het
-mailprogramma dat op het apparaat van de klikker als standaard staat), voorgevuld met ontvanger,
-onderwerp (`Re: ...`) en een korte quote. Nog te doen vóór dit live getest is:
-- Controleer dat `$('IMAP Trigger — Theepot roostermailbox')` in de code exact overeenkomt met de
-  naam van de IMAP-trigger-node in het canvas; pas anders de nodenaam in de expression aan.
-- Test met "Execute step" of `trigger.subject`/`trigger.from`/`trigger.date` daadwerkelijk bestaan op
-  die node (zelfde soort check als destijds bij `textPlain`).
-- Losstaand overwogen: een link die de oorspronkelijke ontvangen mail zelf opent (via de
-  TransIP/Roundcube-webmail, met het IMAP-UID) — dat is nog niet geïmplementeerd, alleen besproken.
+**Update (2026-08-18) — mailto-link toegevoegd:** een `mailto:`-link is toegevoegd aan
+`cardDescription` in Node 2 (regel `**Reageren:** [Antwoord opstellen](...)`), om vanuit de Trello-kaart
+snel een reactie naar de afzender te kunnen opstellen. Dit is bewust géén echte "Beantwoorden"-link —
+`mailto:` kent geen `In-Reply-To`/`References`-headers, dus het opent altijd een nieuw, los
+conceptbericht (in het mailprogramma dat op het apparaat van de klikker als standaard staat), voorgevuld
+met ontvanger, onderwerp (`Re: ...`) en een korte quote.
+
+Rechtstreeks doorgevoerd in de live n8n-workflow (via de n8n API, workflow "Theepot Mail Organisering",
+`hiIyVq1WSdEDWRD4`) en hier in het document bijgewerkt — geen handmatige stap meer nodig:
+- De IMAP-trigger-node heet in het echte canvas **`Email Trigger (IMAP)`** (niet de eerdere
+  placeholder-naam); de code hierboven verwijst er nu correct naar.
+- Bevestigd via een echte binnengekomen mail (test-execution) dat `subject`, `from` en `date`
+  daadwerkelijk als top-level velden op die trigger-node staan.
+- Losstaand overwogen, nog niet geïmplementeerd: een link die de oorspronkelijke ontvangen mail zelf
+  opent via de TransIP/Roundcube-webmail. Bevestigd dat het IMAP-UID beschikbaar is op
+  `attributes.uid` van de trigger-node (bv. `1580` in de test-execution) — bruikbaar als dit later
+  alsnog gebouwd wordt.
