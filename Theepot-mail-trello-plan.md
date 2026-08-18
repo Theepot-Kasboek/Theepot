@@ -289,6 +289,25 @@ if (data.confidence < CONFIDENCE_DREMPEL || ontbreekt.length > 0 || !LIST_IDS[da
 const wie = data.kind_of_groep || data.afzender_naam || data.afzender_email || 'Onbekende afzender';
 const cardTitle = `${data.actie_kort || data.categorie || 'Onbekend'} — ${wie}`.slice(0, 250);
 
+// Mailto-link om snel een reactie te kunnen opstellen richting de afzender.
+// LET OP: dit is GEEN echte "Beantwoorden" — mailto: kent geen In-Reply-To/References-headers,
+// dus het wordt een nieuw conceptbericht (niet gekoppeld aan de oorspronkelijke mailthread),
+// maar wel voorgevuld met ontvanger, onderwerp ("Re: ...") en een korte quote als aanhef.
+// Vervang 'IMAP Trigger — Theepot roostermailbox' hieronder door de EXACTE naam van jouw
+// IMAP-trigger-node als die anders heet in jouw n8n-canvas.
+const trigger = $('IMAP Trigger — Theepot roostermailbox').item.json;
+const origineelOnderwerp = trigger.subject || '';
+const afzenderNaamVoorQuote = data.afzender_naam || trigger.from || 'de afzender';
+const datumVoorQuote = trigger.date || '';
+
+const mailtoBody =
+  `Op ${datumVoorQuote} schreef ${afzenderNaamVoorQuote}:\n` +
+  `> ${(data.samenvatting || '').replace(/\n/g, '\n> ')}\n\n`;
+
+const mailtoLink = `mailto:${data.afzender_email || ''}` +
+  `?subject=${encodeURIComponent('Re: ' + origineelOnderwerp)}` +
+  `&body=${encodeURIComponent(mailtoBody)}`;
+
 const cardDescription = [
   handmatigReden ? `⚠️ **Reden handmatige controle:** ${handmatigReden}\n` : '',
   `**Samenvatting:** ${data.samenvatting || '-'}`,
@@ -298,6 +317,7 @@ const cardDescription = [
   `**Sentiment:** ${data.sentiment || '-'}`,
   `**Deadline:** ${data.deadline || 'geen'}`,
   `**AI-confidence:** ${data.confidence}`,
+  `**Reageren:** [Antwoord opstellen](${mailtoLink})`,
 ].join('\n');
 
 return {
@@ -405,4 +425,17 @@ Verwachte classificatie: categorie `Roosterwijzigingen` (ad-hoc, eenmalige wijzi
 - IMAP Trigger is ge-unpind: de workflow draait **live** op echte inkomende mail in de
   Theepot-roostermailbox.
 
-**Status: workflow is volledig werkend en in productie. Geen openstaande punten.**
+**Status: workflow is volledig werkend en in productie.**
+
+**Openstaand punt (toegevoegd 2026-08-18):** een `mailto:`-link is toegevoegd aan `cardDescription`
+in Node 2 (regel `**Reageren:** [Antwoord opstellen](...)`), om vanuit de Trello-kaart snel een reactie
+naar de afzender te kunnen opstellen. Dit is bewust géén echte "Beantwoorden"-link — `mailto:` kent geen
+`In-Reply-To`/`References`-headers, dus het opent altijd een nieuw, los conceptbericht (in het
+mailprogramma dat op het apparaat van de klikker als standaard staat), voorgevuld met ontvanger,
+onderwerp (`Re: ...`) en een korte quote. Nog te doen vóór dit live getest is:
+- Controleer dat `$('IMAP Trigger — Theepot roostermailbox')` in de code exact overeenkomt met de
+  naam van de IMAP-trigger-node in het canvas; pas anders de nodenaam in de expression aan.
+- Test met "Execute step" of `trigger.subject`/`trigger.from`/`trigger.date` daadwerkelijk bestaan op
+  die node (zelfde soort check als destijds bij `textPlain`).
+- Losstaand overwogen: een link die de oorspronkelijke ontvangen mail zelf opent (via de
+  TransIP/Roundcube-webmail, met het IMAP-UID) — dat is nog niet geïmplementeerd, alleen besproken.
