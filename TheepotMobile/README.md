@@ -31,7 +31,9 @@ rechten/locatietoegang (`SessionStore` spiegelt `components/AuthProvider.tsx`):
   (documentscanner) en uploaden; geen categorie-/locatiebeheer of PDF-export
 - **Maaltijdlijst** — alleen "meegegeten" toggelen per kind/dag; geen kinderenbeheer
 - **Vakantieplanningen** — alleen-lezen, alleen gepubliceerde plannings (tenzij bewerkrecht)
-- **Weekplanningen** — alleen-lezen, weekthema + Knutsel/Koken/Bakken + Groepsspel
+- **Weekplanningen** — volledige pariteit: groepen per locatie (bijv. 4+ en 8+) met
+  eigen planning, weekthema + Knutsel/Koken/Bakken + Groepsspel bewerken, activiteit
+  overnemen uit de activiteitenbibliotheek, voorbeeldfoto uploaden; geen PDF-export
 - **Taken & Notities** — volledige pariteit: lijsten, taken, notitiemappen met auto-save,
   slimme weergaves (Vandaag/Gepland)
 - **Kilometerstanden** — alleen nieuwe stand invullen (met validatie t.o.v. laatste stand);

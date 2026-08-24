@@ -70,6 +70,9 @@ Zelfde scope als de iOS-app (zie `../TheepotMobile/README.md` voor de volledige
 per-module beschrijving): Meldingen (Prikbord), Chat, Agenda, Taken & Notities,
 Kasboek, Maaltijdlijst, Vakantieplanningen, Weekplanningen, Kilometerstanden.
 
+Weekplanningen is hier wél volledig bewerkbaar (groepen, thema, activiteiten,
+bibliotheekkoppeling en foto's) — vakantieplanningen blijft op Android alleen-lezen.
+
 Bewust weggelaten: Activiteitenbeheer, Beleidsstukken, Nieuwsbrieven,
 Brandoefening, Medewerkers, Rechtenbeheer, 10-minutengesprekken, VE Planning.
 

@@ -32,6 +32,7 @@ data class Rechten(
     @SerialName("chat_starten") val chatStarten: Boolean = false,
     @SerialName("agenda_algemeen_bewerken") val agendaAlgemeenBewerken: Boolean = false,
     @SerialName("agenda_personeel_inzien") val agendaPersoneelInzien: Boolean = false,
+    @SerialName("weekplanning_groepen_beheren") val weekplanningGroepenBeheren: Boolean = false,
 ) {
     companion object {
         val SUPERADMIN = Rechten(
@@ -47,6 +48,7 @@ data class Rechten(
             chatStarten = true,
             agendaAlgemeenBewerken = true,
             agendaPersoneelInzien = true,
+            weekplanningGroepenBeheren = true,
         )
         val GEEN = Rechten()
     }

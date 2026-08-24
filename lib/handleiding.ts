@@ -462,8 +462,10 @@ export const HOOFDSTUKKEN: Hoofdstuk[] = [
           {
             naam: 'Weekplanningen',
             tekst:
-              'Meelezen: het weekthema, de knutsel-, kook- of bakactiviteit en het groepsspel. De app toont ' +
-              'de algemene planning van de locatie; groepsplanningen bekijk je in het dashboard.',
+              'Bekijken én bijwerken: het weekthema, de knutsel-, kook- of bakactiviteit en het ' +
+              'groepsspel. Heeft de locatie groepen (bijv. 4+ en 8+), dan kies je die bovenin; met ' +
+              'bewerkrechten kun je ze in de app ook aanmaken. Een activiteit overnemen uit de ' +
+              'activiteitenbibliotheek en een foto meesturen kan ook.',
           },
           {
             naam: 'Kilometerstanden',

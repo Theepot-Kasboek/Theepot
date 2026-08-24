@@ -103,6 +103,9 @@ Elke medewerker krijgt per module (kasboek, maaltijdlijst, weekplanningen, gespr
 
 ### 6. Weekplanningen
 - Per locatie, per week
+- Groepen per locatie (bijv. 4+ en 8+) met elk een eigen planning; zonder groep is het
+  de algemene planning van de locatie. Groepsbeheer achter het recht
+  `weekplanning_groepen_beheren`
 - Twee slots: Knutsel (wissel naar Koken/Bakken) + Groepsspel
 - Weekthema instellen
 - Activiteiten handmatig of uit bibliotheek
@@ -223,7 +226,8 @@ vakantie_weken, vakantie_activiteiten (benodigdheden TEXT[])
 vakantie_categorieen
 
 -- Weekplanningen
-week_planningen, week_activiteiten
+week_groepen (locatie_naam, naam, volgorde)
+week_planningen (groep_id → week_groepen, NULL = algemene planning), week_activiteiten
 
 -- 10-min gesprekken
 gesprek_mappen, gesprek_formulieren

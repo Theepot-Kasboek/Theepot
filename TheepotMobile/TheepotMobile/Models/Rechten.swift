@@ -30,6 +30,7 @@ struct Rechten: Codable {
     var chatStarten: Bool = false
     var agendaAlgemeenBewerken: Bool = false
     var agendaPersoneelInzien: Bool = false
+    var weekplanningGroepenBeheren: Bool = false
 
     enum CodingKeys: String, CodingKey {
         case paginaKasboek = "pagina_kasboek"
@@ -44,6 +45,7 @@ struct Rechten: Codable {
         case chatStarten = "chat_starten"
         case agendaAlgemeenBewerken = "agenda_algemeen_bewerken"
         case agendaPersoneelInzien = "agenda_personeel_inzien"
+        case weekplanningGroepenBeheren = "weekplanning_groepen_beheren"
     }
 
     static let superadmin = Rechten(
@@ -52,8 +54,41 @@ struct Rechten: Codable {
         paginaMaaltijdlijst: .bewerken, paginaWeekplanningen: .bewerken,
         paginaGesprekken: .bewerken, paginaAgenda: .bewerken,
         prikbordToevoegen: true, chatStarten: true,
-        agendaAlgemeenBewerken: true, agendaPersoneelInzien: true
+        agendaAlgemeenBewerken: true, agendaPersoneelInzien: true,
+        weekplanningGroepenBeheren: true
     )
 
     static let geen = Rechten()
+}
+
+/// Net als `normaliseerRechten` in components/AuthProvider.tsx: kolommen die nog
+/// niet in de tabel staan (een nieuw recht dat pas na een migratie bestaat) of
+/// null zijn, vallen terug op "geen recht" in plaats van het hele rechtenobject
+/// te laten mislukken.
+extension Rechten {
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        func toegang(_ sleutel: CodingKeys) -> Toegang {
+            (try? c.decodeIfPresent(Toegang.self, forKey: sleutel)) ?? .geen
+        }
+        func vlag(_ sleutel: CodingKeys) -> Bool {
+            (try? c.decodeIfPresent(Bool.self, forKey: sleutel)) ?? false
+        }
+
+        self.init(
+            paginaKasboek: toegang(.paginaKasboek),
+            paginaVakantieplanningen: toegang(.paginaVakantieplanningen),
+            paginaChat: toegang(.paginaChat),
+            paginaPrikbord: toegang(.paginaPrikbord),
+            paginaMaaltijdlijst: toegang(.paginaMaaltijdlijst),
+            paginaWeekplanningen: toegang(.paginaWeekplanningen),
+            paginaGesprekken: toegang(.paginaGesprekken),
+            paginaAgenda: toegang(.paginaAgenda),
+            prikbordToevoegen: vlag(.prikbordToevoegen),
+            chatStarten: vlag(.chatStarten),
+            agendaAlgemeenBewerken: vlag(.agendaAlgemeenBewerken),
+            agendaPersoneelInzien: vlag(.agendaPersoneelInzien),
+            weekplanningGroepenBeheren: vlag(.weekplanningGroepenBeheren)
+        )
+    }
 }
