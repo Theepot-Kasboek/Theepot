@@ -209,7 +209,7 @@ export const HOOFDSTUKKEN: Hoofdstuk[] = [
     id: 'weekplanningen',
     nummer: 'V',
     titel: 'Weekplanningen',
-    intro: 'Voor het plannen van een knutsel- of kookactiviteit en een groepsspel per week.',
+    intro: 'Voor het plannen van een knutsel- of kookactiviteit en een groepsspel per week — voor de hele locatie of per groep, bijvoorbeeld 4+ en 8+.',
     blokken: [
       {
         soort: 'stappen',
@@ -461,7 +461,9 @@ export const HOOFDSTUKKEN: Hoofdstuk[] = [
           },
           {
             naam: 'Weekplanningen',
-            tekst: 'Meelezen: het weekthema, de knutsel-, kook- of bakactiviteit en het groepsspel.',
+            tekst:
+              'Meelezen: het weekthema, de knutsel-, kook- of bakactiviteit en het groepsspel. De app toont ' +
+              'de algemene planning van de locatie; groepsplanningen bekijk je in het dashboard.',
           },
           {
             naam: 'Kilometerstanden',

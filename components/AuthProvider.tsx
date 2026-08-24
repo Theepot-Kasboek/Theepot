@@ -39,6 +39,7 @@ interface Rechten {
   agenda_personeel_inzien: boolean
   vakantie_exporteren: boolean
   weekplanning_exporteren: boolean
+  weekplanning_groepen_beheren: boolean
   gesprekken_exporteren: boolean
   chat_starten: boolean
   maaltijdlijst_kind_toevoegen: boolean
@@ -55,7 +56,7 @@ const SUPERADMIN_RECHTEN: Rechten = {
   kasboek_export: true, kasboek_bonnetjes_inzien: true,
   activiteiten_importeren: true, activiteiten_verwijderen: true,
   agenda_algemeen_bewerken: true, agenda_personeel_inzien: true,
-  vakantie_exporteren: true, weekplanning_exporteren: true, gesprekken_exporteren: true,
+  vakantie_exporteren: true, weekplanning_exporteren: true, weekplanning_groepen_beheren: true, gesprekken_exporteren: true,
   chat_starten: true,
   maaltijdlijst_kind_toevoegen: true,
 }
@@ -71,7 +72,7 @@ const GEEN_RECHTEN: Rechten = {
   kasboek_export: false, kasboek_bonnetjes_inzien: false,
   activiteiten_importeren: false, activiteiten_verwijderen: false,
   agenda_algemeen_bewerken: false, agenda_personeel_inzien: false,
-  vakantie_exporteren: false, weekplanning_exporteren: false, gesprekken_exporteren: false,
+  vakantie_exporteren: false, weekplanning_exporteren: false, weekplanning_groepen_beheren: false, gesprekken_exporteren: false,
   chat_starten: false,
   maaltijdlijst_kind_toevoegen: false,
 }

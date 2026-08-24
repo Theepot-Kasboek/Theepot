@@ -245,7 +245,7 @@ export default function WeekplanningenPage() {
   const { profiel, isSuperadmin, rechten } = useAuth()
   const magZien = isSuperadmin || rechten.pagina_weekplanningen === 'lezen' || rechten.pagina_weekplanningen === 'bewerken'
   const magExporteren = isSuperadmin || rechten.weekplanning_exporteren === true
-  const magBewerken = isSuperadmin || rechten.pagina_weekplanningen === 'bewerken'
+  const magGroepenBeheren = isSuperadmin || (rechten.pagina_weekplanningen === 'bewerken' && rechten.weekplanning_groepen_beheren === true)
 
   async function getToegankelijkeLocaties(alleLocaties: string[]): Promise<string[]> {
     const magAllesZien = isSuperadmin || profiel?.rol === 'directie' || profiel?.rol === 'leidinggevende'
@@ -494,7 +494,7 @@ export default function WeekplanningenPage() {
                 {g.naam}
               </button>
             ))}
-            {magBewerken && (
+            {magGroepenBeheren && (
               <button className="btn btn-sm" style={{ fontSize: 11, padding: '4px 10px' }} onClick={() => setGroepenBeheer(true)}>
                 <Plus size={12} /> Groepen beheren
               </button>

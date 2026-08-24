@@ -41,6 +41,7 @@ interface Recht {
   agenda_personeel_inzien: boolean
   vakantie_exporteren: boolean
   weekplanning_exporteren: boolean
+  weekplanning_groepen_beheren: boolean
   gesprekken_exporteren: boolean
   maaltijdlijst_kind_toevoegen: boolean
 }
@@ -121,6 +122,7 @@ const PAGINAS: PaginaDef[] = [
     icon: '✂️',
     functies: [
       { key: 'weekplanning_exporteren', label: 'Exporteren', beschrijving: 'Weekplanning exporteren als PDF', vereist: 'lezen' },
+      { key: 'weekplanning_groepen_beheren', label: 'Groepen beheren', beschrijving: 'Groepen (bijv. 4+ en 8+) aanmaken, hernoemen en verwijderen', vereist: 'bewerken' },
     ],
   },
   {
@@ -213,6 +215,7 @@ function leegRecht(): Omit<Recht, 'id' | 'rol' | 'profiel_id'> {
     vakantie_exporteren: false,
     chat_starten: false,
     weekplanning_exporteren: false,
+    weekplanning_groepen_beheren: false,
     gesprekken_exporteren: false,
     maaltijdlijst_kind_toevoegen: false,
   }

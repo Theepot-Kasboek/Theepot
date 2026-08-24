@@ -56,3 +56,14 @@ create unique index if not exists week_planningen_locatie_week_groep_idx
     week_start,
     coalesce(groep_id, '00000000-0000-0000-0000-000000000000'::uuid)
   );
+
+-- Recht om groepen te beheren (zichtbaar op de Rechten-pagina onder
+-- Weekplanningen). Iedereen die weekplanningen al mag bewerken, krijgt dit
+-- recht meteen; daarna kun je het per rol of persoon uitzetten.
+alter table rechten
+  add column if not exists weekplanning_groepen_beheren boolean not null default false;
+
+update rechten
+  set weekplanning_groepen_beheren = true
+  where pagina_weekplanningen = 'bewerken'
+    and weekplanning_groepen_beheren = false;
