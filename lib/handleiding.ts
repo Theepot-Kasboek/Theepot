@@ -216,6 +216,7 @@ export const HOOFDSTUKKEN: Hoofdstuk[] = [
         kop: 'Zo gebruik je het',
         stappen: [
           'Open Weekplanningen, kies je locatie en navigeer naar de juiste week.',
+          'Heeft de locatie aparte groepen (bijvoorbeeld 4+ en 8+)? Maak ze aan via "Groepen beheren" en kies daarna de groepstab. Elke groep heeft haar eigen thema en activiteiten; onder "Algemeen" staat de planning voor de hele locatie.',
           'Stel bovenaan een thema voor de week in, als daar één voor is.',
           'Klik op het "knutsel of kook/bak"-slot en kies een activiteit uit de bibliotheek, of vul er zelf één in.',
           'Klik op het groepsspel-slot en vul naam, beschrijving en benodigdheden in — een voorbeeldafbeelding is optioneel.',

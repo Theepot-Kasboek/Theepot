@@ -501,7 +501,7 @@ function AgendaVandaagWidget({ profielId }: { profielId: string }) {
 function WeekplanningWidget({ profielId, isSuperadmin, profiel }: { profielId: string; isSuperadmin: boolean; profiel: { rol?: string } | null }) {
   const [locaties, setLocaties] = useState<string[]>([])
   const [actieveLocatie, setActieveLocatie] = useState('')
-  const [planning, setPlanning] = useState<{ thema: string | null; knutsel?: string; kook_bak?: string; groepsspel?: string } | null>(null)
+  const [planningen, setPlanningen] = useState<{ id: string; groepNaam: string | null; thema: string | null; acts: Record<string, string> }[]>([])
   const [laden, setLaden] = useState(true)
   const maandag = startVanWeek(new Date())
   const weekStart = `${maandag.getFullYear()}-${String(maandag.getMonth()+1).padStart(2,'0')}-${String(maandag.getDate()).padStart(2,'0')}`
@@ -529,12 +529,23 @@ function WeekplanningWidget({ profielId, isSuperadmin, profiel }: { profielId: s
   async function laadPlanning(locatie: string) {
     setLaden(true)
     const supabase = getSupabase()
-    const { data: planningData } = await supabase.from('week_planningen').select('id,thema').eq('locatie_naam', locatie).eq('week_start', weekStart).eq('gepubliceerd', true).maybeSingle()
-    if (!planningData) { setPlanning(null); setLaden(false); return }
-    const { data: acts } = await supabase.from('week_activiteiten').select('naam,type').eq('planning_id', planningData.id)
-    const actMap: Record<string, string> = {}
-    for (const a of acts ?? []) actMap[a.type] = a.naam
-    setPlanning({ thema: planningData.thema, ...actMap })
+    // Per groep kan er een eigen planning zijn (bijv. 4+ en 8+), plus de algemene planning
+    const { data: planningData } = await supabase.from('week_planningen').select('id,thema,groep_id').eq('locatie_naam', locatie).eq('week_start', weekStart).eq('gepubliceerd', true)
+    if (!planningData || planningData.length === 0) { setPlanningen([]); setLaden(false); return }
+
+    const groepIds = Array.from(new Set(planningData.map((p: { groep_id: string | null }) => p.groep_id).filter(Boolean) as string[]))
+    const groepNamen: Record<string, string> = {}
+    if (groepIds.length > 0) {
+      const { data: groepen } = await supabase.from('week_groepen').select('id,naam').in('id', groepIds)
+      for (const g of groepen ?? []) groepNamen[g.id] = g.naam
+    }
+
+    const { data: acts } = await supabase.from('week_activiteiten').select('planning_id,naam,type').in('planning_id', planningData.map((p: { id: string }) => p.id))
+    setPlanningen(planningData.map((p: { id: string; thema: string | null; groep_id: string | null }) => {
+      const actMap: Record<string, string> = {}
+      for (const a of (acts ?? []).filter((a: { planning_id: string }) => a.planning_id === p.id)) actMap[a.type] = a.naam
+      return { id: p.id, groepNaam: p.groep_id ? groepNamen[p.groep_id] ?? null : null, thema: p.thema, acts: actMap }
+    }))
     setLaden(false)
   }
 
@@ -568,13 +579,14 @@ function WeekplanningWidget({ profielId, isSuperadmin, profiel }: { profielId: s
 
       <div style={{ padding: '12px 14px' }}>
         {laden ? <div style={{ color: 'var(--text-muted)', fontSize: 12 }}>Laden...</div>
-          : !planning ? <div style={{ color: 'var(--text-muted)', fontSize: 13 }}>Geen gepubliceerde planning voor deze week.</div>
-          : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          : planningen.length === 0 ? <div style={{ color: 'var(--text-muted)', fontSize: 13 }}>Geen gepubliceerde planning voor deze week.</div>
+          : planningen.map(planning => (
+            <div key={planning.id} style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: planningen.length > 1 ? 14 : 0 }}>
+              {planning.groepNaam && <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--primary-text)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{planning.groepNaam}</div>}
               {planning.thema && <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>Thema: <strong style={{ color: 'var(--text)' }}>{planning.thema}</strong></div>}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 8 }}>
                 {SLOTS.map(s => {
-                  const naam = (planning as Record<string, string | null>)[s.key]
+                  const naam = planning.acts[s.key]
                   return (
                     <div key={s.key} style={{ padding: '10px 12px', borderRadius: 10, background: s.bg, borderLeft: `3px solid ${s.kleur}` }}>
                       <div style={{ fontSize: 10, fontWeight: 700, color: s.kleur, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>{s.label}</div>
@@ -586,7 +598,7 @@ function WeekplanningWidget({ profielId, isSuperadmin, profiel }: { profielId: s
                 })}
               </div>
             </div>
-          )
+          ))
         }
       </div>
     </div>

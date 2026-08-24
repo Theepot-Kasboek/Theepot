@@ -20,8 +20,16 @@ interface WeekPlanning {
   id: string
   locatie_naam: string
   week_start: string
+  groep_id: string | null
   thema: string | null
   aangemaakt_op: string
+}
+
+interface WeekGroep {
+  id: string
+  locatie_naam: string
+  naam: string
+  volgorde: number
 }
 
 interface WeekActiviteit {
@@ -100,7 +108,7 @@ function fmtMaand(weekStart: string): string {
 
 // ─── PDF Export ───────────────────────────────────────────────────────────────
 
-async function exportPDF(planning: WeekPlanning, activiteiten: WeekActiviteit[]) {
+async function exportPDF(planning: WeekPlanning, activiteiten: WeekActiviteit[], groepNaam: string | null) {
   const { jsPDF } = await import('jspdf')
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
 
@@ -128,6 +136,13 @@ async function exportPDF(planning: WeekPlanning, activiteiten: WeekActiviteit[])
   doc.setFont('helvetica', 'bold')
   doc.text(`Weekplanning — ${planning.locatie_naam}`, marge, y)
   y += 8
+  if (groepNaam) {
+    doc.setFontSize(12)
+    doc.setFont('helvetica', 'bold')
+    doc.setTextColor(61, 107, 26)
+    doc.text(`Groep: ${groepNaam}`, marge, y)
+    y += 7
+  }
   doc.setFontSize(10)
   doc.setFont('helvetica', 'normal')
   doc.setTextColor(61, 107, 26)
@@ -218,10 +233,10 @@ async function exportPDF(planning: WeekPlanning, activiteiten: WeekActiviteit[])
   doc.setFontSize(7)
   doc.setFont('helvetica', 'normal')
   doc.setTextColor(...grijs)
-  doc.text(`De Theepot — Weekplanning ${planning.locatie_naam}`, marge, 291)
+  doc.text(`De Theepot — Weekplanning ${planning.locatie_naam}${groepNaam ? ` · ${groepNaam}` : ''}`, marge, 291)
   doc.text('1 / 1', 210 - marge, 291, { align: 'right' })
 
-  doc.save(`Weekplanning_${planning.locatie_naam}_${planning.week_start}.pdf`)
+  doc.save(`Weekplanning_${planning.locatie_naam}${groepNaam ? `_${groepNaam.replace(/[^a-zA-Z0-9]+/g, '-')}` : ''}_${planning.week_start}.pdf`)
 }
 
 // ─── Hoofd pagina ─────────────────────────────────────────────────────────────
@@ -230,6 +245,7 @@ export default function WeekplanningenPage() {
   const { profiel, isSuperadmin, rechten } = useAuth()
   const magZien = isSuperadmin || rechten.pagina_weekplanningen === 'lezen' || rechten.pagina_weekplanningen === 'bewerken'
   const magExporteren = isSuperadmin || rechten.weekplanning_exporteren === true
+  const magBewerken = isSuperadmin || rechten.pagina_weekplanningen === 'bewerken'
 
   async function getToegankelijkeLocaties(alleLocaties: string[]): Promise<string[]> {
     const magAllesZien = isSuperadmin || profiel?.rol === 'directie' || profiel?.rol === 'leidinggevende'
@@ -245,6 +261,9 @@ export default function WeekplanningenPage() {
 
   const [locaties, setLocaties] = useState<string[]>([])
   const [actieveLocatie, setActieveLocatie] = useState<string>('')
+  const [groepen, setGroepen] = useState<WeekGroep[]>([])
+  const [actieveGroepId, setActieveGroepId] = useState<string | null>(null)
+  const [groepenBeheer, setGroepenBeheer] = useState(false)
   const [huidigWeekStart, setHuidigWeekStart] = useState(toDateStr(maandaagVanWeek(new Date())))
   const [planning, setPlanning] = useState<WeekPlanning | null>(null)
   const [activiteiten, setActiviteiten] = useState<WeekActiviteit[]>([])
@@ -269,18 +288,38 @@ export default function WeekplanningenPage() {
     laad()
   }, [profiel?.id])  // Herlaad als profiel verandert
 
+  // ── Groepen van de locatie ophalen ──────────────────────────────────────────
+  const haalGroepenOp = useCallback(async () => {
+    if (!actieveLocatie) { setGroepen([]); return }
+    const { data } = await getSupabase()
+      .from('week_groepen')
+      .select('*')
+      .eq('locatie_naam', actieveLocatie)
+      .order('volgorde')
+      .order('naam')
+    setGroepen((data ?? []) as WeekGroep[])
+  }, [actieveLocatie])
+
+  useEffect(() => { haalGroepenOp() }, [haalGroepenOp])
+
+  // Bij locatiewissel terug naar de algemene planning
+  useEffect(() => { setActieveGroepId(null) }, [actieveLocatie])
+
   // ── Planning ophalen of aanmaken ────────────────────────────────────────────
   const haalPlanningOp = useCallback(async () => {
     if (!actieveLocatie) return
     setLaden(true)
     const supabase = getSupabase()
 
-    const { data: bestaand } = await supabase
+    const query = supabase
       .from('week_planningen')
       .select('*')
       .eq('locatie_naam', actieveLocatie)
       .eq('week_start', huidigWeekStart)
-      .single()
+    const { data: bestaand } = await (actieveGroepId
+      ? query.eq('groep_id', actieveGroepId)
+      : query.is('groep_id', null)
+    ).maybeSingle()
 
     if (bestaand) {
       setPlanning(bestaand as WeekPlanning)
@@ -294,7 +333,7 @@ export default function WeekplanningenPage() {
       setActiviteiten([])
     }
     setLaden(false)
-  }, [actieveLocatie, huidigWeekStart])
+  }, [actieveLocatie, huidigWeekStart, actieveGroepId])
 
   useEffect(() => { haalPlanningOp() }, [haalPlanningOp])
 
@@ -304,6 +343,7 @@ export default function WeekplanningenPage() {
     const { data, error } = await getSupabase().from('week_planningen').insert({
       locatie_naam: actieveLocatie,
       week_start: huidigWeekStart,
+      groep_id: actieveGroepId,
       thema: thema || null,
       aangemaakt_door: profiel?.id,
     }).select().single()
@@ -351,6 +391,46 @@ export default function WeekplanningenPage() {
     await haalPlanningOp()
   }
 
+  // ── Groepen beheren ─────────────────────────────────────────────────────────
+  async function voegGroepToe(naam: string) {
+    const schoon = naam.trim()
+    if (!schoon || !actieveLocatie) return
+    const { data, error } = await getSupabase().from('week_groepen').insert({
+      locatie_naam: actieveLocatie,
+      naam: schoon,
+      volgorde: groepen.length,
+      aangemaakt_door: profiel?.id,
+    }).select().single()
+    if (error || !data) {
+      setToast({ bericht: 'Groep aanmaken mislukt — bestaat deze naam al?', type: 'error' })
+      return
+    }
+    await haalGroepenOp()
+    setActieveGroepId(data.id)
+    setToast({ bericht: `Groep "${schoon}" toegevoegd!`, type: 'success' })
+  }
+
+  async function hernoemGroep(id: string, naam: string) {
+    const schoon = naam.trim()
+    if (!schoon) return
+    const { error } = await getSupabase().from('week_groepen').update({ naam: schoon }).eq('id', id)
+    if (error) {
+      setToast({ bericht: 'Hernoemen mislukt — bestaat deze naam al?', type: 'error' })
+      return
+    }
+    await haalGroepenOp()
+    setToast({ bericht: 'Groepsnaam opgeslagen!', type: 'success' })
+  }
+
+  async function verwijderGroep(groep: WeekGroep) {
+    if (!confirm(`Groep "${groep.naam}" verwijderen? Alle weekplanningen van deze groep gaan verloren.`)) return
+    await getSupabase().from('week_groepen').delete().eq('id', groep.id)
+    if (actieveGroepId === groep.id) setActieveGroepId(null)
+    await haalGroepenOp()
+    setToast({ bericht: `Groep "${groep.naam}" verwijderd.`, type: 'success' })
+  }
+
+  const actieveGroep = groepen.find(g => g.id === actieveGroepId) ?? null
   const isHuidigeWeek = huidigWeekStart === toDateStr(maandaagVanWeek(new Date()))
 
   // ── SLOTS: knutsel kan worden vervangen door kook_bak ──────────────────────
@@ -371,11 +451,11 @@ export default function WeekplanningenPage() {
     <>
       <Topbar
         titel="Weekplanningen"
-        subtitel={actieveLocatie || 'Selecteer een locatie'}
+        subtitel={actieveLocatie ? `${actieveLocatie}${actieveGroep ? ` · ${actieveGroep.naam}` : ''}` : 'Selecteer een locatie'}
         acties={
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             {planning && magExporteren && (
-              <button className="btn" onClick={() => exportPDF(planning, activiteiten)}>
+              <button className="btn" onClick={() => exportPDF(planning, activiteiten, actieveGroep?.naam ?? null)}>
                 <Download size={14} /> PDF
               </button>
             )}
@@ -398,6 +478,27 @@ export default function WeekplanningenPage() {
                 {loc}
               </button>
             ))}
+          </div>
+        )}
+
+        {/* Groep tabs */}
+        {locaties.length > 0 && (
+          <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
+            <Users size={14} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+            {[{ id: null as string | null, naam: 'Algemeen' }, ...groepen].map(g => (
+              <button
+                key={g.id ?? 'algemeen'}
+                onClick={() => setActieveGroepId(g.id)}
+                style={{ padding: '5px 14px', borderRadius: 20, fontSize: 12, fontWeight: 500, cursor: 'pointer', border: '1.5px solid', transition: 'all 0.12s', borderColor: actieveGroepId === g.id ? 'var(--primary)' : 'var(--border-dark)', background: actieveGroepId === g.id ? 'var(--primary-xlight)' : 'var(--bg-card)', color: actieveGroepId === g.id ? 'var(--primary-text)' : 'var(--text)' }}
+              >
+                {g.naam}
+              </button>
+            ))}
+            {magBewerken && (
+              <button className="btn btn-sm" style={{ fontSize: 11, padding: '4px 10px' }} onClick={() => setGroepenBeheer(true)}>
+                <Plus size={12} /> Groepen beheren
+              </button>
+            )}
           </div>
         )}
 
@@ -510,6 +611,18 @@ export default function WeekplanningenPage() {
           activiteit={detailActiviteit}
           type={detailActiviteit.type as ActType}
           onClose={() => setDetailActiviteit(null)}
+        />
+      )}
+
+      {/* Groepen beheren */}
+      {groepenBeheer && (
+        <GroepenModal
+          locatie={actieveLocatie}
+          groepen={groepen}
+          onToevoegen={voegGroepToe}
+          onHernoemen={hernoemGroep}
+          onVerwijderen={verwijderGroep}
+          onClose={() => setGroepenBeheer(false)}
         />
       )}
 
@@ -869,6 +982,108 @@ function DetailModal({ activiteit, type, onClose }: {
               <ActiviteitBijlagen activiteitId={activiteit.activiteit_id} magBewerken={false} />
             </div>
           )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Groepen Modal ────────────────────────────────────────────────────────────
+
+function GroepenModal({ locatie, groepen, onToevoegen, onHernoemen, onVerwijderen, onClose }: {
+  locatie: string
+  groepen: WeekGroep[]
+  onToevoegen: (naam: string) => void | Promise<void>
+  onHernoemen: (id: string, naam: string) => void | Promise<void>
+  onVerwijderen: (groep: WeekGroep) => void | Promise<void>
+  onClose: () => void
+}) {
+  const [nieuweNaam, setNieuweNaam] = useState('')
+  const [bewerktId, setBewerktId] = useState<string | null>(null)
+  const [bewerktNaam, setBewerktNaam] = useState('')
+
+  async function voegToe() {
+    if (!nieuweNaam.trim()) return
+    await onToevoegen(nieuweNaam)
+    setNieuweNaam('')
+  }
+
+  async function slaHernoemOp(g: WeekGroep) {
+    if (bewerktNaam.trim() && bewerktNaam.trim() !== g.naam) await onHernoemen(g.id, bewerktNaam)
+    setBewerktId(null)
+  }
+
+  return (
+    <div className="modal-backdrop" onClick={e => { if (e.target === e.currentTarget) onClose() }}>
+      <div className="modal-box" style={{ maxWidth: 440 }} onClick={e => e.stopPropagation()}>
+        <div className="card-header">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ width: 30, height: 30, borderRadius: 7, background: 'var(--primary-xlight)', color: 'var(--primary-text)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Users size={16} />
+            </div>
+            <div>
+              <span className="card-title">Groepen</span>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{locatie}</div>
+            </div>
+          </div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex' }}><X size={18} /></button>
+        </div>
+
+        <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: 0, lineHeight: 1.6 }}>
+            Elke groep heeft haar eigen weekactiviteiten en thema, bijvoorbeeld een 4+ en een 8+ groep.
+            De planning onder &quot;Algemeen&quot; blijft gewoon bestaan voor de hele locatie.
+          </p>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {groepen.length === 0 && (
+              <p style={{ fontSize: 13, color: 'var(--text-muted)', fontStyle: 'italic', textAlign: 'center', padding: '12px 0', margin: 0 }}>
+                Nog geen groepen voor deze locatie.
+              </p>
+            )}
+            {groepen.map(g => (
+              <div key={g.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg)' }}>
+                {bewerktId === g.id ? (
+                  <>
+                    <input
+                      className="form-input"
+                      style={{ flex: 1 }}
+                      value={bewerktNaam}
+                      onChange={e => setBewerktNaam(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter') slaHernoemOp(g); if (e.key === 'Escape') setBewerktId(null) }}
+                      autoFocus
+                    />
+                    <button className="btn btn-primary btn-sm" onClick={() => slaHernoemOp(g)}>Opslaan</button>
+                    <button className="btn btn-sm" onClick={() => setBewerktId(null)}>Annuleren</button>
+                  </>
+                ) : (
+                  <>
+                    <span style={{ flex: 1, fontSize: 13, fontWeight: 500 }}>{g.naam}</span>
+                    <button className="btn btn-sm" onClick={() => { setBewerktId(g.id); setBewerktNaam(g.naam) }} title="Hernoemen">
+                      <Pencil size={12} />
+                    </button>
+                    <button className="btn btn-sm" style={{ color: '#DC2626', borderColor: '#FECACA' }} onClick={() => onVerwijderen(g)} title="Verwijderen">
+                      <Trash2 size={12} />
+                    </button>
+                  </>
+                )}
+              </div>
+            ))}
+          </div>
+
+          <div style={{ display: 'flex', gap: 8, borderTop: '1px solid var(--border)', paddingTop: 14 }}>
+            <input
+              className="form-input"
+              style={{ flex: 1 }}
+              value={nieuweNaam}
+              onChange={e => setNieuweNaam(e.target.value)}
+              placeholder="Nieuwe groep — bijv. 4+ of 8+"
+              onKeyDown={e => e.key === 'Enter' && voegToe()}
+            />
+            <button className="btn btn-primary" onClick={voegToe} disabled={!nieuweNaam.trim()}>
+              <Plus size={13} /> Toevoegen
+            </button>
+          </div>
         </div>
       </div>
     </div>
