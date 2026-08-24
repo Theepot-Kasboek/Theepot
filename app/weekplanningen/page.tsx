@@ -9,7 +9,7 @@ import Toast from '@/components/Toast'
 import GeenToegang from '@/components/GeenToegang'
 import {
   Plus, X, ChevronLeft, ChevronRight, Scissors,
-  Users, Download, BookOpen, Pencil, Trash2, MapPin, Upload
+  Users, Download, BookOpen, Pencil, Trash2, MapPin, Upload, FileDown, Check
 } from 'lucide-react'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -108,9 +108,66 @@ function fmtMaand(weekStart: string): string {
 
 // ─── PDF Export ───────────────────────────────────────────────────────────────
 
-async function exportPDF(planning: WeekPlanning, activiteiten: WeekActiviteit[], groepNaam: string | null) {
-  const { jsPDF } = await import('jspdf')
-  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
+type PdfDoc = import('jspdf').jsPDF
+
+interface ExportItem {
+  planning: WeekPlanning
+  activiteiten: WeekActiviteit[]
+  groepNaam: string | null
+}
+
+// Haalt een afbeelding op en zet 'm om naar een JPEG-dataURL die jsPDF aankan.
+// Lukt een directe fetch niet (CORS bij externe hosts), dan via de eigen proxy.
+async function haalAfbeelding(url: string): Promise<{ data: string; verhouding: number } | null> {
+  async function laad(bron: string) {
+    const res = await fetch(bron)
+    if (!res.ok) throw new Error('ophalen mislukt')
+    const blob = await res.blob()
+    if (!blob.type.startsWith('image/')) throw new Error('geen afbeelding')
+
+    const dataUrl = await new Promise<string>((resolve, reject) => {
+      const lezer = new FileReader()
+      lezer.onload = () => resolve(lezer.result as string)
+      lezer.onerror = () => reject(lezer.error)
+      lezer.readAsDataURL(blob)
+    })
+
+    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const el = new Image()
+      el.onload = () => resolve(el)
+      el.onerror = () => reject(new Error('laden mislukt'))
+      el.src = dataUrl
+    })
+
+    // Naar JPEG omzetten (webp/png-transparantie kan jsPDF niet aan) en verkleinen
+    const maxBreedte = 900
+    const schaal = Math.min(1, maxBreedte / (img.naturalWidth || maxBreedte))
+    const canvas = document.createElement('canvas')
+    canvas.width = Math.max(1, Math.round((img.naturalWidth || maxBreedte) * schaal))
+    canvas.height = Math.max(1, Math.round((img.naturalHeight || maxBreedte) * schaal))
+    const ctx = canvas.getContext('2d')
+    if (!ctx) throw new Error('geen canvas')
+    ctx.fillStyle = '#ffffff'
+    ctx.fillRect(0, 0, canvas.width, canvas.height)
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+
+    return { data: canvas.toDataURL('image/jpeg', 0.72), verhouding: canvas.height / canvas.width }
+  }
+
+  try {
+    return await laad(url)
+  } catch {
+    try {
+      return await laad(`/api/afbeelding-proxy?url=${encodeURIComponent(url)}`)
+    } catch {
+      return null
+    }
+  }
+}
+
+// Tekent één weekplanning op de huidige pagina van het document
+async function tekenWeekplanning(doc: PdfDoc, item: ExportItem, metFotos: boolean) {
+  const { planning, activiteiten, groepNaam } = item
 
   const groen: [number, number, number] = [140, 198, 63]
   const wit: [number, number, number] = [255, 255, 255]
@@ -119,6 +176,11 @@ async function exportPDF(planning: WeekPlanning, activiteiten: WeekActiviteit[],
   const marge = 15
   const breedte = 210 - marge * 2
   let y = 0
+
+  function nieuwePagina() {
+    doc.addPage()
+    y = 20
+  }
 
   // Header
   doc.setFillColor(...groen)
@@ -161,11 +223,11 @@ async function exportPDF(planning: WeekPlanning, activiteiten: WeekActiviteit[],
 
   const typenVolgorde: ActType[] = ['knutsel', 'kook_bak', 'groepsspel']
 
-  typenVolgorde.forEach(type => {
+  for (const type of typenVolgorde) {
     const act = typen[type]
     const config = TYPE_CONFIG[type]
 
-    if (y > 240) { doc.addPage(); y = 20 }
+    if (y > 240) nieuwePagina()
 
     // Type header
     const kleurRGB = type === 'knutsel' ? [124, 58, 237] : type === 'kook_bak' ? [217, 119, 6] : [5, 150, 105]
@@ -188,7 +250,7 @@ async function exportPDF(planning: WeekPlanning, activiteiten: WeekActiviteit[],
       doc.setFontSize(9)
       doc.text('Nog niet ingevuld', marge + 4, y)
       y += 14
-      return
+      continue
     }
 
     // Naam
@@ -198,18 +260,36 @@ async function exportPDF(planning: WeekPlanning, activiteiten: WeekActiviteit[],
     doc.text(act.naam, marge, y)
     y += 8
 
+    // Foto (optioneel)
+    if (metFotos && act.afbeelding_url) {
+      const foto = await haalAfbeelding(act.afbeelding_url)
+      if (foto) {
+        const fotoBreedte = 80
+        const fotoHoogte = Math.min(70, fotoBreedte * foto.verhouding)
+        if (y + fotoHoogte > 272) nieuwePagina()
+        try {
+          doc.addImage(foto.data, 'JPEG', marge, y, fotoBreedte, fotoHoogte)
+          y += fotoHoogte + 7
+        } catch {
+          // Afbeelding kon niet worden toegevoegd — sla 'm over
+        }
+      }
+    }
+
     // Beschrijving
     if (act.beschrijving) {
       doc.setFontSize(10)
       doc.setFont('helvetica', 'normal')
       doc.setTextColor(60, 60, 60)
-      const regels = doc.splitTextToSize(act.beschrijving, breedte)
+      const regels: string[] = doc.splitTextToSize(act.beschrijving, breedte)
+      if (y + regels.length * 5.5 > 272) nieuwePagina()
       doc.text(regels, marge, y)
       y += regels.length * 5.5 + 6
     }
 
     // Materialen
     if (act.materialen.length > 0) {
+      if (y > 262) nieuwePagina()
       doc.setFontSize(10)
       doc.setFont('helvetica', 'bold')
       doc.setTextColor(...zwart)
@@ -217,7 +297,7 @@ async function exportPDF(planning: WeekPlanning, activiteiten: WeekActiviteit[],
       y += 6
       doc.setFont('helvetica', 'normal')
       act.materialen.forEach(m => {
-        if (y > 270) { doc.addPage(); y = 20 }
+        if (y > 270) nieuwePagina()
         doc.text(`• ${m}`, marge + 3, y)
         y += 5.5
       })
@@ -225,18 +305,52 @@ async function exportPDF(planning: WeekPlanning, activiteiten: WeekActiviteit[],
     }
 
     y += 6
+  }
+}
+
+// Zet de voettekst met paginanummers op alle pagina's
+function tekenVoetteksten(doc: PdfDoc, ondertitel: string) {
+  const marge = 15
+  const totaal = doc.getNumberOfPages()
+  for (let p = 1; p <= totaal; p++) {
+    doc.setPage(p)
+    doc.setFillColor(245, 247, 245)
+    doc.rect(0, 284, 210, 13, 'F')
+    doc.setFontSize(7)
+    doc.setFont('helvetica', 'normal')
+    doc.setTextColor(150, 150, 150)
+    doc.text(ondertitel, marge, 291)
+    doc.text(`${p} / ${totaal}`, 210 - marge, 291, { align: 'right' })
+  }
+}
+
+// Exporteert één of meerdere weekplanningen naar één PDF
+async function exportPDF(
+  items: ExportItem[],
+  opties: { metFotos: boolean; bestandsnaam: string; ondertitel: string; opVoortgang?: (klaar: number, totaal: number) => void },
+) {
+  if (items.length === 0) return
+  const { jsPDF } = await import('jspdf')
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
+
+  for (let i = 0; i < items.length; i++) {
+    if (i > 0) doc.addPage()
+    await tekenWeekplanning(doc, items[i], opties.metFotos)
+    opties.opVoortgang?.(i + 1, items.length)
+  }
+
+  tekenVoetteksten(doc, opties.ondertitel)
+  doc.save(opties.bestandsnaam)
+}
+
+// Export van de week die nu op het scherm staat
+async function exportHuidigeWeek(planning: WeekPlanning, activiteiten: WeekActiviteit[], groepNaam: string | null, metFotos: boolean) {
+  const naamDeel = groepNaam ? `_${groepNaam.replace(/[^a-zA-Z0-9]+/g, '-')}` : ''
+  await exportPDF([{ planning, activiteiten, groepNaam }], {
+    metFotos,
+    bestandsnaam: `Weekplanning_${planning.locatie_naam}${naamDeel}_${planning.week_start}.pdf`,
+    ondertitel: `De Theepot — Weekplanning ${planning.locatie_naam}${groepNaam ? ` · ${groepNaam}` : ''}`,
   })
-
-  // Footer
-  doc.setFillColor(245, 247, 245)
-  doc.rect(0, 284, 210, 13, 'F')
-  doc.setFontSize(7)
-  doc.setFont('helvetica', 'normal')
-  doc.setTextColor(...grijs)
-  doc.text(`De Theepot — Weekplanning ${planning.locatie_naam}${groepNaam ? ` · ${groepNaam}` : ''}`, marge, 291)
-  doc.text('1 / 1', 210 - marge, 291, { align: 'right' })
-
-  doc.save(`Weekplanning_${planning.locatie_naam}${groepNaam ? `_${groepNaam.replace(/[^a-zA-Z0-9]+/g, '-')}` : ''}_${planning.week_start}.pdf`)
 }
 
 // ─── Hoofd pagina ─────────────────────────────────────────────────────────────
@@ -273,6 +387,7 @@ export default function WeekplanningenPage() {
   const [actieveSlot, setActieveSlot] = useState<ActType | null>(null)
   const [detailActiviteit, setDetailActiviteit] = useState<WeekActiviteit | null>(null)
   const [toast, setToast] = useState<{ bericht: string; type: 'success' | 'error' } | null>(null)
+  const [exportOpen, setExportOpen] = useState(false)
 
   // ── Locaties ophalen — wacht op profiel ────────────────────────────────────
   useEffect(() => {
@@ -455,8 +570,13 @@ export default function WeekplanningenPage() {
         acties={
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             {planning && magExporteren && (
-              <button className="btn" onClick={() => exportPDF(planning, activiteiten, actieveGroep?.naam ?? null)}>
+              <button className="btn" onClick={() => exportHuidigeWeek(planning, activiteiten, actieveGroep?.naam ?? null, true)}>
                 <Download size={14} /> PDF
+              </button>
+            )}
+            {magExporteren && locaties.length > 0 && (
+              <button className="btn" onClick={() => setExportOpen(true)}>
+                <FileDown size={14} /> Exporteren
               </button>
             )}
           </div>
@@ -623,6 +743,19 @@ export default function WeekplanningenPage() {
           onHernoemen={hernoemGroep}
           onVerwijderen={verwijderGroep}
           onClose={() => setGroepenBeheer(false)}
+        />
+      )}
+
+      {/* Meerdere weken exporteren */}
+      {exportOpen && (
+        <ExportModal
+          locatie={actieveLocatie}
+          groepen={groepen}
+          actieveGroepId={actieveGroepId}
+          startWeek={huidigWeekStart}
+          onKlaar={bericht => setToast({ bericht, type: 'success' })}
+          onFout={bericht => setToast({ bericht, type: 'error' })}
+          onClose={() => setExportOpen(false)}
         />
       )}
 
@@ -1082,6 +1215,253 @@ function GroepenModal({ locatie, groepen, onToevoegen, onHernoemen, onVerwijdere
             />
             <button className="btn btn-primary" onClick={voegToe} disabled={!nieuweNaam.trim()}>
               <Plus size={13} /> Toevoegen
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Export Modal — meerdere weken in één PDF ─────────────────────────────────
+
+interface ExportRij {
+  planning: WeekPlanning
+  groepNaam: string | null
+  aantalActiviteiten: number
+}
+
+function ExportModal({ locatie, groepen, actieveGroepId, startWeek, onKlaar, onFout, onClose }: {
+  locatie: string
+  groepen: WeekGroep[]
+  actieveGroepId: string | null
+  startWeek: string
+  onKlaar: (bericht: string) => void
+  onFout: (bericht: string) => void
+  onClose: () => void
+}) {
+  const eindStandaard = (() => { const d = new Date(startWeek); d.setDate(d.getDate() + 21); return toDateStr(d) })()
+
+  const [vanWeek, setVanWeek] = useState(startWeek)
+  const [totWeek, setTotWeek] = useState(eindStandaard)
+  const [groepKeuze, setGroepKeuze] = useState<'huidig' | 'alle'>(groepen.length > 0 ? 'alle' : 'huidig')
+  const [metFotos, setMetFotos] = useState(true)
+  const [rijen, setRijen] = useState<ExportRij[]>([])
+  const [geselecteerd, setGeselecteerd] = useState<string[]>([])
+  const [laden, setLaden] = useState(false)
+  const [bezig, setBezig] = useState<string | null>(null)
+
+  const groepNaamVan = useCallback((id: string | null) => groepen.find(g => g.id === id)?.naam ?? null, [groepen])
+
+  // ── Beschikbare planningen in de gekozen periode ophalen ────────────────────
+  useEffect(() => {
+    let afgebroken = false
+    async function laad() {
+      if (!locatie || !vanWeek || !totWeek || vanWeek > totWeek) { setRijen([]); setGeselecteerd([]); return }
+      setLaden(true)
+      const supabase = getSupabase()
+
+      const basis = supabase
+        .from('week_planningen')
+        .select('*')
+        .eq('locatie_naam', locatie)
+        .gte('week_start', vanWeek)
+        .lte('week_start', totWeek)
+        .order('week_start')
+
+      const { data } = await (groepKeuze === 'alle'
+        ? basis
+        : actieveGroepId ? basis.eq('groep_id', actieveGroepId) : basis.is('groep_id', null))
+
+      const planningen = (data ?? []) as WeekPlanning[]
+      let tellingen: Record<string, number> = {}
+      if (planningen.length > 0) {
+        const { data: acts } = await supabase
+          .from('week_activiteiten')
+          .select('planning_id')
+          .in('planning_id', planningen.map(p => p.id))
+        tellingen = (acts ?? []).reduce((acc: Record<string, number>, a: { planning_id: string }) => {
+          acc[a.planning_id] = (acc[a.planning_id] ?? 0) + 1
+          return acc
+        }, {})
+      }
+
+      if (afgebroken) return
+      const lijst: ExportRij[] = planningen.map(p => ({
+        planning: p,
+        groepNaam: groepNaamVan(p.groep_id),
+        aantalActiviteiten: tellingen[p.id] ?? 0,
+      }))
+      setRijen(lijst)
+      setGeselecteerd(lijst.map(r => r.planning.id))
+      setLaden(false)
+    }
+    laad()
+    return () => { afgebroken = true }
+  }, [locatie, vanWeek, totWeek, groepKeuze, actieveGroepId, groepNaamVan])
+
+  function wisselWeek(id: string) {
+    setGeselecteerd(huidig => huidig.includes(id) ? huidig.filter(x => x !== id) : [...huidig, id])
+  }
+
+  // ── Exporteren ──────────────────────────────────────────────────────────────
+  async function exporteer() {
+    const teExporteren = rijen.filter(r => geselecteerd.includes(r.planning.id))
+    if (teExporteren.length === 0) return
+
+    setBezig(`Bezig… 0 / ${teExporteren.length}`)
+    try {
+      const { data: acts } = await getSupabase()
+        .from('week_activiteiten')
+        .select('*')
+        .in('planning_id', teExporteren.map(r => r.planning.id))
+      const perPlanning = ((acts ?? []) as WeekActiviteit[]).reduce((acc: Record<string, WeekActiviteit[]>, a) => {
+        (acc[a.planning_id] ??= []).push(a)
+        return acc
+      }, {})
+
+      const items: ExportItem[] = teExporteren.map(r => ({
+        planning: r.planning,
+        activiteiten: perPlanning[r.planning.id] ?? [],
+        groepNaam: r.groepNaam,
+      }))
+
+      const eersteWeek = items[0].planning.week_start
+      const laatsteWeek = items[items.length - 1].planning.week_start
+      const periode = eersteWeek === laatsteWeek ? eersteWeek : `${eersteWeek}_tm_${laatsteWeek}`
+
+      await exportPDF(items, {
+        metFotos,
+        bestandsnaam: `Weekplanningen_${locatie.replace(/[^a-zA-Z0-9]+/g, '-')}_${periode}.pdf`,
+        ondertitel: `De Theepot — Weekplanningen ${locatie}`,
+        opVoortgang: (klaar, totaal) => setBezig(`Bezig… ${klaar} / ${totaal}`),
+      })
+
+      onKlaar(`${items.length} weekplanning${items.length === 1 ? '' : 'en'} geëxporteerd!`)
+      onClose()
+    } catch {
+      onFout('Exporteren mislukt. Probeer het opnieuw.')
+    } finally {
+      setBezig(null)
+    }
+  }
+
+  const alleGeselecteerd = rijen.length > 0 && geselecteerd.length === rijen.length
+
+  return (
+    <div className="modal-backdrop" onClick={e => { if (e.target === e.currentTarget && !bezig) onClose() }}>
+      <div className="modal-box" style={{ maxWidth: 560 }} onClick={e => e.stopPropagation()}>
+        <div className="card-header">
+          <div>
+            <div className="card-title">Weekplanningen exporteren</div>
+            <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{locatie} — meerdere weken in één PDF</div>
+          </div>
+          <button onClick={() => !bezig && onClose()} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex' }}><X size={18} /></button>
+        </div>
+
+        <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+          {/* Periode */}
+          <div style={{ display: 'flex', gap: 12 }}>
+            <div style={{ flex: 1 }}>
+              <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Van week</label>
+              <input
+                className="form-input"
+                type="date"
+                value={vanWeek}
+                onChange={e => e.target.value && setVanWeek(toDateStr(maandaagVanWeek(new Date(e.target.value))))}
+              />
+            </div>
+            <div style={{ flex: 1 }}>
+              <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Tot en met week</label>
+              <input
+                className="form-input"
+                type="date"
+                value={totWeek}
+                onChange={e => e.target.value && setTotWeek(toDateStr(maandaagVanWeek(new Date(e.target.value))))}
+              />
+            </div>
+          </div>
+
+          {/* Groepen */}
+          {groepen.length > 0 && (
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>Groepen</div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                {([
+                  { waarde: 'alle' as const, label: 'Alle groepen' },
+                  { waarde: 'huidig' as const, label: actieveGroepId ? (groepen.find(g => g.id === actieveGroepId)?.naam ?? 'Huidige groep') : 'Algemeen' },
+                ]).map(optie => (
+                  <button
+                    key={optie.waarde}
+                    onClick={() => setGroepKeuze(optie.waarde)}
+                    style={{ padding: '5px 14px', borderRadius: 20, fontSize: 12, fontWeight: 500, cursor: 'pointer', border: '1.5px solid', borderColor: groepKeuze === optie.waarde ? 'var(--primary)' : 'var(--border-dark)', background: groepKeuze === optie.waarde ? 'var(--primary-xlight)' : 'var(--bg-card)', color: groepKeuze === optie.waarde ? 'var(--primary-text)' : 'var(--text)' }}
+                  >
+                    {optie.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Foto's */}
+          <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 10 }}>
+            <input type="checkbox" checked={metFotos} onChange={e => setMetFotos(e.target.checked)} />
+            <span>
+              <span style={{ fontSize: 13, fontWeight: 600 }}>Foto&apos;s meenemen</span>
+              <span style={{ display: 'block', fontSize: 11, color: 'var(--text-muted)' }}>Zet de afbeelding van elke activiteit in de PDF (duurt iets langer)</span>
+            </span>
+          </label>
+
+          {/* Weken */}
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                Weken ({geselecteerd.length} van {rijen.length})
+              </div>
+              {rijen.length > 0 && (
+                <button className="btn btn-sm" style={{ fontSize: 11, padding: '3px 10px' }} onClick={() => setGeselecteerd(alleGeselecteerd ? [] : rijen.map(r => r.planning.id))}>
+                  {alleGeselecteerd ? 'Niets selecteren' : 'Alles selecteren'}
+                </button>
+              )}
+            </div>
+
+            {laden ? (
+              <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: 0 }}>Laden…</p>
+            ) : rijen.length === 0 ? (
+              <p style={{ fontSize: 13, color: 'var(--text-muted)', fontStyle: 'italic', margin: 0 }}>
+                Geen weekplanningen gevonden in deze periode.
+              </p>
+            ) : (
+              <div style={{ maxHeight: 220, overflowY: 'auto', border: '1px solid var(--border)', borderRadius: 10 }}>
+                {rijen.map(r => {
+                  const aan = geselecteerd.includes(r.planning.id)
+                  return (
+                    <label
+                      key={r.planning.id}
+                      style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', borderBottom: '1px solid var(--border)', cursor: 'pointer', background: aan ? 'var(--primary-xlight)' : 'transparent' }}
+                    >
+                      <input type="checkbox" checked={aan} onChange={() => wisselWeek(r.planning.id)} />
+                      <span style={{ flex: 1 }}>
+                        <span style={{ fontSize: 13, fontWeight: 600 }}>{fmtWeek(r.planning.week_start)}</span>
+                        <span style={{ display: 'block', fontSize: 11, color: 'var(--text-muted)' }}>
+                          {r.groepNaam ?? 'Algemeen'}
+                          {r.planning.thema ? ` · ${r.planning.thema}` : ''}
+                          {` · ${r.aantalActiviteiten} activiteit${r.aantalActiviteiten === 1 ? '' : 'en'}`}
+                        </span>
+                      </span>
+                      {aan && <Check size={14} style={{ color: 'var(--primary)' }} />}
+                    </label>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', paddingTop: 4 }}>
+            <button className="btn" onClick={onClose} disabled={!!bezig}>Annuleren</button>
+            <button className="btn btn-primary" onClick={exporteer} disabled={!!bezig || geselecteerd.length === 0}>
+              <Download size={14} /> {bezig ?? `Exporteren (${geselecteerd.length})`}
             </button>
           </div>
         </div>

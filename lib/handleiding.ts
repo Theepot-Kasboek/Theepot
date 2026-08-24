@@ -222,6 +222,7 @@ export const HOOFDSTUKKEN: Hoofdstuk[] = [
           'Klik op het groepsspel-slot en vul naam, beschrijving en benodigdheden in — een voorbeeldafbeelding is optioneel.',
           'Bekijk eventuele bijlagen bij een activiteit; die kun je hier alleen bekijken, niet toevoegen.',
           'Klopt een activiteit niet meer voor die week? Verwijder hem uit het slot en kies iets anders.',
+          'Met "PDF" exporteer je de week die je op dat moment bekijkt. Wil je meerdere weken tegelijk? Klik op "Exporteren", kies de periode (van/tot week), eventueel alle groepen, vink de gewenste weken aan en geef aan of de foto\u2019s mee moeten in de PDF.',
         ],
       },
     ],
