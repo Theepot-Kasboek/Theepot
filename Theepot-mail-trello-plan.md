@@ -442,3 +442,24 @@ Rechtstreeks doorgevoerd in de live n8n-workflow (via de n8n API, workflow "Thee
   opent via de TransIP/Roundcube-webmail. Bevestigd dat het IMAP-UID beschikbaar is op
   `attributes.uid` van de trigger-node (bv. `1580` in de test-execution) — bruikbaar als dit later
   alsnog gebouwd wordt.
+
+**Update (2026-09-02) — Trello-notificaties uitgefilterd:** de roostermailbox ontvangt zelf veel
+notificatiemail van Trello (de kaarten die deze workflow aanmaakt genereren op hun beurt weer mail).
+Uit de laatste 114 executions bleek dat er 64 van `do-not-reply@trello.com` kwamen — meer dan de helft
+van alle verwerkte mail, elk met een eigen Claude-call en een eigen kaart als gevolg.
+
+Nieuwe node **`Geen Trello-notificaties`** (`n8n-nodes-base.filter`, typeVersion 2.2) toegevoegd tussen
+`Email Trigger (IMAP)` en `Anthropic - Theepot Mail Analyseren`:
+
+- Conditie: `{{ $json.from }}` **does not contain** `trello.com`, hoofdletterongevoelig
+  (`typeValidation: loose`).
+- Bewust op het hele domein en niet alleen op `do-not-reply@`: in de mailbox komen ook
+  `boards.trello.com` (email-to-board) en `atlassian-bounces.trello.com` voor.
+- De filter staat vóór de Anthropic-node, zodat gefilterde mail ook geen API-kosten meer veroorzaakt.
+- Gefilterde mail wordt alleen genegeerd — geen kaart, geen lijst; de mail blijft gewoon in de mailbox.
+
+Doorgevoerd via de n8n CLI in de container (`n8n export:workflow` als backup →
+JSON gepatcht → `n8n import:workflow` → `n8n update:workflow --active=true` → `docker restart
+ai-stack-n8n-1`). **Let op:** `import:workflow` **deactiveert de workflow**, en `update:workflow` werkt
+alleen na een herstart van n8n — beide stappen zijn dus verplicht, anders staat de automatisering stil
+zonder dat dat direct opvalt. Na de herstart bevestigd: `active = 1` en activering geslaagd in de log.
