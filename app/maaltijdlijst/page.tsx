@@ -812,16 +812,18 @@ function StandaardKinderenModal({ locatie, onClose, onToast }: {
   async function voegToe() {
     if (!naam.trim()) return
     const dagKinderen = kinderen.filter(k => k.dag === activeDag)
-    const { data } = await getSupabase().from('maaltijd_standaard_kinderen').insert({
+    const { data, error } = await getSupabase().from('maaltijd_standaard_kinderen').insert({
       locatie_id: locatie.id, naam: naam.trim(), bijzonderheden: bijzonderheden.trim() || null,
       dag: activeDag, volgorde: dagKinderen.length,
       vanaf_datum: vanaf || null, tot_datum: tot || null,
     }).select().single()
-    if (data) { setKinderen(prev => [...prev, data as StandaardKind]); setNaam(''); setBijzonderheden(''); setVanaf(''); setTot('') }
+    if (error) { onToast({ bericht: 'Toevoegen mislukt: ' + error.message, type: 'error' }); return }
+    if (data) { setKinderen(prev => [...prev, data as StandaardKind]); setNaam(''); setBijzonderheden(''); setVanaf(''); setTot(''); onToast({ bericht: `${data.naam} toegevoegd aan ${DAG_LABEL[activeDag]}!`, type: 'success' }) }
   }
 
   async function verwijder(id: string) {
-    await getSupabase().from('maaltijd_standaard_kinderen').delete().eq('id', id)
+    const { error } = await getSupabase().from('maaltijd_standaard_kinderen').delete().eq('id', id)
+    if (error) { onToast({ bericht: 'Verwijderen mislukt: ' + error.message, type: 'error' }); return }
     setKinderen(prev => prev.filter(k => k.id !== id))
   }
 
@@ -834,9 +836,11 @@ function StandaardKinderenModal({ locatie, onClose, onToast }: {
   async function slaPeriodeOp(id: string) {
     const vanaf_datum = bewerkVanaf || null
     const tot_datum = bewerkTot || null
-    await getSupabase().from('maaltijd_standaard_kinderen').update({ vanaf_datum, tot_datum }).eq('id', id)
+    const { error } = await getSupabase().from('maaltijd_standaard_kinderen').update({ vanaf_datum, tot_datum }).eq('id', id)
+    if (error) { onToast({ bericht: 'Opslaan mislukt: ' + error.message, type: 'error' }); return }
     setKinderen(prev => prev.map(k => k.id === id ? { ...k, vanaf_datum, tot_datum } : k))
     setBewerkId(null)
+    onToast({ bericht: 'Periode opgeslagen!', type: 'success' })
   }
 
   const dagKinderen = kinderen.filter(k => k.dag === activeDag)
