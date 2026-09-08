@@ -630,10 +630,16 @@ function LocatieToegang({ profielen, kasboekLocaties, maaltijdLocaties, locatieT
 
     // Direct lokale state updaten zodat UI meteen reageert
     if (bestaand) {
+      const vorigeWaarde = bestaand.toegang
       setLokaaleToegang(prev => prev.map(t =>
         t.id === bestaand.id ? { ...t, toegang } : t
       ))
-      await supabase.from('locatie_toegang').update({ toegang }).eq('id', bestaand.id)
+      const { error } = await supabase.from('locatie_toegang').update({ toegang }).eq('id', bestaand.id)
+      if (error) {
+        // Terugdraaien: het opslaan is mislukt, dus de UI mag niet iets tonen wat niet bewaard is.
+        setLokaaleToegang(prev => prev.map(t => t.id === bestaand.id ? { ...t, toegang: vorigeWaarde } : t))
+        onToast({ bericht: 'Opslaan mislukt: ' + error.message, type: 'error' })
+      }
     } else {
       // Tijdelijk id voor optimistic update
       const tijdelijkId = `temp-${Date.now()}`
@@ -645,11 +651,15 @@ function LocatieToegang({ profielen, kasboekLocaties, maaltijdLocaties, locatieT
         toegang,
       }
       setLokaaleToegang(prev => [...prev, nieuw])
-      const { data } = await supabase.from('locatie_toegang')
+      const { data, error } = await supabase.from('locatie_toegang')
         .insert({ profiel_id: actieveProfiel, locatie_type: locatieType, locatie_naam: locatieNaam, toegang })
         .select().single()
-      // Vervang tijdelijk id met echt id
-      if (data) {
+      if (error) {
+        // Terugdraaien: het opslaan is mislukt, dus de UI mag niet iets tonen wat niet bewaard is.
+        setLokaaleToegang(prev => prev.filter(t => t.id !== tijdelijkId))
+        onToast({ bericht: 'Opslaan mislukt: ' + error.message, type: 'error' })
+      } else if (data) {
+        // Vervang tijdelijk id met echt id
         setLokaaleToegang(prev => prev.map(t => t.id === tijdelijkId ? data as LocatieToegangsRij : t))
       }
     }
