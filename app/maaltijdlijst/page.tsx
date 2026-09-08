@@ -15,7 +15,7 @@ import {
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface Locatie { id: string; naam: string; actief: boolean }
-interface StandaardKind { id: string; locatie_id: string; naam: string; bijzonderheden: string | null; dag: Dag; volgorde: number }
+interface StandaardKind { id: string; locatie_id: string; naam: string; bijzonderheden: string | null; dag: Dag; volgorde: number; vanaf_datum: string | null; tot_datum: string | null }
 interface Week { id: string; locatie_id: string; maand: string; week_start: string }
 interface Registratie {
   id: string; week_id: string; dag: Dag; naam: string
@@ -60,6 +60,14 @@ function dagDatum(weekStart: string, dag: Dag): string {
 
 function maandLabel(weekStart: string): string {
   return new Date(weekStart).toLocaleDateString('nl-NL', { month: 'long', year: 'numeric' })
+}
+
+// Een standaard eter telt alleen mee voor een week als de weekstart-datum
+// binnen zijn vanaf/tot-periode valt (leeg = geen grens aan die kant).
+function standaardActiefInWeek(kind: StandaardKind, weekStart: string): boolean {
+  if (kind.vanaf_datum && weekStart < kind.vanaf_datum) return false
+  if (kind.tot_datum && weekStart > kind.tot_datum) return false
+  return true
 }
 
 // ─── PDF Export ───────────────────────────────────────────────────────────────
@@ -358,7 +366,7 @@ export default function MaaltijdlijstPage() {
       if (nieuw) {
         weekData = nieuw
         // Standaard kinderen invoegen per dag
-        const std = standaardKinderen.length > 0 ? standaardKinderen : (await supabase.from('maaltijd_standaard_kinderen').select('*').eq('locatie_id', actieveLocatie.id).order('dag').order('volgorde')).data ?? []
+        const std = (standaardKinderen.length > 0 ? standaardKinderen : (await supabase.from('maaltijd_standaard_kinderen').select('*').eq('locatie_id', actieveLocatie.id).order('dag').order('volgorde')).data ?? []).filter((k: StandaardKind) => standaardActiefInWeek(k, huidigWeekStart))
 
         if (std.length > 0) {
           const invoegen = std.map((k: StandaardKind) => ({
@@ -409,8 +417,9 @@ export default function MaaltijdlijstPage() {
 
         if (nieuw) {
           weekData = nieuw
-          if (std.length > 0) {
-            const invoegen = std.map((k: StandaardKind) => ({
+          const stdActief = std.filter((k: StandaardKind) => standaardActiefInWeek(k, huidigWeekStart))
+          if (stdActief.length > 0) {
+            const invoegen = stdActief.map((k: StandaardKind) => ({
               week_id: nieuw.id, dag: k.dag, naam: k.naam,
               bijzonderheden: k.bijzonderheden, aanwezig: true, is_extra: false, volgorde: k.volgorde,
             }))
@@ -789,6 +798,11 @@ function StandaardKinderenModal({ locatie, onClose, onToast }: {
   const [activeDag, setActiveDag] = useState<Dag>('maandag')
   const [naam, setNaam] = useState('')
   const [bijzonderheden, setBijzonderheden] = useState('')
+  const [vanaf, setVanaf] = useState('')
+  const [tot, setTot] = useState('')
+  const [bewerkId, setBewerkId] = useState<string | null>(null)
+  const [bewerkVanaf, setBewerkVanaf] = useState('')
+  const [bewerkTot, setBewerkTot] = useState('')
 
   useEffect(() => {
     getSupabase().from('maaltijd_standaard_kinderen').select('*').eq('locatie_id', locatie.id).order('dag').order('volgorde')
@@ -801,13 +815,28 @@ function StandaardKinderenModal({ locatie, onClose, onToast }: {
     const { data } = await getSupabase().from('maaltijd_standaard_kinderen').insert({
       locatie_id: locatie.id, naam: naam.trim(), bijzonderheden: bijzonderheden.trim() || null,
       dag: activeDag, volgorde: dagKinderen.length,
+      vanaf_datum: vanaf || null, tot_datum: tot || null,
     }).select().single()
-    if (data) { setKinderen(prev => [...prev, data as StandaardKind]); setNaam(''); setBijzonderheden('') }
+    if (data) { setKinderen(prev => [...prev, data as StandaardKind]); setNaam(''); setBijzonderheden(''); setVanaf(''); setTot('') }
   }
 
   async function verwijder(id: string) {
     await getSupabase().from('maaltijd_standaard_kinderen').delete().eq('id', id)
     setKinderen(prev => prev.filter(k => k.id !== id))
+  }
+
+  function startBewerken(k: StandaardKind) {
+    setBewerkId(k.id)
+    setBewerkVanaf(k.vanaf_datum ?? '')
+    setBewerkTot(k.tot_datum ?? '')
+  }
+
+  async function slaPeriodeOp(id: string) {
+    const vanaf_datum = bewerkVanaf || null
+    const tot_datum = bewerkTot || null
+    await getSupabase().from('maaltijd_standaard_kinderen').update({ vanaf_datum, tot_datum }).eq('id', id)
+    setKinderen(prev => prev.map(k => k.id === id ? { ...k, vanaf_datum, tot_datum } : k))
+    setBewerkId(null)
   }
 
   const dagKinderen = kinderen.filter(k => k.dag === activeDag)
@@ -821,7 +850,7 @@ function StandaardKinderenModal({ locatie, onClose, onToast }: {
         </div>
         <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <p style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.6 }}>
-            Standaard kinderen worden automatisch ingevuld als je een nieuwe week opent.
+            Standaard kinderen worden automatisch ingevuld als je een nieuwe week opent, maar alleen voor weken die binnen hun vanaf/tot-periode vallen. Met het potloodje pas je die periode later aan, met het kruisje verwijder je een kind helemaal.
           </p>
 
           {/* Dag tabs */}
@@ -843,12 +872,38 @@ function StandaardKinderenModal({ locatie, onClose, onToast }: {
             )}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               {dagKinderen.map(k => (
-                <div key={k.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', borderRadius: 8, background: 'var(--bg)', border: '1px solid var(--border)' }}>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 13, fontWeight: 500 }}>{k.naam}</div>
-                    {k.bijzonderheden && <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{k.bijzonderheden}</div>}
+                <div key={k.id} style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '9px 12px', borderRadius: 8, background: 'var(--bg)', border: '1px solid var(--border)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 13, fontWeight: 500 }}>{k.naam}</div>
+                      {k.bijzonderheden && <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{k.bijzonderheden}</div>}
+                      {(k.vanaf_datum || k.tot_datum) && bewerkId !== k.id && (
+                        <div style={{ fontSize: 11, color: 'var(--primary-text)', marginTop: 2 }}>
+                          {k.vanaf_datum ? `vanaf ${new Date(k.vanaf_datum).toLocaleDateString('nl-NL')}` : ''}
+                          {k.vanaf_datum && k.tot_datum ? ' · ' : ''}
+                          {k.tot_datum ? `tot ${new Date(k.tot_datum).toLocaleDateString('nl-NL')}` : ''}
+                        </div>
+                      )}
+                    </div>
+                    <button onClick={() => startBewerken(k)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex' }} title="Periode bewerken"><Pencil size={14} /></button>
+                    <button onClick={() => verwijder(k.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex' }} title="Volledig verwijderen"><X size={14} /></button>
                   </div>
-                  <button onClick={() => verwijder(k.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex' }}><X size={14} /></button>
+                  {bewerkId === k.id && (
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                      <div>
+                        <label className="form-label">Vanaf</label>
+                        <input type="date" className="form-input" value={bewerkVanaf} onChange={e => setBewerkVanaf(e.target.value)} />
+                      </div>
+                      <div>
+                        <label className="form-label">Tot en met</label>
+                        <input type="date" className="form-input" value={bewerkTot} onChange={e => setBewerkTot(e.target.value)} />
+                      </div>
+                      <div style={{ gridColumn: '1 / -1', display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                        <button className="btn" onClick={() => setBewerkId(null)}>Annuleren</button>
+                        <button className="btn btn-primary" onClick={() => slaPeriodeOp(k.id)}>Opslaan</button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -866,7 +921,18 @@ function StandaardKinderenModal({ locatie, onClose, onToast }: {
               <label className="form-label">Bijzonderheden / allergie</label>
               <input className="form-input" value={bijzonderheden} onChange={e => setBijzonderheden(e.target.value)} placeholder="Optioneel" />
             </div>
+            <div>
+              <label className="form-label">Vanaf (optioneel)</label>
+              <input type="date" className="form-input" value={vanaf} onChange={e => setVanaf(e.target.value)} />
+            </div>
+            <div>
+              <label className="form-label">Tot en met (optioneel)</label>
+              <input type="date" className="form-input" value={tot} onChange={e => setTot(e.target.value)} />
+            </div>
           </div>
+          <p style={{ fontSize: 11, color: 'var(--text-muted)', margin: 0 }}>
+            Laat leeg voor geen begin- of eindgrens. Zo blijft een kind niet oneindig op de lijst staan.
+          </p>
           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
             <button className="btn" onClick={onClose}>Sluiten</button>
             <button className="btn btn-primary" onClick={voegToe} disabled={!naam.trim()}>
