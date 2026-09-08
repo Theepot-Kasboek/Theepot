@@ -297,6 +297,19 @@ export default function AgendaPage() {
     })
   }
 
+  function selecteerAlleKalenders() {
+    const alleIds = [
+      ...(eigneKalender ? [eigneKalender.id] : []),
+      ...anderePersoneelKalenders.map(k => k.id),
+      ...algemeenKalenders.map(k => k.id),
+    ]
+    setZichtbareIds(new Set(alleIds))
+  }
+
+  function deselecteerAlleKalenders() {
+    setZichtbareIds(new Set())
+  }
+
   // Iedereen met agendatoegang mag zijn eigen persoonlijke agenda bewerken.
   // Alleen met 'bewerken' op de agendapagina én het recht "algemene agenda
   // bewerken" mag je in gedeelde kalenders schrijven; de kalenderlijst in de
@@ -641,6 +654,12 @@ export default function AgendaPage() {
               <button onClick={() => setKalenderPanelOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex' }}><X size={18} /></button>
             </div>
             <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+              {/* Alles selecteren / deselecteren */}
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button className="btn btn-sm" style={{ flex: 1 }} onClick={selecteerAlleKalenders}>Selecteer alles</button>
+                <button className="btn btn-sm" style={{ flex: 1 }} onClick={deselecteerAlleKalenders}>Deselecteer alles</button>
+              </div>
 
               {/* Mijn agenda */}
               {eigneKalender && (

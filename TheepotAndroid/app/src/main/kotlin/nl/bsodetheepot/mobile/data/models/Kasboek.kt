@@ -15,6 +15,7 @@ data class KasboekEntry(
     val id: String,
     val periode: String,
     val categorie: String? = null,
+    val datum: String? = null,
     val omschrijving: String? = null,
     val bedrag: Double,
     val type: KasboekType,
@@ -22,6 +23,14 @@ data class KasboekEntry(
     @SerialName("aangemaakt_op") val aangemaaktOp: String,
     val locatie: String,
     @SerialName("bonnetje_pad") val bonnetjePad: String? = null,
+)
+
+/** Tabel `kasboek_periode_status`: publicatiestatus per locatie/maand voor directie. */
+@Serializable
+data class KasboekPeriodeStatus(
+    @SerialName("locatie_naam") val locatieNaam: String,
+    val periode: String,
+    val gepubliceerd: Boolean,
 )
 
 object KasboekCategorieen {

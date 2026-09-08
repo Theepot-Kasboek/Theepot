@@ -7,7 +7,7 @@ import Topbar from '@/components/Topbar'
 import Toast from '@/components/Toast'
 import {
   Plus, X, Download, Pencil, Trash2,
-  Flame, MapPin, ChevronRight, Check
+  Flame, MapPin, ChevronRight, Check, Send, Eye
 } from 'lucide-react'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -18,6 +18,7 @@ interface BrandoefeningWeek {
   jaar: number
   locatie_naam: string
   aangemaakt_op: string
+  gepubliceerd: boolean
 }
 
 interface BrandoefeningDag {
@@ -240,11 +241,22 @@ export default function BrandoefeningPage() {
     setLaden(true)
     const { data } = await getSupabase().from('brandoefening_weken').select('*')
       .eq('locatie_naam', actieveLocatie).order('jaar', { ascending: false }).order('week_nummer', { ascending: false })
-    setWeken((data ?? []) as BrandoefeningWeek[])
+    // Wie niet mag bewerken (dus alleen lezen) ziet een week pas nadat de invuller publiceert.
+    const alle = (data ?? []) as BrandoefeningWeek[]
+    setWeken(magBewerken ? alle : alle.filter(w => w.gepubliceerd))
     setLaden(false)
-  }, [actieveLocatie])
+  }, [actieveLocatie, magBewerken])
 
   useEffect(() => { haalWekenOp() }, [haalWekenOp])
+
+  async function togglePubliceren(week: BrandoefeningWeek) {
+    const nieuweWaarde = !week.gepubliceerd
+    const { error } = await getSupabase().from('brandoefening_weken').update({ gepubliceerd: nieuweWaarde }).eq('id', week.id)
+    if (error) { setToast({ bericht: 'Publiceren mislukt: ' + error.message, type: 'error' }); return }
+    setToast({ bericht: nieuweWaarde ? 'Week gepubliceerd!' : 'Publicatie ingetrokken.', type: 'success' })
+    setActieveWeek(prev => prev && prev.id === week.id ? { ...prev, gepubliceerd: nieuweWaarde } : prev)
+    await haalWekenOp()
+  }
 
   const haalDagenOp = useCallback(async () => {
     if (!actieveWeek) return
@@ -275,6 +287,8 @@ export default function BrandoefeningPage() {
   }
 
   async function verwijderWeek(id: string) {
+    const week = weken.find(w => w.id === id)
+    if (week?.gepubliceerd) { setToast({ bericht: 'Gepubliceerde week kan niet meer verwijderd worden.', type: 'error' }); return }
     if (!confirm('Week verwijderen? Alle dagformulieren gaan verloren.')) return
     await getSupabase().from('brandoefening_weken').delete().eq('id', id)
     setActieveWeek(null); setDagen([])
@@ -283,6 +297,7 @@ export default function BrandoefeningPage() {
   }
 
   async function slaagDagOp(dagNaam: string, data: Partial<BrandoefeningDag>) {
+    if (actieveWeek?.gepubliceerd) { setToast({ bericht: 'Deze week is gepubliceerd en kan niet meer gewijzigd worden.', type: 'error' }); return }
     const supabase = getSupabase()
     const bestaand = dagen.find(d => d.dag === dagNaam && d.id)
     if (bestaand?.id) {
@@ -366,9 +381,16 @@ export default function BrandoefeningPage() {
                         style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 10, cursor: 'pointer', transition: 'all 0.12s', background: isActief ? 'var(--primary-light)' : 'var(--bg-card)', border: `1px solid ${isActief ? 'var(--border-dark)' : 'var(--border)'}`, borderLeft: `4px solid ${isActief ? 'var(--primary)' : 'var(--border-dark)'}` }}>
                         <div style={{ flex: 1 }}>
                           <div style={{ fontSize: 13, fontWeight: 700, fontFamily: 'Sora, sans-serif' }}>Week {w.week_nummer}</div>
-                          <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{w.jaar}</div>
+                          <div style={{ fontSize: 11, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                            {w.jaar}
+                            {magBewerken && (
+                              <span style={{ color: w.gepubliceerd ? 'var(--success)' : 'var(--text-muted)' }}>
+                                {w.gepubliceerd ? '● Gepubliceerd' : '○ Concept'}
+                              </span>
+                            )}
+                          </div>
                         </div>
-                        {magBewerken && (
+                        {magBewerken && !w.gepubliceerd && (
                           <button onClick={e => { e.stopPropagation(); verwijderWeek(w.id) }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', opacity: 0.4, display: 'flex', padding: 2 }}
                             onMouseEnter={e => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.color = '#DC2626' }}
                             onMouseLeave={e => { e.currentTarget.style.opacity = '0.4'; e.currentTarget.style.color = 'var(--text-muted)' }}>
@@ -388,8 +410,21 @@ export default function BrandoefeningPage() {
               <div className="empty-state" style={{ padding: 60 }}><Flame size={36} /><h3>Selecteer een week</h3><p>Klik op een oefenweek om de dagformulieren te bekijken.</p></div>
             ) : (
               <>
-                <div style={{ fontFamily: 'Sora, sans-serif', fontSize: 17, fontWeight: 700, marginBottom: 16 }}>
-                  Week {actieveWeek.week_nummer}, {actieveWeek.jaar} — {actieveWeek.locatie_naam}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
+                  <div style={{ fontFamily: 'Sora, sans-serif', fontSize: 17, fontWeight: 700 }}>
+                    Week {actieveWeek.week_nummer}, {actieveWeek.jaar} — {actieveWeek.locatie_naam}
+                  </div>
+                  {magBewerken && (
+                    <button className="btn btn-sm" onClick={() => togglePubliceren(actieveWeek)} title={actieveWeek.gepubliceerd ? 'Verbergen' : 'Publiceren'}>
+                      {actieveWeek.gepubliceerd ? <Eye size={13} /> : <Send size={13} color="var(--primary)" />}
+                      {actieveWeek.gepubliceerd ? ' Verbergen' : ' Publiceren'}
+                    </button>
+                  )}
+                  {!magBewerken && (
+                    <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                      {actieveWeek.gepubliceerd ? '● Gepubliceerd' : '○ Concept'}
+                    </span>
+                  )}
                 </div>
 
                 {/* Dag tabs */}
@@ -419,7 +454,7 @@ export default function BrandoefeningPage() {
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <div style={{ fontFamily: 'Sora, sans-serif', fontSize: 15, fontWeight: 600 }}>{activeDag}</div>
-                      {magBewerken && (
+                      {magBewerken && !actieveWeek.gepubliceerd && (
                         <button className="btn btn-primary" onClick={() => setInvulModal(actieveDagObj)}>
                           <Pencil size={14} /> {actieveDagObj.id ? 'Bewerken' : 'Invullen'}
                         </button>
@@ -430,7 +465,7 @@ export default function BrandoefeningPage() {
                       <div className="empty-state" style={{ padding: 32 }}>
                         <Flame size={28} style={{ opacity: 0.2 }} />
                         <p style={{ fontSize: 13 }}>Nog niet ingevuld voor {activeDag}</p>
-                        {magBewerken && <button className="btn btn-primary btn-sm" onClick={() => setInvulModal(actieveDagObj)}><Plus size={13} /> Invullen</button>}
+                        {magBewerken && !actieveWeek.gepubliceerd && <button className="btn btn-primary btn-sm" onClick={() => setInvulModal(actieveDagObj)}><Plus size={13} /> Invullen</button>}
                       </div>
                     ) : (
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>

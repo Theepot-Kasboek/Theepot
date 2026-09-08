@@ -27,6 +27,7 @@ export interface Profiel {
   rol: Rol
   actief: boolean
   aangemaakt_op: string
+  locatie_naam: string | null
 }
 
 export interface Activiteit {
@@ -50,6 +51,7 @@ export interface KasboekEntry {
   id: string
   periode: string
   categorie: string | null
+  datum: string | null
   omschrijving: string | null
   bedrag: number
   type: 'inkomst' | 'uitgave'

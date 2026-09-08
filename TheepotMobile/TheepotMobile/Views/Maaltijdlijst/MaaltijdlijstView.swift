@@ -7,6 +7,7 @@ struct MaaltijdlijstView: View {
     @State private var weekStart = Date()
     @State private var registraties: [MaaltijdRegistratie] = []
     @State private var isLoading = true
+    @State private var teBevestigen: MaaltijdRegistratie?
 
     private var toegankelijkeLocaties: [MaaltijdLocatie] {
         locaties.filter { session.toegang(voorLocatie: $0.naam, locatieType: "maaltijdlijst") != .geen }
@@ -56,6 +57,15 @@ struct MaaltijdlijstView: View {
         .task { await laadLocaties() }
         .onChange(of: actieveLocatie) { _, _ in Task { await laad() } }
         .onChange(of: weekStart) { _, _ in Task { await laad() } }
+        .alert("Niet meegegeten?", isPresented: Binding(get: { teBevestigen != nil }, set: { if !$0 { teBevestigen = nil } })) {
+            Button("Niet meegegeten", role: .destructive) {
+                if let registratie = teBevestigen { Task { await toggle(registratie) } }
+                teBevestigen = nil
+            }
+            Button("Annuleren", role: .cancel) { teBevestigen = nil }
+        } message: {
+            Text("Weet je zeker dat \(teBevestigen?.naam ?? "dit kind") niet heeft meegegeten?")
+        }
     }
 
     private var weekLabel: String {
@@ -81,7 +91,12 @@ struct MaaltijdlijstView: View {
             Section(dag.label) {
                 ForEach(kinderen) { kind in
                     KindRow(registratie: kind, magBewerken: magBewerken) {
-                        await toggle(kind)
+                        if kind.aanwezig {
+                            // Van "meegegeten" naar "niet meegegeten": eerst bevestigen.
+                            teBevestigen = kind
+                        } else {
+                            await toggle(kind)
+                        }
                     }
                 }
             }

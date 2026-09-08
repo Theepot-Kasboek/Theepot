@@ -348,9 +348,9 @@ export default function NotulenPage() {
               <div key={k.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', background: 'var(--bg)', borderRadius: 8, border: '1px solid var(--border)' }}>
                 <GripVertical size={13} color="var(--border-dark)" style={{ flexShrink: 0 }} />
                 <span style={{ flex: 1, fontSize: 13 }}>{k.titel}</span>
-                <button onClick={() => verplaatsKop(k.id, 'up')} disabled={idx === 0} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', opacity: idx === 0 ? 0.2 : 0.7 }}><ChevronUp size={13} /></button>
-                <button onClick={() => verplaatsKop(k.id, 'down')} disabled={idx === standaardKoppen.length - 1} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', opacity: idx === standaardKoppen.length - 1 ? 0.2 : 0.7 }}><ChevronDown size={13} /></button>
-                <button onClick={() => verwijderKop(k.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#DC2626', opacity: 0.7 }}><Trash2 size={13} /></button>
+                <button onClick={() => verplaatsKop(k.id, 'up')} disabled={idx === 0} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text)', opacity: idx === 0 ? 0.3 : 0.9 }}><ChevronUp size={13} /></button>
+                <button onClick={() => verplaatsKop(k.id, 'down')} disabled={idx === standaardKoppen.length - 1} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text)', opacity: idx === standaardKoppen.length - 1 ? 0.3 : 0.9 }}><ChevronDown size={13} /></button>
+                <button onClick={() => verwijderKop(k.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#DC2626', opacity: 0.9 }}><Trash2 size={13} /></button>
               </div>
             ))}
             {standaardKoppen.length === 0 && <p style={{ fontSize: 12, color: 'var(--text-muted)', textAlign: 'center', padding: '12px 0' }}>Nog geen standaard koppen.</p>}
@@ -449,9 +449,9 @@ export default function NotulenPage() {
                     <GripVertical size={12} color="var(--border-dark)" style={{ flexShrink: 0 }} />
                     <span style={{ flex: 1, fontSize: 12, fontWeight: actieveSectie === s.id ? 600 : 400, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: 'var(--text)' }}>{s.titel}</span>
                     {s.inhoud.trim() && <div style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--primary)', flexShrink: 0 }} />}
-                    <button onClick={e => { e.stopPropagation(); verplaatsSectie(s.id, 'up') }} disabled={idx === 0} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', opacity: idx === 0 ? 0.2 : 0.6, padding: '1px 2px', display: 'flex' }}><ChevronUp size={11} /></button>
-                    <button onClick={e => { e.stopPropagation(); verplaatsSectie(s.id, 'down') }} disabled={idx === editorSecties.length - 1} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', opacity: idx === editorSecties.length - 1 ? 0.2 : 0.6, padding: '1px 2px', display: 'flex' }}><ChevronDown size={11} /></button>
-                    <button onClick={e => { e.stopPropagation(); verwijderSectie(s.id) }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', opacity: 0.4, padding: '1px 2px', display: 'flex' }}><X size={11} /></button>
+                    <button onClick={e => { e.stopPropagation(); verplaatsSectie(s.id, 'up') }} disabled={idx === 0} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text)', opacity: idx === 0 ? 0.3 : 0.85, padding: '1px 2px', display: 'flex' }}><ChevronUp size={11} /></button>
+                    <button onClick={e => { e.stopPropagation(); verplaatsSectie(s.id, 'down') }} disabled={idx === editorSecties.length - 1} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text)', opacity: idx === editorSecties.length - 1 ? 0.3 : 0.85, padding: '1px 2px', display: 'flex' }}><ChevronDown size={11} /></button>
+                    <button onClick={e => { e.stopPropagation(); verwijderSectie(s.id) }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#DC2626', opacity: 0.85, padding: '1px 2px', display: 'flex' }}><X size={11} /></button>
                   </div>
                 ))}
               </div>

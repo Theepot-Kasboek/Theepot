@@ -70,17 +70,57 @@ function standaardActiefInWeek(kind: StandaardKind, weekStart: string): boolean 
   return true
 }
 
+// Haalt een week op, of maakt hem aan (met kopie van de op dat moment actieve
+// standaard kinderen) als hij nog niet bestaat. Gedeeld door de weekweergave
+// én de maandexport, zodat beide exact dezelfde standaard-eters-logica gebruiken.
+async function haalOfMaakWeek(
+  locatieId: string,
+  weekStart: string,
+  standaardKinderen: StandaardKind[]
+): Promise<{ week: Week; registraties: Registratie[] } | null> {
+  const supabase = getSupabase()
+  let { data: weekData } = await supabase
+    .from('maaltijd_weken').select('*')
+    .eq('locatie_id', locatieId).eq('week_start', weekStart).maybeSingle()
+
+  if (!weekData) {
+    const { data: nieuw } = await supabase.from('maaltijd_weken').insert({
+      locatie_id: locatieId,
+      maand: maandLabel(weekStart),
+      week_start: weekStart,
+    }).select().single()
+
+    if (nieuw) {
+      weekData = nieuw
+      const stdActief = standaardKinderen.filter(k => standaardActiefInWeek(k, weekStart))
+      if (stdActief.length > 0) {
+        const invoegen = stdActief.map(k => ({
+          week_id: nieuw.id, dag: k.dag, naam: k.naam,
+          bijzonderheden: k.bijzonderheden, aanwezig: true, is_extra: false, volgorde: k.volgorde,
+        }))
+        await supabase.from('maaltijd_registraties').insert(invoegen)
+      }
+    }
+  }
+
+  if (!weekData) return null
+  const { data: regData } = await supabase
+    .from('maaltijd_registraties').select('*')
+    .eq('week_id', weekData.id).order('volgorde')
+  return { week: weekData as Week, registraties: (regData ?? []) as Registratie[] }
+}
+
 // ─── PDF Export ───────────────────────────────────────────────────────────────
 
-async function exporteerPDF(
+// Tekent één week (header, titel, tabel) op de huidige pagina van `doc`.
+// Wordt hergebruikt voor zowel de losse weekexport als de maandexport (meerdere weken in 1 PDF).
+function tekenWeekPagina(
+  doc: any,
+  orientatie: 'portrait' | 'landscape',
   locatieNaam: string,
   weekStart: string,
-  registraties: Registratie[],
-  orientatie: 'portrait' | 'landscape' = 'portrait'
+  registraties: Registratie[]
 ) {
-  const { jsPDF } = await import('jspdf')
-  const doc = new jsPDF({ orientation: orientatie, unit: 'mm', format: 'a4' })
-
   const groen: [number, number, number] = [140, 198, 63]
   const donkerGroen: [number, number, number] = [61, 107, 26]
   const wit: [number, number, number] = [255, 255, 255]
@@ -265,8 +305,16 @@ async function exporteerPDF(
     doc.rect(marge, y, breedte, 2.5, 'F')
     y += 2.5
   })
+}
 
-  // Footer op alle pagina's
+// Footer met paginanummering, achteraf over alle pagina's van het document.
+function tekenVoetteksten(doc: any, orientatie: 'portrait' | 'landscape', tekst: string) {
+  const isLandscape = orientatie === 'landscape'
+  const paginaBreedte = isLandscape ? 297 : 210
+  const paginaHoogte = isLandscape ? 210 : 297
+  const marge = 14
+  const grijs: [number, number, number] = [180, 180, 180]
+
   const aantalPaginas = doc.getNumberOfPages()
   for (let p = 1; p <= aantalPaginas; p++) {
     doc.setPage(p)
@@ -275,11 +323,59 @@ async function exporteerPDF(
     doc.setFontSize(7)
     doc.setFont('helvetica', 'normal')
     doc.setTextColor(...grijs)
-    doc.text(`De Theepot — Maaltijdlijst ${locatieNaam} — ${weekLabel}`, marge, paginaHoogte - 5)
+    doc.text(tekst, marge, paginaHoogte - 5)
     doc.text(`${p} / ${aantalPaginas}`, paginaBreedte - marge, paginaHoogte - 5, { align: 'right' })
   }
+}
 
+// ─── Export: één week ───────────────────────────────────────────────────────────
+
+async function exporteerPDF(
+  locatieNaam: string,
+  weekStart: string,
+  registraties: Registratie[],
+  orientatie: 'portrait' | 'landscape' = 'portrait'
+) {
+  const { jsPDF } = await import('jspdf')
+  const doc = new jsPDF({ orientation: orientatie, unit: 'mm', format: 'a4' })
+  tekenWeekPagina(doc, orientatie, locatieNaam, weekStart, registraties)
+  tekenVoetteksten(doc, orientatie, `De Theepot — Maaltijdlijst ${locatieNaam} — ${fmtWeek(weekStart)}`)
   doc.save(`Maaltijdlijst_${locatieNaam}_${weekStart}.pdf`)
+}
+
+// ─── Export: hele kalendermaand (alle weken in 1 PDF) ──────────────────────────
+
+async function exporteerMaandPDF(
+  locatieNaam: string,
+  maandSleutel: string, // "YYYY-MM"
+  weken: { weekStart: string; registraties: Registratie[] }[],
+  orientatie: 'portrait' | 'landscape' = 'portrait'
+) {
+  const { jsPDF } = await import('jspdf')
+  const doc = new jsPDF({ orientation: orientatie, unit: 'mm', format: 'a4' })
+
+  weken.forEach((week, i) => {
+    if (i > 0) doc.addPage()
+    tekenWeekPagina(doc, orientatie, locatieNaam, week.weekStart, week.registraties)
+  })
+
+  const maandNaam = weken[0] ? maandLabel(weken[0].weekStart) : maandSleutel
+  tekenVoetteksten(doc, orientatie, `De Theepot — Maaltijdlijst ${locatieNaam} — ${maandNaam}`)
+  doc.save(`Maaltijdlijst_${locatieNaam}_${maandSleutel}.pdf`)
+}
+
+// Geeft alle week-starts (maandagen) terug van weken die minstens één dag in de
+// opgegeven kalendermaand hebben ("YYYY-MM").
+function weekStartsInMaand(maandSleutel: string): string[] {
+  const [jaarStr, maandStr] = maandSleutel.split('-')
+  const jaar = parseInt(jaarStr, 10)
+  const maandIdx = parseInt(maandStr, 10) - 1
+  const laatsteDag = new Date(jaar, maandIdx + 1, 0).getDate()
+  const set = new Set<string>()
+  for (let dag = 1; dag <= laatsteDag; dag++) {
+    set.add(toDateStr(maandaagVanWeek(new Date(jaar, maandIdx, dag))))
+  }
+  return Array.from(set).sort()
 }
 
 // ─── Hoofd pagina ─────────────────────────────────────────────────────────────
@@ -304,7 +400,39 @@ export default function MaaltijdlijstPage() {
   const [laden, setLaden] = useState(false)
   const [exportOrientatie, setExportOrientatie] = useState<'portrait' | 'landscape'>('portrait')
   const [toonOrientatieKeuze, setToonOrientatieKeuze] = useState(false)
+  const [maandExportModal, setMaandExportModal] = useState(false)
+  const [maandExportBezig, setMaandExportBezig] = useState(false)
   const [toast, setToast] = useState<{ bericht: string; type: 'success' | 'error' } | null>(null)
+
+  // ── Maandexport: alle weken van een gekozen kalendermaand in 1 PDF ─────────
+  async function exporteerMaand(maandSleutel: string, orientatie: 'portrait' | 'landscape') {
+    if (!actieveLocatie) return
+    setMaandExportBezig(true)
+    try {
+      const weekStarts = weekStartsInMaand(maandSleutel)
+      const weken: { weekStart: string; registraties: Registratie[] }[] = []
+      for (const weekStart of weekStarts) {
+        const resultaat = await haalOfMaakWeek(actieveLocatie.id, weekStart, standaardKinderen)
+        if (resultaat) weken.push({ weekStart, registraties: resultaat.registraties })
+      }
+      if (weken.length === 0) {
+        setToast({ bericht: 'Geen weken gevonden voor deze maand.', type: 'error' })
+        return
+      }
+      await exporteerMaandPDF(actieveLocatie.naam, maandSleutel, weken, orientatie)
+      setMaandExportModal(false)
+      // Als de huidige week door het aanmaken van ontbrekende weken is aangeraakt, ververs de weergave.
+      if (weekStarts.includes(huidigWeekStart)) {
+        const resultaat = await haalOfMaakWeek(actieveLocatie.id, huidigWeekStart, standaardKinderen)
+        setWeek(resultaat?.week ?? null)
+        setRegistraties(resultaat?.registraties ?? [])
+      }
+    } catch (err) {
+      setToast({ bericht: 'Exporteren mislukt: ' + (err as Error).message, type: 'error' })
+    } finally {
+      setMaandExportBezig(false)
+    }
+  }
 
   // ── Locaties ────────────────────────────────────────────────────────────────
   const haalLocatiesOp = useCallback(async () => {
@@ -347,46 +475,6 @@ export default function MaaltijdlijstPage() {
     setStandaardKinderen((data ?? []) as StandaardKind[])
   }, [actieveLocatie])
 
-  // ── Week ophalen of aanmaken ─────────────────────────────────────────────────
-  const haalWeekOp = useCallback(async () => {
-    if (!actieveLocatie) return
-    setLaden(true)
-    const supabase = getSupabase()
-
-    let { data: weekData } = await supabase.from('maaltijd_weken').select('*').eq('locatie_id', actieveLocatie.id).eq('week_start', huidigWeekStart).maybeSingle()
-
-    if (!weekData) {
-      // Maak nieuwe week aan en kopieer standaard kinderen
-      const { data: nieuw } = await supabase.from('maaltijd_weken').insert({
-        locatie_id: actieveLocatie.id,
-        maand: maandLabel(huidigWeekStart),
-        week_start: huidigWeekStart,
-      }).select().single()
-
-      if (nieuw) {
-        weekData = nieuw
-        // Standaard kinderen invoegen per dag
-        const std = (standaardKinderen.length > 0 ? standaardKinderen : (await supabase.from('maaltijd_standaard_kinderen').select('*').eq('locatie_id', actieveLocatie.id).order('dag').order('volgorde')).data ?? []).filter((k: StandaardKind) => standaardActiefInWeek(k, huidigWeekStart))
-
-        if (std.length > 0) {
-          const invoegen = std.map((k: StandaardKind) => ({
-            week_id: nieuw.id, dag: k.dag, naam: k.naam,
-            bijzonderheden: k.bijzonderheden, aanwezig: true, is_extra: false, volgorde: k.volgorde,
-          }))
-          await supabase.from('maaltijd_registraties').insert(invoegen)
-        }
-      }
-    }
-
-    setWeek(weekData as Week)
-
-    if (weekData) {
-      const { data: regData } = await supabase.from('maaltijd_registraties').select('*').eq('week_id', weekData.id).order('volgorde')
-      setRegistraties((regData ?? []) as Registratie[])
-    }
-    setLaden(false)
-  }, [actieveLocatie, huidigWeekStart, standaardKinderen])
-
   // Laad standaard kinderen EERST, daarna pas de week
   useEffect(() => {
     if (!actieveLocatie) return
@@ -402,39 +490,9 @@ export default function MaaltijdlijstPage() {
 
       // 2. Week ophalen of aanmaken (nu met standaard kinderen beschikbaar)
       setLaden(true)
-      const supabase = getSupabase()
-      let { data: weekData } = await supabase
-        .from('maaltijd_weken').select('*')
-        .eq('locatie_id', actieveLocatie!.id)
-        .eq('week_start', huidigWeekStart).maybeSingle()
-
-      if (!weekData) {
-        const { data: nieuw } = await supabase.from('maaltijd_weken').insert({
-          locatie_id: actieveLocatie!.id,
-          maand: maandLabel(huidigWeekStart),
-          week_start: huidigWeekStart,
-        }).select().single()
-
-        if (nieuw) {
-          weekData = nieuw
-          const stdActief = std.filter((k: StandaardKind) => standaardActiefInWeek(k, huidigWeekStart))
-          if (stdActief.length > 0) {
-            const invoegen = stdActief.map((k: StandaardKind) => ({
-              week_id: nieuw.id, dag: k.dag, naam: k.naam,
-              bijzonderheden: k.bijzonderheden, aanwezig: true, is_extra: false, volgorde: k.volgorde,
-            }))
-            await supabase.from('maaltijd_registraties').insert(invoegen)
-          }
-        }
-      }
-
-      setWeek(weekData as Week)
-      if (weekData) {
-        const { data: regData } = await supabase
-          .from('maaltijd_registraties').select('*')
-          .eq('week_id', weekData.id).order('volgorde')
-        setRegistraties((regData ?? []) as Registratie[])
-      }
+      const resultaat = await haalOfMaakWeek(actieveLocatie!.id, huidigWeekStart, std)
+      setWeek(resultaat?.week ?? null)
+      setRegistraties(resultaat?.registraties ?? [])
       setLaden(false)
     }
     laadAlles()
@@ -509,6 +567,11 @@ export default function MaaltijdlijstPage() {
                   </div>
                 )}
               </div>
+            )}
+            {actieveLocatie && (
+              <button className="btn" onClick={() => setMaandExportModal(true)}>
+                <Download size={14} /> Maand exporteren
+              </button>
             )}
             {magBewerken && actieveLocatie && (
               <button className="btn" onClick={() => setStandaardModal(true)}>
@@ -688,6 +751,16 @@ export default function MaaltijdlijstPage() {
 
       {/* ─── Modals ──────────────────────────────────────────────────────────── */}
 
+      {/* Maand exporteren */}
+      {maandExportModal && actieveLocatie && (
+        <MaandExportModal
+          voorgesteldeMaand={huidigWeekStart.slice(0, 7)}
+          bezig={maandExportBezig}
+          onExporteer={exporteerMaand}
+          onClose={() => setMaandExportModal(false)}
+        />
+      )}
+
       {/* Locaties beheer */}
       {locatieModal && (
         <LocatieModal
@@ -731,6 +804,60 @@ export default function MaaltijdlijstPage() {
 }
 
 // ─── Sub-modals ───────────────────────────────────────────────────────────────
+
+function MaandExportModal({ voorgesteldeMaand, bezig, onExporteer, onClose }: {
+  voorgesteldeMaand: string // "YYYY-MM"
+  bezig: boolean
+  onExporteer: (maandSleutel: string, orientatie: 'portrait' | 'landscape') => void
+  onClose: () => void
+}) {
+  const [maand, setMaand] = useState(voorgesteldeMaand)
+  const [orientatie, setOrientatie] = useState<'portrait' | 'landscape'>('portrait')
+
+  return (
+    <div className="modal-backdrop" onClick={e => { if (e.target === e.currentTarget && !bezig) onClose() }}>
+      <div className="modal-box" style={{ maxWidth: 380 }} onClick={e => e.stopPropagation()}>
+        <div className="card-header">
+          <span className="card-title">Maand exporteren</span>
+          <button onClick={onClose} disabled={bezig} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex' }}><X size={18} /></button>
+        </div>
+        <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: 0 }}>
+            Alle weken van de gekozen kalendermaand worden in 1 PDF gezet. Weken die nog niet bezocht zijn, worden automatisch aangemaakt met de standaard eters.
+          </p>
+          <div>
+            <label className="form-label">Maand</label>
+            <input type="month" className="form-input" value={maand} onChange={e => setMaand(e.target.value)} disabled={bezig} />
+          </div>
+          <div>
+            <label className="form-label">Oriëntatie</label>
+            <div style={{ display: 'flex', gap: 8 }}>
+              {(['portrait', 'landscape'] as const).map(o => (
+                <button
+                  key={o} type="button" disabled={bezig} onClick={() => setOrientatie(o)}
+                  style={{
+                    flex: 1, padding: '8px 0', borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: 'pointer',
+                    border: '1.5px solid', borderColor: orientatie === o ? 'var(--primary)' : 'var(--border-dark)',
+                    background: orientatie === o ? 'var(--primary)' : 'var(--bg-card)',
+                    color: orientatie === o ? '#fff' : 'var(--text)',
+                  }}
+                >
+                  {o === 'portrait' ? '📄 Staand' : '📰 Liggend'}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+            <button className="btn" onClick={onClose} disabled={bezig}>Annuleren</button>
+            <button className="btn btn-primary" onClick={() => onExporteer(maand, orientatie)} disabled={bezig || !maand}>
+              <Download size={14} /> {bezig ? 'Bezig...' : 'Exporteren'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 function LocatieModal({ locaties, onClose, onRefresh, onToast }: {
   locaties: Locatie[]

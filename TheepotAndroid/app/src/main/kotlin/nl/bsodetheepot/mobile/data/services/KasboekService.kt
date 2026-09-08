@@ -7,6 +7,7 @@ import io.github.jan.supabase.storage.storage
 import kotlinx.serialization.Serializable
 import nl.bsodetheepot.mobile.data.models.KasboekCategorieen
 import nl.bsodetheepot.mobile.data.models.KasboekEntry
+import nl.bsodetheepot.mobile.data.models.KasboekPeriodeStatus
 import nl.bsodetheepot.mobile.data.models.KasboekType
 
 object KasboekService {
@@ -55,6 +56,7 @@ object KasboekService {
     private data class EntryInsert(
         val periode: String,
         val categorie: String,
+        val datum: String?,
         val omschrijving: String?,
         val bedrag: Double,
         val type: String,
@@ -67,6 +69,7 @@ object KasboekService {
         locatieNaam: String,
         periode: String,
         categorie: String,
+        datum: String?,
         omschrijving: String?,
         bedrag: Double,
         type: KasboekType,
@@ -81,7 +84,7 @@ object KasboekService {
             bonnetjePad = pad
         }
         SupabaseManager.client.postgrest["kasboek_entries"].insert(
-            EntryInsert(periode, categorie, omschrijving, bedrag, type.name.lowercase(), aangemaaktDoor, locatieNaam, bonnetjePad),
+            EntryInsert(periode, categorie, datum, omschrijving, bedrag, type.name.lowercase(), aangemaaktDoor, locatieNaam, bonnetjePad),
         )
     }
 
@@ -90,6 +93,7 @@ object KasboekService {
         val type: String,
         val bedrag: Double,
         val categorie: String?,
+        val datum: String?,
         val omschrijving: String?,
         val bonnetje_pad: String?,
     )
@@ -103,6 +107,7 @@ object KasboekService {
         type: KasboekType,
         bedrag: Double,
         categorie: String?,
+        datum: String?,
         omschrijving: String?,
         nieuwBonnetje: ByteArray?,
         bonnetjeVerwijderen: Boolean,
@@ -117,7 +122,7 @@ object KasboekService {
         }
 
         SupabaseManager.client.postgrest["kasboek_entries"].update(
-            EntryUpdate(type.name.lowercase(), bedrag, categorie, omschrijving, bonnetjePad),
+            EntryUpdate(type.name.lowercase(), bedrag, categorie, datum, omschrijving, bonnetjePad),
         ) {
             filter { eq("id", entry.id) }
         }
@@ -134,4 +139,40 @@ object KasboekService {
 
     suspend fun downloadBonnetje(pad: String): ByteArray =
         SupabaseManager.client.storage["bonnetjes"].downloadAuthenticated(pad)
+
+    /** Publicatiestatus van een locatie/maand ophalen (geen rij = nog niet gepubliceerd). */
+    suspend fun periodeStatus(locatieNaam: String, periode: String): Boolean {
+        val rijen = runCatching {
+            SupabaseManager.client.postgrest["kasboek_periode_status"]
+                .select(Columns.raw("gepubliceerd")) {
+                    filter {
+                        eq("locatie_naam", locatieNaam)
+                        eq("periode", periode)
+                    }
+                }
+                .decodeList<KasboekPeriodeStatus>()
+        }.getOrDefault(emptyList())
+        return rijen.firstOrNull()?.gepubliceerd ?: false
+    }
+
+    @Serializable
+    private data class PeriodeStatusUpsert(
+        val locatie_naam: String,
+        val periode: String,
+        val gepubliceerd: Boolean,
+        val gepubliceerd_op: String?,
+        val gepubliceerd_door: String?,
+    )
+
+    suspend fun togglePubliceer(locatieNaam: String, periode: String, nieuweWaarde: Boolean, doorNaam: String?) {
+        SupabaseManager.client.postgrest["kasboek_periode_status"].upsert(
+            PeriodeStatusUpsert(
+                locatie_naam = locatieNaam,
+                periode = periode,
+                gepubliceerd = nieuweWaarde,
+                gepubliceerd_op = if (nieuweWaarde) java.time.Instant.now().toString() else null,
+                gepubliceerd_door = doorNaam,
+            ),
+        ) { onConflict = "locatie_naam,periode" }
+    }
 }

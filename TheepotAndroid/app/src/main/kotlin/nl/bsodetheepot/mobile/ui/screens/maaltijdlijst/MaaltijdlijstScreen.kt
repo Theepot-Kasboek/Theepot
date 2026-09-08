@@ -65,6 +65,7 @@ fun MaaltijdlijstScreen(session: SessionViewModel, onTerug: (() -> Unit)? = null
     var extraDialoogDag by remember { mutableStateOf<Dag?>(null) }
     var detailsRegistratie by remember { mutableStateOf<MaaltijdRegistratie?>(null) }
     var toonStandaardBeheer by remember { mutableStateOf(false) }
+    var teBevestigen by remember { mutableStateOf<MaaltijdRegistratie?>(null) }
     val scope = rememberCoroutineScope()
 
     LaunchedEffect(Unit) {
@@ -174,9 +175,14 @@ fun MaaltijdlijstScreen(session: SessionViewModel, onTerug: (() -> Unit)? = null
                                         contentDescription = "Meegegeten",
                                         tint = if (reg.aanwezig) TheepotGroenDonker else Color.Gray,
                                         modifier = Modifier.clickable(enabled = magBewerken) {
-                                            scope.launch {
-                                                runCatching { MaaltijdlijstService.toggleAanwezig(reg.id, !reg.aanwezig) }
-                                                laad()
+                                            if (reg.aanwezig) {
+                                                // Van "meegegeten" naar "niet meegegeten": eerst bevestigen.
+                                                teBevestigen = reg
+                                            } else {
+                                                scope.launch {
+                                                    runCatching { MaaltijdlijstService.toggleAanwezig(reg.id, true) }
+                                                    laad()
+                                                }
                                             }
                                         },
                                     )
@@ -246,6 +252,24 @@ fun MaaltijdlijstScreen(session: SessionViewModel, onTerug: (() -> Unit)? = null
         StandaardKinderenDialog(
             locatie = actieveLocatie!!,
             onDismiss = { toonStandaardBeheer = false },
+        )
+    }
+
+    teBevestigen?.let { reg ->
+        AlertDialog(
+            onDismissRequest = { teBevestigen = null },
+            title = { Text("Niet meegegeten?") },
+            text = { Text("Weet je zeker dat ${reg.naam} niet heeft meegegeten?") },
+            confirmButton = {
+                TextButton(onClick = {
+                    teBevestigen = null
+                    scope.launch {
+                        runCatching { MaaltijdlijstService.toggleAanwezig(reg.id, false) }
+                        laad()
+                    }
+                }) { Text("Niet meegegeten") }
+            },
+            dismissButton = { TextButton(onClick = { teBevestigen = null }) { Text("Annuleren") } },
         )
     }
 }

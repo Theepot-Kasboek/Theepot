@@ -82,7 +82,7 @@ export default function BeleidPage() {
   // ── Preview ──────────────────────────────────────────────────────────────────
   async function preview(stuk: Beleidsstuk) {
     const supabase = getSupabase()
-    const { data, error } = await supabase.storage.from('beleid-documenten').createSignedUrl(stuk.bestandspad, 300)
+    const { data, error } = await supabase.storage.from('beleidsstukken').createSignedUrl(stuk.bestandspad, 300)
     if (error || !data) { setToast({ bericht: 'Preview mislukt', type: 'error' }); return }
     setPreviewStuk({ url: data.signedUrl, naam: stuk.bestandsnaam })
   }
@@ -100,16 +100,6 @@ export default function BeleidPage() {
     a.download = stuk.bestandsnaam
     a.click()
     URL.revokeObjectURL(url)
-  }
-
-  // ── Bekijken in nieuwe tab ──────────────────────────────────────────────────
-  async function bekijk(stuk: Beleidsstuk) {
-    const supabase = getSupabase()
-    const { data } = await supabase.storage
-      .from('beleidsstukken')
-      .createSignedUrl(stuk.bestandspad, 300) // 5 minuten geldig
-    if (data?.signedUrl) window.open(data.signedUrl, '_blank')
-    else setToast({ bericht: 'Kon bestand niet openen', type: 'error' })
   }
 
   // ── Verwijderen ─────────────────────────────────────────────────────────────
@@ -250,9 +240,6 @@ export default function BeleidPage() {
 
                   {/* Acties */}
                   <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-                    <button className="btn btn-sm" onClick={() => bekijk(stuk)} title="Openen in nieuw tabblad">
-                      <Eye size={13} /> Bekijken
-                    </button>
                     <button className="btn btn-sm" onClick={() => preview(stuk)} title="Bekijken">
                       <Eye size={13} /> Bekijken
                     </button>

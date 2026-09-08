@@ -22,19 +22,24 @@ import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Send
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -58,6 +63,7 @@ import nl.bsodetheepot.mobile.data.models.Locatie
 import nl.bsodetheepot.mobile.data.models.LocatieService
 import nl.bsodetheepot.mobile.data.models.KasboekEntry
 import nl.bsodetheepot.mobile.data.models.KasboekType
+import nl.bsodetheepot.mobile.data.models.Rol
 import nl.bsodetheepot.mobile.data.models.Toegang
 import nl.bsodetheepot.mobile.data.services.DateUtils
 import nl.bsodetheepot.mobile.data.services.KasboekService
@@ -65,7 +71,9 @@ import nl.bsodetheepot.mobile.data.session.SessionViewModel
 import nl.bsodetheepot.mobile.ui.components.DropdownVeld
 import nl.bsodetheepot.mobile.ui.theme.TheepotGroenDonker
 import java.io.File
+import java.time.Instant
 import java.time.LocalDate
+import java.time.ZoneOffset
 
 @Composable
 fun KasboekScreen(session: SessionViewModel) {
@@ -76,7 +84,10 @@ fun KasboekScreen(session: SessionViewModel) {
     var beginsaldo by remember { mutableStateOf(0.0) }
     var toonNieuw by remember { mutableStateOf(false) }
     var bewerkEntry by remember { mutableStateOf<KasboekEntry?>(null) }
+    var gepubliceerd by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
+    val profiel by session.profiel.collectAsState()
+    val isDirectieViewer = profiel?.rol == Rol.DIRECTIE
 
     LaunchedEffect(Unit) {
         val alle = runCatching { LocatieService.actieveLocaties() }.getOrDefault(emptyList())
@@ -88,6 +99,7 @@ fun KasboekScreen(session: SessionViewModel) {
     suspend fun laad() {
         val loc = actieveLocatie ?: return
         val periode = DateUtils.periodeSleutel(maand)
+        gepubliceerd = runCatching { KasboekService.periodeStatus(loc.naam, periode) }.getOrDefault(false)
         entries = runCatching { KasboekService.entries(loc.naam, periode) }.getOrDefault(emptyList())
         beginsaldo = runCatching { KasboekService.beginsaldo(loc.naam, periode) }.getOrDefault(0.0)
     }
@@ -110,12 +122,36 @@ fun KasboekScreen(session: SessionViewModel) {
     }
 
     val magBewerken = actieveLocatie?.let { session.toegang(it.naam, "kasboek") == Toegang.BEWERKEN } ?: false
+    val magPubliceren = magBewerken && !isDirectieViewer
+    val magInhoudZien = !isDirectieViewer || gepubliceerd
     val inkomsten = entries.filter { it.type == KasboekType.INKOMST }.sumOf { it.bedrag }
     val uitgaven = entries.filter { it.type == KasboekType.UITGAVE }.sumOf { it.bedrag }
     val eindsaldo = beginsaldo + inkomsten - uitgaven
 
     Scaffold(
-        topBar = { TopAppBar(title = { Text("Kasboek") }) },
+        topBar = {
+            TopAppBar(
+                title = { Text("Kasboek") },
+                actions = {
+                    if (magPubliceren && actieveLocatie != null) {
+                        IconButton(onClick = {
+                            scope.launch {
+                                val nieuweWaarde = !gepubliceerd
+                                runCatching {
+                                    KasboekService.togglePubliceer(actieveLocatie!!.naam, DateUtils.periodeSleutel(maand), nieuweWaarde, profiel?.naam)
+                                }
+                                gepubliceerd = nieuweWaarde
+                            }
+                        }) {
+                            Icon(
+                                if (gepubliceerd) Icons.Filled.VisibilityOff else Icons.Filled.Send,
+                                contentDescription = if (gepubliceerd) "Verbergen" else "Publiceren",
+                            )
+                        }
+                    }
+                },
+            )
+        },
         floatingActionButton = {
             if (magBewerken) {
                 FloatingActionButton(onClick = { toonNieuw = true }, containerColor = TheepotGroenDonker) {
@@ -140,25 +176,41 @@ fun KasboekScreen(session: SessionViewModel) {
                 IconButton(onClick = { maand = maand.plusMonths(1) }) { Icon(Icons.Filled.ChevronRight, contentDescription = "Volgende maand") }
             }
 
-            Row(modifier = Modifier.fillMaxWidth().padding(16.dp, 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                SamenvattingTegel("Beginsaldo", beginsaldo, Color0xFF37474F, Modifier.weight(1f))
-                SamenvattingTegel("Inkomsten", inkomsten, Color0xFF2E7D32, Modifier.weight(1f))
-                SamenvattingTegel("Uitgaven", uitgaven, Color0xFFC62828, Modifier.weight(1f))
-                SamenvattingTegel("Eindsaldo", eindsaldo, Color0xFF37474F, Modifier.weight(1f))
-            }
-
-            LazyColumn {
-                items(entries, key = { it.id }) { entry ->
-                    ListItem(
-                        headlineContent = { Text(entry.omschrijving?.ifBlank { entry.categorie ?: "" } ?: entry.categorie ?: "") },
-                        supportingContent = { if (entry.categorie != null) Text(entry.categorie) },
-                        leadingContent = { if (entry.bonnetjePad != null) Icon(Icons.Filled.AttachFile, contentDescription = "Heeft bonnetje") },
-                        trailingContent = {
-                            val kleur = if (entry.type == KasboekType.INKOMST) TheepotGroenDonker else androidx.compose.ui.graphics.Color(0xFFC62828)
-                            Text("€ ${"%.2f".format(entry.bedrag)}", color = kleur)
-                        },
-                        modifier = if (magBewerken) Modifier.clickable { bewerkEntry = entry } else Modifier,
+            if (!magInhoudZien) {
+                Column(
+                    modifier = Modifier.fillMaxSize().padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center,
+                ) {
+                    Icon(Icons.Filled.VisibilityOff, contentDescription = null)
+                    Text("Nog niet gepubliceerd", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 8.dp))
+                    Text(
+                        "Dit kasboek is nog niet gepubliceerd door degene die het invult.",
+                        style = MaterialTheme.typography.bodySmall,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                     )
+                }
+            } else {
+                Row(modifier = Modifier.fillMaxWidth().padding(16.dp, 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    SamenvattingTegel("Beginsaldo", beginsaldo, Color0xFF37474F, Modifier.weight(1f))
+                    SamenvattingTegel("Inkomsten", inkomsten, Color0xFF2E7D32, Modifier.weight(1f))
+                    SamenvattingTegel("Uitgaven", uitgaven, Color0xFFC62828, Modifier.weight(1f))
+                    SamenvattingTegel("Eindsaldo", eindsaldo, Color0xFF37474F, Modifier.weight(1f))
+                }
+
+                LazyColumn {
+                    items(entries, key = { it.id }) { entry ->
+                        ListItem(
+                            headlineContent = { Text(entry.omschrijving?.ifBlank { entry.categorie ?: "" } ?: entry.categorie ?: "") },
+                            supportingContent = { if (entry.categorie != null) Text(entry.categorie) },
+                            leadingContent = { if (entry.bonnetjePad != null) Icon(Icons.Filled.AttachFile, contentDescription = "Heeft bonnetje") },
+                            trailingContent = {
+                                val kleur = if (entry.type == KasboekType.INKOMST) TheepotGroenDonker else androidx.compose.ui.graphics.Color(0xFFC62828)
+                                Text("€ ${"%.2f".format(entry.bedrag)}", color = kleur)
+                            },
+                            modifier = if (magBewerken) Modifier.clickable { bewerkEntry = entry } else Modifier,
+                        )
+                    }
                 }
             }
         }
@@ -244,6 +296,8 @@ private fun BoekingBewerkenDialog(
     var omschrijving by remember { mutableStateOf(entry.omschrijving ?: "") }
     var categorieen by remember { mutableStateOf<List<String>>(emptyList()) }
     var categorie by remember { mutableStateOf(entry.categorie) }
+    var datum by remember { mutableStateOf(entry.datum?.let { DateUtils.parseDateStr(it) }) }
+    var toonDatumDialog by remember { mutableStateOf(false) }
     var nieuwBonnetje by remember { mutableStateOf<ByteArray?>(null) }
     var bonnetjeVerwijderen by remember { mutableStateOf(false) }
     var bezig by remember { mutableStateOf(false) }
@@ -284,7 +338,6 @@ private fun BoekingBewerkenDialog(
                     }
                 }
                 OutlinedTextField(value = bedragTekst, onValueChange = { bedragTekst = it }, label = { Text("Bedrag") })
-                OutlinedTextField(value = omschrijving, onValueChange = { omschrijving = it }, label = { Text("Omschrijving") })
 
                 DropdownVeld(
                     label = "Categorie",
@@ -292,6 +345,11 @@ private fun BoekingBewerkenDialog(
                     opties = listOf("Geen" to { categorie = null }) +
                         kiesbareCategorieen.map { c -> c to { categorie = c } },
                 )
+
+                OutlinedButton(onClick = { toonDatumDialog = true }) {
+                    Text(datum?.let { DateUtils.toDateStr(it) } ?: "Datum kiezen")
+                }
+                OutlinedTextField(value = omschrijving, onValueChange = { omschrijving = it }, label = { Text("Omschrijving") })
 
                 TextButton(onClick = startScan) {
                     Icon(Icons.Filled.CameraAlt, contentDescription = null)
@@ -328,6 +386,7 @@ private fun BoekingBewerkenDialog(
                                 type = type,
                                 bedrag = bedrag ?: 0.0,
                                 categorie = categorie,
+                                datum = datum?.let { DateUtils.toDateStr(it) },
                                 omschrijving = omschrijving.ifBlank { null },
                                 nieuwBonnetje = nieuwBonnetje,
                                 bonnetjeVerwijderen = bonnetjeVerwijderen,
@@ -342,6 +401,29 @@ private fun BoekingBewerkenDialog(
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Annuleren") } },
     )
+
+    if (toonDatumDialog) {
+        DatumDialog(
+            huidig = datum ?: DateUtils.vandaag(),
+            onDismiss = { toonDatumDialog = false },
+            onGekozen = { datum = it; toonDatumDialog = false },
+        )
+    }
+}
+
+@Composable
+private fun DatumDialog(huidig: LocalDate, onDismiss: () -> Unit, onGekozen: (LocalDate) -> Unit) {
+    val state = rememberDatePickerState(initialSelectedDateMillis = huidig.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli())
+    DatePickerDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {
+            TextButton(onClick = {
+                val millis = state.selectedDateMillis
+                if (millis != null) onGekozen(Instant.ofEpochMilli(millis).atZone(ZoneOffset.UTC).toLocalDate()) else onDismiss()
+            }) { Text("OK") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Annuleren") } },
+    ) { androidx.compose.material3.DatePicker(state = state) }
 }
 
 @Composable
@@ -357,6 +439,8 @@ private fun NieuweBoekingDialog(
     var omschrijving by remember { mutableStateOf("") }
     var categorieen by remember { mutableStateOf<List<String>>(emptyList()) }
     var categorie by remember { mutableStateOf<String?>(null) }
+    var datum by remember { mutableStateOf<LocalDate?>(null) }
+    var toonDatumDialog by remember { mutableStateOf(false) }
     var bonnetjeBytes by remember { mutableStateOf<ByteArray?>(null) }
     var bezig by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
@@ -385,7 +469,6 @@ private fun NieuweBoekingDialog(
                     }
                 }
                 OutlinedTextField(value = bedragTekst, onValueChange = { bedragTekst = it }, label = { Text("Bedrag") })
-                OutlinedTextField(value = omschrijving, onValueChange = { omschrijving = it }, label = { Text("Omschrijving") })
 
                 DropdownVeld(
                     label = "Categorie",
@@ -393,6 +476,11 @@ private fun NieuweBoekingDialog(
                     opties = listOf("Geen" to { categorie = null }) +
                         categorieen.map { c -> c to { categorie = c } },
                 )
+
+                OutlinedButton(onClick = { toonDatumDialog = true }) {
+                    Text(datum?.let { DateUtils.toDateStr(it) } ?: "Datum kiezen")
+                }
+                OutlinedTextField(value = omschrijving, onValueChange = { omschrijving = it }, label = { Text("Omschrijving") })
 
                 TextButton(onClick = startScan) {
                     Icon(Icons.Filled.CameraAlt, contentDescription = null)
@@ -411,6 +499,7 @@ private fun NieuweBoekingDialog(
                                 locatieNaam = locatieNaam,
                                 periode = periode,
                                 categorie = categorie ?: "Overige kosten",
+                                datum = datum?.let { DateUtils.toDateStr(it) },
                                 omschrijving = omschrijving.ifBlank { null },
                                 bedrag = bedrag ?: 0.0,
                                 type = type,
@@ -427,4 +516,12 @@ private fun NieuweBoekingDialog(
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Annuleren") } },
     )
+
+    if (toonDatumDialog) {
+        DatumDialog(
+            huidig = datum ?: DateUtils.vandaag(),
+            onDismiss = { toonDatumDialog = false },
+            onGekozen = { datum = it; toonDatumDialog = false },
+        )
+    }
 }

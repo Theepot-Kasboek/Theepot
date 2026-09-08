@@ -46,7 +46,7 @@ enum KasboekService {
         return rijen.reduce(0) { $0 + ($1.type == "inkomst" ? $1.bedrag : -$1.bedrag) }
     }
 
-    static func voegToe(locatieNaam: String, periode: String, type: KasboekType, bedrag: Double, categorie: String?, omschrijving: String?, aangemaaktDoor: String, bonnetjeData: Data?, bonnetjeBestandsnaam: String?) async throws {
+    static func voegToe(locatieNaam: String, periode: String, type: KasboekType, bedrag: Double, categorie: String?, datum: String?, omschrijving: String?, aangemaaktDoor: String, bonnetjeData: Data?, bonnetjeBestandsnaam: String?) async throws {
         var bonnetjePad: String?
         if let data = bonnetjeData, let naam = bonnetjeBestandsnaam {
             let pad = "\(locatieNaam)/\(periode)/\(Int(Date().timeIntervalSince1970 * 1000))_\(naam)"
@@ -59,6 +59,7 @@ enum KasboekService {
         struct Insert: Encodable {
             let periode: String
             let categorie: String?
+            let datum: String?
             let omschrijving: String?
             let bedrag: Double
             let type: String
@@ -68,13 +69,49 @@ enum KasboekService {
         }
         try await SupabaseManager.client
             .from("kasboek_entries")
-            .insert(Insert(periode: periode, categorie: categorie, omschrijving: omschrijving, bedrag: bedrag, type: type.rawValue, aangemaakt_door: aangemaaktDoor, locatie: locatieNaam, bonnetje_pad: bonnetjePad))
+            .insert(Insert(periode: periode, categorie: categorie, datum: datum, omschrijving: omschrijving, bedrag: bedrag, type: type.rawValue, aangemaakt_door: aangemaaktDoor, locatie: locatieNaam, bonnetje_pad: bonnetjePad))
+            .execute()
+    }
+
+    /// Publiceer- of verberg-status van een locatie/maand ophalen (nil = nog geen rij, dus niet gepubliceerd).
+    static func periodeStatus(locatieNaam: String, periode: String) async throws -> Bool {
+        struct Rij: Decodable { let gepubliceerd: Bool }
+        let rijen: [Rij] = try await SupabaseManager.client
+            .from("kasboek_periode_status")
+            .select("gepubliceerd")
+            .eq("locatie_naam", value: locatieNaam)
+            .eq("periode", value: periode)
+            .execute()
+            .value
+        return rijen.first?.gepubliceerd ?? false
+    }
+
+    static func togglePubliceer(locatieNaam: String, periode: String, nieuweWaarde: Bool, doorNaam: String?) async throws {
+        struct Upsert: Encodable {
+            let locatie_naam: String
+            let periode: String
+            let gepubliceerd: Bool
+            let gepubliceerd_op: String?
+            let gepubliceerd_door: String?
+        }
+        try await SupabaseManager.client
+            .from("kasboek_periode_status")
+            .upsert(
+                Upsert(
+                    locatie_naam: locatieNaam,
+                    periode: periode,
+                    gepubliceerd: nieuweWaarde,
+                    gepubliceerd_op: nieuweWaarde ? ISO8601DateFormatter().string(from: Date()) : nil,
+                    gepubliceerd_door: doorNaam
+                ),
+                onConflict: "locatie_naam,periode"
+            )
             .execute()
     }
 
     /// Past een bestaande boeking aan. Een vervangen of verwijderd bonnetje wordt pas
     /// uit de opslag gehaald nadat de boeking succesvol is bijgewerkt.
-    static func werkBij(entry: KasboekEntry, type: KasboekType, bedrag: Double, categorie: String?, omschrijving: String?, nieuwBonnetje: Data?, bonnetjeVerwijderen: Bool) async throws {
+    static func werkBij(entry: KasboekEntry, type: KasboekType, bedrag: Double, categorie: String?, datum: String?, omschrijving: String?, nieuwBonnetje: Data?, bonnetjeVerwijderen: Bool) async throws {
         var bonnetjePad = entry.bonnetjePad
         if let data = nieuwBonnetje {
             let pad = "\(entry.locatie)/\(entry.periode)/\(Int(Date().timeIntervalSince1970 * 1000))_bonnetje.jpg"
@@ -90,11 +127,12 @@ enum KasboekService {
             let type: String
             let bedrag: Double
             let categorie: String?
+            let datum: String?
             let omschrijving: String?
             let bonnetjePad: String?
 
             enum CodingKeys: String, CodingKey {
-                case type, bedrag, categorie, omschrijving
+                case type, bedrag, categorie, datum, omschrijving
                 case bonnetjePad = "bonnetje_pad"
             }
 
@@ -105,6 +143,7 @@ enum KasboekService {
                 try container.encode(type, forKey: .type)
                 try container.encode(bedrag, forKey: .bedrag)
                 if let categorie { try container.encode(categorie, forKey: .categorie) } else { try container.encodeNil(forKey: .categorie) }
+                if let datum { try container.encode(datum, forKey: .datum) } else { try container.encodeNil(forKey: .datum) }
                 if let omschrijving { try container.encode(omschrijving, forKey: .omschrijving) } else { try container.encodeNil(forKey: .omschrijving) }
                 if let bonnetjePad { try container.encode(bonnetjePad, forKey: .bonnetjePad) } else { try container.encodeNil(forKey: .bonnetjePad) }
             }
@@ -112,7 +151,7 @@ enum KasboekService {
 
         try await SupabaseManager.client
             .from("kasboek_entries")
-            .update(Update(type: type.rawValue, bedrag: bedrag, categorie: categorie, omschrijving: omschrijving, bonnetjePad: bonnetjePad))
+            .update(Update(type: type.rawValue, bedrag: bedrag, categorie: categorie, datum: datum, omschrijving: omschrijving, bonnetjePad: bonnetjePad))
             .eq("id", value: entry.id)
             .execute()
 

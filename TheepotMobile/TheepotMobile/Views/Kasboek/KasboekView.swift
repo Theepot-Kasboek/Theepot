@@ -10,6 +10,7 @@ struct KasboekView: View {
     @State private var isLoading = true
     @State private var toonNieuw = false
     @State private var bewerkEntry: KasboekEntry?
+    @State private var gepubliceerd = false
 
     private var periode: String { KasboekService.periodeSleutel(maand) }
 
@@ -21,6 +22,11 @@ struct KasboekView: View {
         guard let actieveLocatie else { return false }
         return session.toegang(voorLocatie: actieveLocatie.naam, locatieType: "kasboek") == .bewerken
     }
+
+    /// Directie wacht op publicatie door degene die het kasboek invult.
+    private var isDirectieViewer: Bool { session.profiel?.rol == .directie }
+    private var magPubliceren: Bool { magBewerken && !isDirectieViewer }
+    private var magInhoudZien: Bool { !isDirectieViewer || gepubliceerd }
 
     private var inkomsten: Double { entries.filter { $0.type == .inkomst }.reduce(0) { $0 + $1.bedrag } }
     private var uitgaven: Double { entries.filter { $0.type == .uitgave }.reduce(0) { $0 + $1.bedrag } }
@@ -46,17 +52,25 @@ struct KasboekView: View {
                     }
                     .padding(.horizontal)
 
-                    HStack(spacing: 10) {
-                        SaldoTegel(titel: "Beginsaldo", bedrag: beginsaldo, kleur: .secondary)
-                        SaldoTegel(titel: "Inkomsten", bedrag: inkomsten, kleur: .theepotGroenDonker)
-                        SaldoTegel(titel: "Uitgaven", bedrag: uitgaven, kleur: .red)
-                        SaldoTegel(titel: "Eindsaldo", bedrag: eindsaldo, kleur: .primary)
+                    if magInhoudZien {
+                        HStack(spacing: 10) {
+                            SaldoTegel(titel: "Beginsaldo", bedrag: beginsaldo, kleur: .secondary)
+                            SaldoTegel(titel: "Inkomsten", bedrag: inkomsten, kleur: .theepotGroenDonker)
+                            SaldoTegel(titel: "Uitgaven", bedrag: uitgaven, kleur: .red)
+                            SaldoTegel(titel: "Eindsaldo", bedrag: eindsaldo, kleur: .primary)
+                        }
+                        .padding(.horizontal)
+                        .padding(.top, 4)
                     }
-                    .padding(.horizontal)
-                    .padding(.top, 4)
                 }
 
-                if isLoading {
+                if !magInhoudZien {
+                    ContentUnavailableView(
+                        "Nog niet gepubliceerd",
+                        systemImage: "eye.slash",
+                        description: Text("Dit kasboek is nog niet gepubliceerd door degene die het invult.")
+                    )
+                } else if isLoading {
                     ProgressView()
                     Spacer()
                 } else if entries.isEmpty {
@@ -76,6 +90,13 @@ struct KasboekView: View {
             }
             .navigationTitle("Kasboek")
             .toolbar {
+                if magPubliceren {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button { Task { await togglePubliceren() } } label: {
+                            Label(gepubliceerd ? "Verbergen" : "Publiceren", systemImage: gepubliceerd ? "eye" : "paperplane.fill")
+                        }
+                    }
+                }
                 if magBewerken {
                     ToolbarItem(placement: .topBarTrailing) {
                         Button { toonNieuw = true } label: {
@@ -119,9 +140,17 @@ struct KasboekView: View {
     private func laad() async {
         guard let actieveLocatie else { isLoading = false; return }
         isLoading = true
+        gepubliceerd = (try? await KasboekService.periodeStatus(locatieNaam: actieveLocatie.naam, periode: periode)) ?? false
         entries = (try? await KasboekService.entries(locatieNaam: actieveLocatie.naam, periode: periode)) ?? []
         beginsaldo = (try? await KasboekService.beginsaldo(locatieNaam: actieveLocatie.naam, voorPeriode: periode)) ?? 0
         isLoading = false
+    }
+
+    private func togglePubliceren() async {
+        guard let actieveLocatie else { return }
+        let nieuweWaarde = !gepubliceerd
+        try? await KasboekService.togglePubliceer(locatieNaam: actieveLocatie.naam, periode: periode, nieuweWaarde: nieuweWaarde, doorNaam: session.profiel?.naam)
+        gepubliceerd = nieuweWaarde
     }
 }
 
@@ -175,6 +204,7 @@ private struct NieuweBoekingView: View {
     @State private var omschrijving = ""
     @State private var categorie: String?
     @State private var categorieen: [String] = []
+    @State private var datum = Date()
     @State private var bonnetjeData: Data?
     @State private var toonScanner = false
     @State private var bezig = false
@@ -190,13 +220,14 @@ private struct NieuweBoekingView: View {
 
                 TextField("Bedrag (€)", text: $bedragTekst)
                     .keyboardType(.decimalPad)
-                TextField("Omschrijving", text: $omschrijving)
                 Picker("Categorie", selection: $categorie) {
                     Text("Geen").tag(String?.none)
                     ForEach(categorieen, id: \.self) { (naam: String) in
                         Text(naam).tag(Optional(naam))
                     }
                 }
+                DatePicker("Datum", selection: $datum, displayedComponents: .date)
+                TextField("Omschrijving", text: $omschrijving)
 
                 Section("Bonnetje") {
                     if bonnetjeData != nil {
@@ -235,9 +266,10 @@ private struct NieuweBoekingView: View {
         guard let bedrag, let profielId = session.profiel?.id.uuidString.lowercased() else { return }
         bezig = true
         defer { bezig = false }
+        let datumTekst = KasboekDatumFormatter.string(from: datum)
         try? await KasboekService.voegToe(
             locatieNaam: locatieNaam, periode: periode, type: type, bedrag: bedrag,
-            categorie: categorie, omschrijving: omschrijving.isEmpty ? nil : omschrijving,
+            categorie: categorie, datum: datumTekst, omschrijving: omschrijving.isEmpty ? nil : omschrijving,
             aangemaaktDoor: profielId, bonnetjeData: bonnetjeData,
             bonnetjeBestandsnaam: bonnetjeData != nil ? "bonnetje.jpg" : nil
         )
@@ -256,6 +288,7 @@ private struct BoekingBewerkenView: View {
     @State private var omschrijving = ""
     @State private var categorie: String?
     @State private var categorieen: [String] = []
+    @State private var datum = Date()
     @State private var nieuwBonnetje: Data?
     @State private var bonnetjeVerwijderen = false
     @State private var toonScanner = false
@@ -284,13 +317,14 @@ private struct BoekingBewerkenView: View {
 
                 TextField("Bedrag (€)", text: $bedragTekst)
                     .keyboardType(.decimalPad)
-                TextField("Omschrijving", text: $omschrijving)
                 Picker("Categorie", selection: $categorie) {
                     Text("Geen").tag(String?.none)
                     ForEach(kiesbareCategorieen, id: \.self) { (naam: String) in
                         Text(naam).tag(Optional(naam))
                     }
                 }
+                DatePicker("Datum", selection: $datum, displayedComponents: .date)
+                TextField("Omschrijving", text: $omschrijving)
 
                 Section("Bonnetje") {
                     if nieuwBonnetje != nil {
@@ -349,6 +383,9 @@ private struct BoekingBewerkenView: View {
             bedragTekst = String(format: "%.2f", entry.bedrag)
             omschrijving = entry.omschrijving ?? ""
             categorie = entry.categorie
+            if let datumTekst = entry.datum, let gedecodeerd = KasboekDatumFormatter.date(from: datumTekst) {
+                datum = gedecodeerd
+            }
             categorieen = (try? await KasboekService.categorieen()) ?? KasboekCategorieen.standaard
         }
     }
@@ -364,7 +401,7 @@ private struct BoekingBewerkenView: View {
         do {
             try await KasboekService.werkBij(
                 entry: entry, type: type, bedrag: bedrag, categorie: categorie,
-                omschrijving: omschrijving.isEmpty ? nil : omschrijving,
+                datum: KasboekDatumFormatter.string(from: datum), omschrijving: omschrijving.isEmpty ? nil : omschrijving,
                 nieuwBonnetje: nieuwBonnetje, bonnetjeVerwijderen: bonnetjeVerwijderen
             )
         } catch {
@@ -374,4 +411,17 @@ private struct BoekingBewerkenView: View {
         await onKlaar()
         dismiss()
     }
+}
+
+/// Kolom `datum` is een Postgres `date` ("yyyy-MM-dd"), geen timestamp.
+enum KasboekDatumFormatter {
+    private static let formatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd"
+        f.timeZone = TimeZone(identifier: "Europe/Amsterdam")
+        return f
+    }()
+
+    static func string(from datum: Date) -> String { formatter.string(from: datum) }
+    static func date(from tekst: String) -> Date? { formatter.date(from: tekst) }
 }

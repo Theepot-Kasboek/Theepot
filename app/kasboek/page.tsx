@@ -8,7 +8,7 @@ import Toast from '@/components/Toast'
 import GeenToegang from '@/components/GeenToegang'
 import {
   ChevronLeft, ChevronRight, Plus, Trash2,
-  MapPin, Settings, X, Building2, Tag, Paperclip, Download, Eye, Pencil
+  MapPin, Settings, X, Building2, Tag, Paperclip, Download, Eye, Pencil, Send
 } from 'lucide-react'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -299,6 +299,7 @@ export default function KasboekPage() {
   const [type, setType] = useState<'inkomst' | 'uitgave'>('inkomst')
   const [bedrag, setBedrag] = useState('')
   const [categorie, setCategorie] = useState('')
+  const [datum, setDatum] = useState('')
   const [omschrijving, setOmschrijving] = useState('')
   const [opslaan, setOpslaan] = useState(false)
 
@@ -313,6 +314,7 @@ export default function KasboekPage() {
   const [bewerkType, setBewerkType] = useState<'inkomst' | 'uitgave'>('inkomst')
   const [bewerkBedrag, setBewerkBedrag] = useState('')
   const [bewerkCategorie, setBewerkCategorie] = useState('')
+  const [bewerkDatum, setBewerkDatum] = useState('')
   const [bewerkOmschrijving, setBewerkOmschrijving] = useState('')
   const [bewerkBonnetjeBestand, setBewerkBonnetjeBestand] = useState<File | null>(null)
   const [bewerkBonnetjeWeg, setBewerkBonnetjeWeg] = useState(false)
@@ -442,6 +444,44 @@ export default function KasboekPage() {
 
   useEffect(() => { haalBeginsaldoOp() }, [haalBeginsaldoOp])
 
+  // ── Publiceren: directie ziet een maand pas nadat de invuller publiceert ───
+  const [periodeStatus, setPeriodeStatus] = useState<{ gepubliceerd: boolean } | null>(null)
+  const isDirectieViewer = !isSuperadmin && profiel?.rol === 'directie'
+  const magPubliceren = magBewerkenKasboek && !isDirectieViewer
+
+  const haalPeriodeStatusOp = useCallback(async () => {
+    if (!actieveLocatie) { setPeriodeStatus(null); return }
+    const { data } = await getSupabase()
+      .from('kasboek_periode_status')
+      .select('gepubliceerd')
+      .eq('locatie_naam', actieveLocatie.naam)
+      .eq('periode', huidigePeriode)
+      .maybeSingle()
+    setPeriodeStatus(data ? { gepubliceerd: (data as { gepubliceerd: boolean }).gepubliceerd } : { gepubliceerd: false })
+  }, [actieveLocatie, huidigePeriode])
+
+  useEffect(() => { haalPeriodeStatusOp() }, [haalPeriodeStatusOp])
+
+  async function togglePubliceren() {
+    if (!actieveLocatie) return
+    const nieuweStatus = !(periodeStatus?.gepubliceerd)
+    const { error } = await getSupabase()
+      .from('kasboek_periode_status')
+      .upsert({
+        locatie_naam: actieveLocatie.naam,
+        periode: huidigePeriode,
+        gepubliceerd: nieuweStatus,
+        gepubliceerd_op: nieuweStatus ? new Date().toISOString() : null,
+        gepubliceerd_door: profiel?.naam ?? null,
+      }, { onConflict: 'locatie_naam,periode' })
+    if (error) {
+      setToast({ bericht: 'Publiceren mislukt: ' + error.message, type: 'error' })
+      return
+    }
+    setPeriodeStatus({ gepubliceerd: nieuweStatus })
+    setToast({ bericht: nieuweStatus ? 'Kasboek gepubliceerd voor directie.' : 'Publicatie ingetrokken.', type: 'success' })
+  }
+
   // ── Boeking toevoegen ───────────────────────────────────────────────────────
   async function handleToevoegen(e: React.FormEvent) {
     e.preventDefault()
@@ -467,6 +507,7 @@ export default function KasboekPage() {
       type,
       bedrag: parseFloat(bedrag.replace(',', '.')),
       categorie: categorie || null,
+      datum: datum || null,
       omschrijving: omschrijving || null,
       locatie: actieveLocatie.naam,
       aangemaakt_door: profiel?.id ?? null,
@@ -477,6 +518,7 @@ export default function KasboekPage() {
       setFout('Opslaan mislukt: ' + error.message)
     } else {
       setBedrag('')
+      setDatum('')
       setOmschrijving('')
       setBonnetjeBestand(null)
       setToast({ bericht: 'Boeking toegevoegd!', type: 'success' })
@@ -543,6 +585,7 @@ export default function KasboekPage() {
     setBewerkType(entry.type)
     setBewerkBedrag(String(entry.bedrag))
     setBewerkCategorie(entry.categorie ?? '')
+    setBewerkDatum(entry.datum ?? '')
     setBewerkOmschrijving(entry.omschrijving ?? '')
     setBewerkBonnetjeBestand(null)
     setBewerkBonnetjeWeg(false)
@@ -581,6 +624,7 @@ export default function KasboekPage() {
       type: bewerkType,
       bedrag: parseFloat(bewerkBedrag.replace(',', '.')),
       categorie: bewerkCategorie || null,
+      datum: bewerkDatum || null,
       omschrijving: bewerkOmschrijving || null,
       bonnetje_pad,
     }).eq('id', bewerkEntry.id)
@@ -710,6 +754,18 @@ export default function KasboekPage() {
                 </button>
               </>
             )}
+            {/* Publiceren: directie ziet deze maand pas na publicatie */}
+            {actieveLocatie && magPubliceren && (
+              <button className="btn" onClick={togglePubliceren} title={periodeStatus?.gepubliceerd ? 'Verbergen voor directie' : 'Publiceren voor directie'}>
+                {periodeStatus?.gepubliceerd ? <Eye size={14} /> : <Send size={14} color="var(--primary)" />}
+                {periodeStatus?.gepubliceerd ? ' Verbergen' : ' Publiceren'}
+              </button>
+            )}
+            {actieveLocatie && isDirectieViewer && (
+              <span style={{ fontSize: 12, color: 'var(--text-muted)', padding: '6px 12px', borderRadius: 8, background: 'var(--bg)', border: '1px solid var(--border)' }}>
+                {periodeStatus?.gepubliceerd ? '● Gepubliceerd' : '○ Nog niet gepubliceerd'}
+              </span>
+            )}
             {/* Lees-indicator voor read-only gebruikers */}
             {!isSuperadmin && actieveLocatie && kasboekToegang(actieveLocatie.naam) === 'lezen' && (
               <span style={{ fontSize: 12, color: 'var(--text-muted)', padding: '6px 12px', borderRadius: 8, background: 'var(--bg)', border: '1px solid var(--border)' }}>
@@ -769,7 +825,17 @@ export default function KasboekPage() {
           </div>
         )}
 
-        {actieveLocatie && (
+        {actieveLocatie && isDirectieViewer && !periodeStatus?.gepubliceerd && (
+          <div className="card">
+            <div className="empty-state" style={{ padding: 40 }}>
+              <Eye size={36} />
+              <h3>Nog niet gepubliceerd</h3>
+              <p>Het kasboek van {actieveLocatie.naam} voor {periodeLabel(huidigeDatum)} is nog niet gepubliceerd door degene die het invult.</p>
+            </div>
+          </div>
+        )}
+
+        {actieveLocatie && (!isDirectieViewer || periodeStatus?.gepubliceerd) && (
           <>
             {/* Saldo kaarten */}
             <div className="grid-4col" style={{ marginBottom: 20 }}>
@@ -838,6 +904,14 @@ export default function KasboekPage() {
                           <option value="">— Geen categorie —</option>
                           {categorieen.map(c => <option key={c} value={c}>{c}</option>)}
                         </select>
+                      </div>
+
+                      <div>
+                        <label className="form-label">Datum</label>
+                        <input
+                          type="date" className="form-input"
+                          value={datum} onChange={e => setDatum(e.target.value)}
+                        />
                       </div>
 
                       <div>
@@ -959,6 +1033,7 @@ export default function KasboekPage() {
                             )}
                           </div>
                           <div style={{ fontSize: 11, color: 'var(--text-muted)', display: 'flex', gap: 8 }}>
+                            {entry.datum && <span>{new Date(entry.datum + 'T00:00:00').toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric' })}</span>}
                             {entry.omschrijving && <span>{entry.omschrijving}</span>}
                             <span>{new Date(entry.aangemaakt_op).toLocaleString('nl-NL', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
                           </div>
@@ -1207,6 +1282,14 @@ export default function KasboekPage() {
                     {Array.from(new Set(bewerkEntry.categorie ? [...categorieen, bewerkEntry.categorie] : categorieen))
                       .map(c => <option key={c} value={c}>{c}</option>)}
                   </select>
+                </div>
+
+                <div>
+                  <label className="form-label">Datum</label>
+                  <input
+                    type="date" className="form-input"
+                    value={bewerkDatum} onChange={e => setBewerkDatum(e.target.value)}
+                  />
                 </div>
 
                 <div>

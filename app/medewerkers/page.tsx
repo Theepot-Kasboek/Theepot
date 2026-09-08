@@ -37,6 +37,8 @@ export default function MedewerkersPage() {
   const [formNaam, setFormNaam] = useState('')
   const [formEmail, setFormEmail] = useState('')
   const [formRol, setFormRol] = useState<Rol>('locatie')
+  const [formLocatieNaam, setFormLocatieNaam] = useState('')
+  const [locaties, setLocaties] = useState<string[]>([])
   const [formWachtwoord, setFormWachtwoord] = useState('')
   const [formLaden, setFormLaden] = useState(false)
   const [formFout, setFormFout] = useState('')
@@ -51,7 +53,7 @@ export default function MedewerkersPage() {
   }, [authLoading, isSuperadmin, router])
 
   useEffect(() => {
-    if (isSuperadmin) laadMedewerkers()
+    if (isSuperadmin) { laadMedewerkers(); laadLocaties() }
   }, [isSuperadmin])
 
   async function laadMedewerkers() {
@@ -66,11 +68,17 @@ export default function MedewerkersPage() {
     setLaden(false)
   }
 
+  async function laadLocaties() {
+    const { data } = await getSupabase().from('kasboek_locaties').select('naam').eq('actief', true).order('naam')
+    setLocaties((data ?? []).map((l: { naam: string }) => l.naam))
+  }
+
   function openNieuw() {
     setBewerkProfiel(null)
     setFormNaam('')
     setFormEmail('')
     setFormRol('locatie')
+    setFormLocatieNaam('')
     setFormWachtwoord('')
     setFormFout('')
     setToonModal(true)
@@ -81,6 +89,7 @@ export default function MedewerkersPage() {
     setFormNaam(profiel.naam)
     setFormEmail(profiel.email)
     setFormRol(profiel.rol)
+    setFormLocatieNaam(profiel.locatie_naam ?? '')
     setFormWachtwoord('')
     setFormFout('')
     setOpenMenu(null)
@@ -105,7 +114,7 @@ export default function MedewerkersPage() {
       // Bewerk bestaand profiel
       const { error } = await supabase
         .from('profielen')
-        .update({ naam: formNaam.trim(), email: formEmail.trim(), rol: formRol })
+        .update({ naam: formNaam.trim(), email: formEmail.trim(), rol: formRol, locatie_naam: formLocatieNaam || null })
         .eq('id', bewerkProfiel.id)
 
       if (error) {
@@ -411,6 +420,29 @@ export default function MedewerkersPage() {
                   {formRol === 'locatie' && 'Basistoegang: activiteiten bekijken en agenda inzien.'}
                 </div>
               </div>
+
+              {formRol === 'locatie' && (
+                <div>
+                  <label className="form-label">Locatie</label>
+                  <div style={{ position: 'relative' }}>
+                    <select
+                      className="form-select"
+                      value={formLocatieNaam}
+                      onChange={(e) => setFormLocatieNaam(e.target.value)}
+                      style={{ appearance: 'none', paddingRight: 32 }}
+                    >
+                      <option value="">— Geen locatie gekoppeld —</option>
+                      {locaties.map((loc) => (
+                        <option key={loc} value={loc}>{loc}</option>
+                      ))}
+                    </select>
+                    <ChevronDown size={14} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: 'var(--text-muted)' }} />
+                  </div>
+                  <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
+                    Nodig zodat een leidinggevende met rechten voor deze locatie de takenlijst van deze medewerker kan invullen.
+                  </p>
+                </div>
+              )}
 
               {!bewerkProfiel && (
                 <div>

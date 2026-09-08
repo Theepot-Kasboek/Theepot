@@ -5,9 +5,9 @@ import { getSupabase } from '@/lib/supabase'
 import { useAuth } from '@/components/AuthProvider'
 import {
   Plus, X, Trash2, Circle, CheckCircle2,
-  ChevronRight, Calendar, Flag, Star,
+  ChevronRight, ChevronDown, Calendar, Flag, Star,
   MoreHorizontal, Inbox, FileText, StickyNote,
-  List, Bold, Italic, AlignLeft
+  List, Bold, Italic, AlignLeft, Users, Eye
 } from 'lucide-react'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -82,8 +82,50 @@ function fmtBijgewerkt(iso: string) {
 
 // ─── Hoofd pagina ─────────────────────────────────────────────────────────────
 
+interface TeamLid { id: string; naam: string; locatie_naam: string; magBewerken: boolean }
+
 export default function TakenPage() {
-  const { user, profiel } = useAuth()
+  const { user, profiel, isSuperadmin } = useAuth()
+
+  // ── Team: leidinggevenden kunnen (met toegang) de taken van medewerkers invullen ──
+  const [teamleden, setTeamleden] = useState<TeamLid[]>([])
+  const [weergaveGebruiker, setWeergaveGebruiker] = useState<TeamLid | null>(null)
+  const [teamMenuOpen, setTeamMenuOpen] = useState(false)
+
+  const eigenaarId = weergaveGebruiker?.id ?? user?.id ?? ''
+  const magBewerkenWeergave = !weergaveGebruiker || weergaveGebruiker.magBewerken
+
+  useEffect(() => {
+    if (!profiel) return
+    async function laadTeam() {
+      const magMogelijkTeamzien = isSuperadmin || profiel!.rol === 'leidinggevende'
+      if (!magMogelijkTeamzien) { setTeamleden([]); return }
+
+      const supabase = getSupabase()
+      let toegankelijkeLocaties: { naam: string; toegang: string }[] = []
+      if (isSuperadmin) {
+        const { data } = await supabase.from('kasboek_locaties').select('naam').eq('actief', true)
+        toegankelijkeLocaties = (data ?? []).map((l: { naam: string }) => ({ naam: l.naam, toegang: 'bewerken' }))
+      } else {
+        const { data } = await supabase.from('locatie_toegang')
+          .select('locatie_naam, toegang')
+          .eq('profiel_id', profiel!.id).eq('locatie_type', 'taken').neq('toegang', 'geen')
+        toegankelijkeLocaties = (data ?? []).map((t: { locatie_naam: string; toegang: string }) => ({ naam: t.locatie_naam, toegang: t.toegang }))
+      }
+      if (toegankelijkeLocaties.length === 0) { setTeamleden([]); return }
+
+      const { data: medewerkersData } = await supabase
+        .from('profielen').select('id, naam, locatie_naam')
+        .eq('rol', 'locatie').eq('actief', true)
+        .in('locatie_naam', toegankelijkeLocaties.map(l => l.naam))
+
+      setTeamleden((medewerkersData ?? []).map((m: { id: string; naam: string; locatie_naam: string }) => ({
+        id: m.id, naam: m.naam, locatie_naam: m.locatie_naam,
+        magBewerken: toegankelijkeLocaties.find(l => l.naam === m.locatie_naam)?.toegang === 'bewerken',
+      })))
+    }
+    laadTeam()
+  }, [profiel, isSuperadmin])
 
   const [lijsten, setLijsten] = useState<Lijst[]>([])
   const [taken, setTaken] = useState<Taak[]>([])
@@ -100,35 +142,42 @@ export default function TakenPage() {
   // ── Data ────────────────────────────────────────────────────────────────────
 
   const haalLijstenOp = useCallback(async () => {
-    if (!user) return
-    const { data } = await getSupabase().from('todo_lijsten').select('*').eq('eigenaar_id', user.id).order('volgorde')
+    if (!eigenaarId) return
+    const { data } = await getSupabase().from('todo_lijsten').select('*').eq('eigenaar_id', eigenaarId).order('volgorde')
     setLijsten((data ?? []) as Lijst[])
-  }, [user])
+  }, [eigenaarId])
 
   const haalTakenOp = useCallback(async () => {
-    if (!user) return
+    if (!eigenaarId) return
     const ids = lijsten.filter(l => l.type === 'taken').map(l => l.id)
     if (ids.length === 0) { setTaken([]); return }
     const { data } = await getSupabase().from('todo_taken').select('*').in('lijst_id', ids).order('volgorde')
     setTaken((data ?? []) as Taak[])
-  }, [user, lijsten])
+  }, [eigenaarId, lijsten])
 
   const haalNotitiesOp = useCallback(async () => {
-    if (!user) return
+    if (!eigenaarId) return
     const ids = lijsten.filter(l => l.type === 'notities').map(l => l.id)
     if (ids.length === 0) { setNotities([]); return }
     const { data } = await getSupabase().from('notities').select('*').in('lijst_id', ids).order('bijgewerkt_op', { ascending: false })
     setNotities((data ?? []) as Notitie[])
-  }, [user, lijsten])
+  }, [eigenaarId, lijsten])
 
   useEffect(() => { haalLijstenOp() }, [haalLijstenOp])
   useEffect(() => { haalTakenOp(); haalNotitiesOp() }, [haalTakenOp, haalNotitiesOp])
 
+  // Bij het wisselen van weergave (eigen taken <-> taken van een teamlid) de selectie resetten.
+  useEffect(() => {
+    setActiveLijst('inbox')
+    setGeselecteerdeTaak(null)
+    setActieveNotitie(null)
+  }, [eigenaarId])
+
   // ── Lijsten ─────────────────────────────────────────────────────────────────
 
   async function maakLijst(naam: string, kleur: string, type: 'taken' | 'notities') {
-    if (!user) return
-    await getSupabase().from('todo_lijsten').insert({ naam, kleur, type, eigenaar_id: user.id, volgorde: lijsten.length })
+    if (!eigenaarId) return
+    await getSupabase().from('todo_lijsten').insert({ naam, kleur, type, eigenaar_id: eigenaarId, volgorde: lijsten.length })
     setNieuweLijstModal(false)
     await haalLijstenOp()
   }
@@ -237,8 +286,43 @@ export default function TakenPage() {
       <div className="taken-sidebar" style={{ background: 'var(--bg-card)', borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column' }}>
         <div style={{ padding: '16px 14px 10px', borderBottom: '1px solid var(--border)' }}>
           <div style={{ fontFamily: 'Sora, sans-serif', fontSize: 15, fontWeight: 700 }}>Taken & Notities</div>
-          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{profiel?.naam}</div>
+          {teamleden.length === 0 ? (
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{profiel?.naam}</div>
+          ) : (
+            <div style={{ position: 'relative', marginTop: 6 }}>
+              <button onClick={() => setTeamMenuOpen(o => !o)} style={{ display: 'flex', alignItems: 'center', gap: 6, width: '100%', padding: '5px 8px', borderRadius: 7, border: '1px solid var(--border)', background: 'var(--bg)', cursor: 'pointer', fontSize: 12, color: 'var(--text)' }}>
+                <Users size={12} color="var(--text-muted)" style={{ flexShrink: 0 }} />
+                <span style={{ flex: 1, textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {weergaveGebruiker ? weergaveGebruiker.naam : `${profiel?.naam} (jij)`}
+                </span>
+                {weergaveGebruiker && !weergaveGebruiker.magBewerken && <Eye size={11} color="var(--text-muted)" />}
+                <ChevronDown size={12} color="var(--text-muted)" style={{ flexShrink: 0 }} />
+              </button>
+              {teamMenuOpen && (
+                <>
+                  <div style={{ position: 'fixed', inset: 0, zIndex: 20 }} onClick={() => setTeamMenuOpen(false)} />
+                  <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, marginTop: 4, background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 9, boxShadow: '0 4px 20px rgba(0,0,0,0.12)', padding: 4, zIndex: 30, maxHeight: 260, overflowY: 'auto' }}>
+                    <button onClick={() => { setWeergaveGebruiker(null); setTeamMenuOpen(false) }} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '7px 10px', borderRadius: 6, border: 'none', background: !weergaveGebruiker ? 'var(--primary-xlight)' : 'transparent', cursor: 'pointer', fontSize: 12.5, color: 'var(--text)' }}>
+                      {profiel?.naam} (jij)
+                    </button>
+                    <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', padding: '6px 10px 2px' }}>Team</div>
+                    {teamleden.map(lid => (
+                      <button key={lid.id} onClick={() => { setWeergaveGebruiker(lid); setTeamMenuOpen(false) }} style={{ display: 'flex', alignItems: 'center', gap: 6, width: '100%', textAlign: 'left', padding: '7px 10px', borderRadius: 6, border: 'none', background: weergaveGebruiker?.id === lid.id ? 'var(--primary-xlight)' : 'transparent', cursor: 'pointer', fontSize: 12.5, color: 'var(--text)' }}>
+                        <span style={{ flex: 1 }}>{lid.naam} <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>· {lid.locatie_naam}</span></span>
+                        {!lid.magBewerken && <Eye size={11} color="var(--text-muted)" />}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
         </div>
+        {weergaveGebruiker && (
+          <div style={{ padding: '6px 14px', fontSize: 11, color: 'var(--text-muted)', background: 'var(--bg)', borderBottom: '1px solid var(--border)' }}>
+            {magBewerkenWeergave ? `Je bewerkt de taken van ${weergaveGebruiker.naam}.` : `Alleen-lezen weergave van ${weergaveGebruiker.naam}.`}
+          </div>
+        )}
 
         {/* Slimme views */}
         <div style={{ padding: '8px 6px 4px' }}>
@@ -269,7 +353,7 @@ export default function TakenPage() {
               {takenLijsten.map(lijst => (
                 <LijstRij key={lijst.id} lijst={lijst} actief={activeLijst === lijst.id} count={taken.filter(t => t.lijst_id === lijst.id && !t.voltooid).length}
                   onClick={() => { setActiveLijst(lijst.id); setGeselecteerdeTaak(null); setActieveNotitie(null) }}
-                  onBewerk={() => setBewerkLijst(lijst)} />
+                  onBewerk={magBewerkenWeergave ? () => setBewerkLijst(lijst) : undefined} />
               ))}
             </>
           )}
@@ -289,6 +373,7 @@ export default function TakenPage() {
           )}
 
           {/* Nieuwe lijst knoppen */}
+          {magBewerkenWeergave && (
           <div style={{ padding: '8px 6px 4px', display: 'flex', flexDirection: 'column', gap: 2 }}>
             <button onClick={() => { setNieuweLijstType('taken'); setNieuweLijstModal(true) }}
               style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderRadius: 8, border: 'none', cursor: 'pointer', background: 'transparent', color: 'var(--text-muted)', fontSize: 12, width: '100%', textAlign: 'left' }}
@@ -303,6 +388,7 @@ export default function TakenPage() {
               <Plus size={13} /> <StickyNote size={13} /> Nieuwe notitiemap
             </button>
           </div>
+          )}
         </div>
       </div>
 
@@ -319,7 +405,7 @@ export default function TakenPage() {
               {toonVoltooid ? 'Verberg voltooid' : `${voltooideCount} voltooid`}
             </button>
           )}
-          {isNotitieLijst && (
+          {isNotitieLijst && magBewerkenWeergave && (
             <button onClick={() => maakNotitie(activeLijst as string)} className="btn btn-primary btn-sm">
               <Plus size={13} /> Notitie
             </button>
@@ -360,7 +446,7 @@ export default function TakenPage() {
                   style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '9px 20px', cursor: 'pointer', transition: 'background 0.1s', background: geselecteerdeTaak?.id === taak.id ? 'var(--primary-xlight)' : 'transparent', borderLeft: geselecteerdeTaak?.id === taak.id ? '3px solid var(--primary)' : '3px solid transparent' }}
                   onMouseEnter={e => { if (geselecteerdeTaak?.id !== taak.id) e.currentTarget.style.background = 'var(--bg)' }}
                   onMouseLeave={e => { if (geselecteerdeTaak?.id !== taak.id) e.currentTarget.style.background = 'transparent' }}>
-                  <button onClick={e => { e.stopPropagation(); toggleVoltooid(taak) }} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, marginTop: 1, flexShrink: 0, color: taak.voltooid ? actiefKleur : 'var(--border-dark)' }}>
+                  <button onClick={e => { e.stopPropagation(); if (magBewerkenWeergave) toggleVoltooid(taak) }} disabled={!magBewerkenWeergave} style={{ background: 'none', border: 'none', cursor: magBewerkenWeergave ? 'pointer' : 'default', padding: 0, marginTop: 1, flexShrink: 0, color: taak.voltooid ? actiefKleur : 'var(--border-dark)' }}>
                     {taak.voltooid ? <CheckCircle2 size={20} color={actiefLijstObj?.kleur ?? 'var(--primary)'} fill={actiefLijstObj?.kleur ?? 'var(--primary)'} /> : <Circle size={20} />}
                   </button>
                   <div style={{ flex: 1, minWidth: 0 }}>
@@ -383,7 +469,7 @@ export default function TakenPage() {
         </div>
 
         {/* Nieuwe taak invoer */}
-        {!isNotitieLijst && (activeLijst === 'inbox' || lijsten.find(l => l.id === activeLijst && l.type === 'taken')) && (
+        {!isNotitieLijst && magBewerkenWeergave && (activeLijst === 'inbox' || lijsten.find(l => l.id === activeLijst && l.type === 'taken')) && (
           <div style={{ padding: '10px 16px', borderTop: '1px solid var(--border)', background: 'var(--bg-card)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', borderRadius: 10, border: '1.5px solid var(--border-dark)', background: 'var(--bg)' }}>
               <Circle size={18} color="var(--border-dark)" style={{ flexShrink: 0 }} />
@@ -401,6 +487,7 @@ export default function TakenPage() {
       {/* ── Rechter paneel: taak detail of notitie editor ── */}
       {geselecteerdeTaak && !isNotitieLijst && (
         <TaakDetail taak={geselecteerdeTaak} lijst={lijsten.find(l => l.id === geselecteerdeTaak.lijst_id)} lijsten={lijsten.filter(l => l.type === 'taken')}
+          magBewerken={magBewerkenWeergave}
           onUpdate={updateTaak} onVerwijder={verwijderTaak} onToggle={toggleVoltooid} onClose={() => setGeselecteerdeTaak(null)} />
       )}
       {actieveNotitie && isNotitieLijst && (
@@ -415,7 +502,7 @@ export default function TakenPage() {
 
 // ─── LijstRij ─────────────────────────────────────────────────────────────────
 
-function LijstRij({ lijst, actief, count, onClick, onBewerk }: { lijst: Lijst; actief: boolean; count: number; onClick: () => void; onBewerk: () => void }) {
+function LijstRij({ lijst, actief, count, onClick, onBewerk }: { lijst: Lijst; actief: boolean; count: number; onClick: () => void; onBewerk?: () => void }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
       <button onClick={onClick} style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 9, padding: '7px 10px', borderRadius: 8, border: 'none', cursor: 'pointer', background: actief ? 'var(--primary-xlight)' : 'transparent', color: 'var(--text)', textAlign: 'left' }}>
@@ -423,10 +510,12 @@ function LijstRij({ lijst, actief, count, onClick, onBewerk }: { lijst: Lijst; a
         <span style={{ flex: 1, fontSize: 13, fontWeight: actief ? 600 : 400, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{lijst.naam}</span>
         {count > 0 && <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{count}</span>}
       </button>
-      <button onClick={onBewerk} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '4px 5px', borderRadius: 6, display: 'flex', opacity: 0.5 }}
-        onMouseEnter={e => (e.currentTarget.style.opacity = '1')} onMouseLeave={e => (e.currentTarget.style.opacity = '0.5')}>
-        <MoreHorizontal size={13} />
-      </button>
+      {onBewerk && (
+        <button onClick={onBewerk} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '4px 5px', borderRadius: 6, display: 'flex', opacity: 0.5 }}
+          onMouseEnter={e => (e.currentTarget.style.opacity = '1')} onMouseLeave={e => (e.currentTarget.style.opacity = '0.5')}>
+          <MoreHorizontal size={13} />
+        </button>
+      )}
     </div>
   )
 }
@@ -488,8 +577,8 @@ function NotitieEditor({ notitie, onUpdate, onVerwijder, onClose }: {
 
 // ─── Taak Detail ──────────────────────────────────────────────────────────────
 
-function TaakDetail({ taak, lijst, lijsten, onUpdate, onVerwijder, onToggle, onClose }: {
-  taak: Taak; lijst?: Lijst; lijsten: Lijst[]
+function TaakDetail({ taak, lijst, lijsten, magBewerken, onUpdate, onVerwijder, onToggle, onClose }: {
+  taak: Taak; lijst?: Lijst; lijsten: Lijst[]; magBewerken: boolean
   onUpdate: (id: string, data: Partial<Taak>) => void
   onVerwijder: (id: string) => void; onToggle: (taak: Taak) => void; onClose: () => void
 }) {
@@ -499,12 +588,12 @@ function TaakDetail({ taak, lijst, lijsten, onUpdate, onVerwijder, onToggle, onC
 
   useEffect(() => { setTitel(taak.titel); setNotitie(taak.notitie ?? '') }, [taak.id])
 
-  function slaOp() { onUpdate(taak.id, { titel: titel.trim() || taak.titel, notitie: notitie.trim() || null }) }
+  function slaOp() { if (magBewerken) onUpdate(taak.id, { titel: titel.trim() || taak.titel, notitie: notitie.trim() || null }) }
 
   return (
     <div className="taken-detail" style={{ background: 'var(--bg-card)', borderLeft: '1px solid var(--border)', display: 'flex', flexDirection: 'column' }}>
       <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 10 }}>
-        <button onClick={() => onToggle(taak)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, flexShrink: 0 }}>
+        <button onClick={() => magBewerken && onToggle(taak)} disabled={!magBewerken} style={{ background: 'none', border: 'none', cursor: magBewerken ? 'pointer' : 'default', padding: 0, flexShrink: 0 }}>
           {taak.voltooid ? <CheckCircle2 size={22} color={kleur} fill={kleur} /> : <Circle size={22} />}
         </button>
         <span style={{ flex: 1, fontSize: 12, color: 'var(--text-muted)' }}>{lijst?.naam}</span>
@@ -512,20 +601,20 @@ function TaakDetail({ taak, lijst, lijsten, onUpdate, onVerwijder, onToggle, onC
       </div>
 
       <div style={{ flex: 1, overflowY: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 14 }}>
-        <textarea value={titel} onChange={e => setTitel(e.target.value)} onBlur={slaOp}
+        <textarea value={titel} onChange={e => setTitel(e.target.value)} onBlur={slaOp} disabled={!magBewerken}
           style={{ fontSize: 16, fontWeight: 600, border: 'none', background: 'none', color: 'var(--text)', resize: 'none', outline: 'none', fontFamily: 'Sora, sans-serif', lineHeight: 1.4, width: '100%', textDecoration: taak.voltooid ? 'line-through' : 'none' }} rows={2} />
 
         <div>
           <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: 5 }}>Vervaldatum</label>
-          <input type="date" className="form-input" style={{ fontSize: 13 }} value={taak.vervaldatum ?? ''} onChange={e => onUpdate(taak.id, { vervaldatum: e.target.value || null })} />
+          <input type="date" className="form-input" style={{ fontSize: 13 }} disabled={!magBewerken} value={taak.vervaldatum ?? ''} onChange={e => onUpdate(taak.id, { vervaldatum: e.target.value || null })} />
         </div>
 
         <div>
           <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: 5 }}>Prioriteit</label>
           <div style={{ display: 'flex', gap: 6 }}>
             {([0, 1, 2, 3] as const).map(p => (
-              <button key={p} onClick={() => onUpdate(taak.id, { prioriteit: p })}
-                style={{ flex: 1, padding: '6px 4px', borderRadius: 7, border: `1.5px solid ${taak.prioriteit === p ? PRIORITEIT_CONFIG[p].kleur : 'var(--border)'}`, background: taak.prioriteit === p ? PRIORITEIT_CONFIG[p].kleur + '20' : 'var(--bg)', cursor: 'pointer', fontSize: 11, color: PRIORITEIT_CONFIG[p].kleur, fontWeight: taak.prioriteit === p ? 600 : 400 }}>
+              <button key={p} onClick={() => magBewerken && onUpdate(taak.id, { prioriteit: p })} disabled={!magBewerken}
+                style={{ flex: 1, padding: '6px 4px', borderRadius: 7, border: `1.5px solid ${taak.prioriteit === p ? PRIORITEIT_CONFIG[p].kleur : 'var(--border)'}`, background: taak.prioriteit === p ? PRIORITEIT_CONFIG[p].kleur + '20' : 'var(--bg)', cursor: magBewerken ? 'pointer' : 'default', fontSize: 11, color: PRIORITEIT_CONFIG[p].kleur, fontWeight: taak.prioriteit === p ? 600 : 400 }}>
                 {p === 0 ? '—' : PRIORITEIT_CONFIG[p].label}
               </button>
             ))}
@@ -534,24 +623,26 @@ function TaakDetail({ taak, lijst, lijsten, onUpdate, onVerwijder, onToggle, onC
 
         <div>
           <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: 5 }}>Lijst</label>
-          <select className="form-select" style={{ fontSize: 13 }} value={taak.lijst_id} onChange={e => onUpdate(taak.id, { lijst_id: e.target.value })}>
+          <select className="form-select" style={{ fontSize: 13 }} disabled={!magBewerken} value={taak.lijst_id} onChange={e => onUpdate(taak.id, { lijst_id: e.target.value })}>
             {lijsten.map(l => <option key={l.id} value={l.id}>{l.naam}</option>)}
           </select>
         </div>
 
         <div>
           <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: 5 }}>Notitie</label>
-          <textarea className="form-textarea" style={{ minHeight: 100, fontSize: 13 }} value={notitie} onChange={e => setNotitie(e.target.value)} onBlur={slaOp} placeholder="Voeg een notitie toe..." />
+          <textarea className="form-textarea" style={{ minHeight: 100, fontSize: 13 }} disabled={!magBewerken} value={notitie} onChange={e => setNotitie(e.target.value)} onBlur={slaOp} placeholder="Voeg een notitie toe..." />
         </div>
       </div>
 
-      <div style={{ padding: '10px 16px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'flex-end' }}>
-        <button onClick={() => onVerwijder(taak.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex', opacity: 0.5 }}
-          onMouseEnter={e => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.color = '#EF4444' }}
-          onMouseLeave={e => { e.currentTarget.style.opacity = '0.5'; e.currentTarget.style.color = 'var(--text-muted)' }}>
-          <Trash2 size={15} />
-        </button>
-      </div>
+      {magBewerken && (
+        <div style={{ padding: '10px 16px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'flex-end' }}>
+          <button onClick={() => onVerwijder(taak.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex', opacity: 0.5 }}
+            onMouseEnter={e => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.color = '#EF4444' }}
+            onMouseLeave={e => { e.currentTarget.style.opacity = '0.5'; e.currentTarget.style.color = 'var(--text-muted)' }}>
+            <Trash2 size={15} />
+          </button>
+        </div>
+      )}
     </div>
   )
 }
