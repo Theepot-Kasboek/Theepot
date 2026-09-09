@@ -234,7 +234,18 @@ function leegRecht(): Omit<Recht, 'id' | 'rol' | 'profiel_id'> {
 export default function RechtenPage() {
   const { isSuperadmin } = useAuth()
 
-  const [tab, setTab] = useState<'rollen' | 'accounts' | 'locaties' | 'meldingen'>('rollen')
+  type Tab = 'rollen' | 'accounts' | 'locaties' | 'meldingen'
+  const GELDIGE_TABS: Tab[] = ['rollen', 'accounts', 'locaties', 'meldingen']
+  const [tab, setTabRuw] = useState<Tab>('rollen')
+  // Onthoud het geopende tabblad, zodat een refresh niet lijkt alsof je instellingen kwijt bent
+  useEffect(() => {
+    const opgeslagen = localStorage.getItem('rechten_tab')
+    if (opgeslagen && GELDIGE_TABS.includes(opgeslagen as Tab)) setTabRuw(opgeslagen as Tab)
+  }, [])
+  function setTab(t: Tab) {
+    setTabRuw(t)
+    localStorage.setItem('rechten_tab', t)
+  }
   const [kasboekLocaties, setKasboekLocaties] = useState<string[]>([])
   const [maaltijdLocaties, setMaaltijdLocaties] = useState<string[]>([])
   const [locatieToegang, setLocatieToegang] = useState<{id:string;profiel_id:string;locatie_type:string;locatie_naam:string;toegang:string}[]>([])
@@ -639,6 +650,8 @@ function MeldingVoorkeuren({ profielen, voorkeuren, onRefresh, onToast }: {
       if (error) {
         setLokaal(prev => [...prev, bestaand])
         onToast({ bericht: 'Opslaan mislukt: ' + error.message, type: 'error' })
+      } else {
+        onToast({ bericht: 'Melding uitgeschakeld.', type: 'success' })
       }
     } else {
       const tijdelijkId = `temp-${Date.now()}`
@@ -650,6 +663,7 @@ function MeldingVoorkeuren({ profielen, voorkeuren, onRefresh, onToast }: {
         onToast({ bericht: 'Opslaan mislukt: ' + error.message, type: 'error' })
       } else if (data) {
         setLokaal(prev => prev.map(v => v.id === tijdelijkId ? (data as MeldingVoorkeurRij) : v))
+        onToast({ bericht: 'Melding ingesteld.', type: 'success' })
       }
     }
   }
