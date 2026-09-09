@@ -5,6 +5,7 @@ import { useAuth } from '@/components/AuthProvider'
 import Topbar from '@/components/Topbar'
 import { getSupabase } from '@/lib/supabase'
 import { haalPrikbordLocaties, isZichtbaarPrikbordBericht } from '@/lib/prikbord'
+import { haalMeldingenOp, markeerMeldingGelezen, type Melding } from '@/lib/meldingen'
 import {
   BookOpen, Calendar, MessageSquare, Users, Scissors,
   ChevronRight, Settings, X, GripVertical, Plus,
@@ -47,6 +48,7 @@ function fmtDagKort(d: Date) { return d.toLocaleDateString('nl-NL', { weekday: '
 // ─── Widget Catalogus ─────────────────────────────────────────────────────────
 
 const WIDGET_CATALOGUS = [
+  { id: 'meldingen',      label: 'Meldingen',          icon: '🔔', beschrijving: 'Meldingen zoals afgeronde kasboekmaanden' },
   { id: 'prikbord',       label: 'Prikbord',           icon: '📌', beschrijving: 'Mededelingen en berichten per locatie' },
   { id: 'welkom',         label: 'Welkomstkaart',     icon: '👋', beschrijving: 'Naam, datum en begroeting' },
   { id: 'weekagenda',     label: 'Weekagenda',         icon: '📅', beschrijving: 'Afspraken van deze week' },
@@ -66,10 +68,11 @@ const LOCATIE_KEY = (uid: string) => `dashboard_weer_locatie_${uid}`
 const DEFAULT_WIDGETS: DashboardWidget[] = [
   { id: 'prikbord', size: '3x1', volgorde: 0 },
   { id: 'welkom', size: '2x1', volgorde: 1 },
-  { id: 'weekagenda', size: '3x1', volgorde: 2 },
-  { id: 'weekplanning', size: '2x1', volgorde: 3 },
-  { id: 'weer', size: '1x1', volgorde: 4 },
-  { id: 'snelkoppelingen', size: '3x1', volgorde: 5 },
+  { id: 'meldingen', size: '1x1', volgorde: 2 },
+  { id: 'weekagenda', size: '3x1', volgorde: 3 },
+  { id: 'weekplanning', size: '2x1', volgorde: 4 },
+  { id: 'weer', size: '1x1', volgorde: 5 },
+  { id: 'snelkoppelingen', size: '3x1', volgorde: 6 },
 ]
 
 // ─── Hoofd Dashboard ──────────────────────────────────────────────────────────
@@ -188,6 +191,7 @@ export default function DashboardPage() {
 
                 {/* Widget inhoud */}
                 <div style={{ outline: bewerkmodus ? '2px dashed var(--border-dark)' : 'none', borderRadius: 14, overflow: 'hidden' }}>
+                  {w.id === 'meldingen' && user && <MeldingenWidget profielId={user.id} />}
                   {w.id === 'prikbord' && user && profiel && <PrikbordWidget profiel={profiel} isSuperadmin={isSuperadmin} />}
                   {w.id === 'welkom' && user && profiel && <WelkomWidget profiel={profiel} />}
                   {w.id === 'weekagenda' && user && <WeekAgendaWidget profielId={user.id} />}
@@ -778,6 +782,84 @@ function PrikbordWidget({ profiel, isSuperadmin }: { profiel: { id: string; naam
               </div>
             </div>
           ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── Meldingen Widget ─────────────────────────────────────────────────────────
+
+function MeldingenWidget({ profielId }: { profielId: string }) {
+  const [meldingen, setMeldingen] = useState<Melding[]>([])
+  const [laden, setLaden] = useState(true)
+
+  const laad = useCallback(async () => {
+    setLaden(true)
+    setMeldingen(await haalMeldingenOp(profielId, 10))
+    setLaden(false)
+  }, [profielId])
+
+  useEffect(() => { laad() }, [laad])
+
+  const ongelezen = meldingen.filter(m => !m.gelezen_op).length
+
+  async function markeerGelezen(m: Melding) {
+    if (m.gelezen_op) return
+    await markeerMeldingGelezen(m.id, profielId)
+    setMeldingen(prev => prev.map(x => x.id === m.id ? { ...x, gelezen_op: new Date().toISOString() } : x))
+  }
+
+  return (
+    <div className="card">
+      <div className="card-header">
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <Bell size={15} color="var(--primary)" />
+          <span className="card-title">Meldingen</span>
+          {ongelezen > 0 && (
+            <span style={{ fontSize: 11, background: 'var(--primary-light)', color: 'var(--primary-text)', padding: '1px 8px', borderRadius: 20, fontWeight: 600 }}>
+              {ongelezen}
+            </span>
+          )}
+        </div>
+      </div>
+
+      {laden ? (
+        <div style={{ padding: '16px 18px', color: 'var(--text-muted)', fontSize: 12 }}>Laden...</div>
+      ) : meldingen.length === 0 ? (
+        <div style={{ padding: '20px 18px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 13 }}>
+          <Bell size={24} style={{ opacity: 0.15, marginBottom: 6, display: 'block', margin: '0 auto 8px' }} />
+          Geen meldingen
+        </div>
+      ) : (
+        <div>
+          {meldingen.map((m, i) => {
+            const inhoud = (
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                  {!m.gelezen_op && <div style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--primary)', flexShrink: 0 }} />}
+                  <span style={{ fontWeight: m.gelezen_op ? 500 : 700, fontSize: 13, color: 'var(--text)' }}>{m.titel}</span>
+                </div>
+                <div style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.5 }}>{m.bericht}</div>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
+                  {new Date(m.aangemaakt_op).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                </div>
+              </div>
+            )
+            const rijStijl: React.CSSProperties = {
+              padding: '12px 18px', borderBottom: i < meldingen.length - 1 ? '1px solid var(--border)' : 'none',
+              display: 'flex', gap: 10, alignItems: 'flex-start', cursor: m.link ? 'pointer' : 'default',
+            }
+            return m.link ? (
+              <Link key={m.id} href={m.link} onClick={() => markeerGelezen(m)} style={{ ...rijStijl, textDecoration: 'none' }}>
+                {inhoud}
+              </Link>
+            ) : (
+              <div key={m.id} style={rijStijl} onClick={() => markeerGelezen(m)}>
+                {inhoud}
+              </div>
+            )
+          })}
         </div>
       )}
     </div>

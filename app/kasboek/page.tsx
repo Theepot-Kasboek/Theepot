@@ -6,9 +6,10 @@ import { useAuth } from '@/components/AuthProvider'
 import Topbar from '@/components/Topbar'
 import Toast from '@/components/Toast'
 import GeenToegang from '@/components/GeenToegang'
+import { maakMelding } from '@/lib/meldingen'
 import {
   ChevronLeft, ChevronRight, Plus, Trash2,
-  MapPin, Settings, X, Building2, Tag, Paperclip, Download, Eye, Pencil, Send
+  MapPin, Settings, X, Building2, Tag, Paperclip, Download, Eye, Pencil, Lock, LockOpen
 } from 'lucide-react'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -444,48 +445,78 @@ export default function KasboekPage() {
 
   useEffect(() => { haalBeginsaldoOp() }, [haalBeginsaldoOp])
 
-  // ── Publiceren: directie ziet een maand pas nadat de invuller publiceert ───
-  const [periodeStatus, setPeriodeStatus] = useState<{ gepubliceerd: boolean } | null>(null)
-  const isDirectieViewer = !isSuperadmin && profiel?.rol === 'directie'
-  const magPubliceren = magBewerkenKasboek && !isDirectieViewer
+  // ── Afronden: zodra een maand is afgerond kan niemand er meer iets in wijzigen ──
+  // Een maand is altijd zichtbaar voor directie/leidinggevenden, ongeacht status.
+  const [periodeStatus, setPeriodeStatus] = useState<{ status: 'open' | 'afgerond' } | null>(null)
+  const isBeheerder = isSuperadmin || profiel?.rol === 'directie' || profiel?.rol === 'leidinggevende'
+  const isAfgerond = periodeStatus?.status === 'afgerond'
+  const magAfronden = magBewerkenKasboek || isBeheerder
+  const magHeropenen = isBeheerder
 
   const haalPeriodeStatusOp = useCallback(async () => {
     if (!actieveLocatie) { setPeriodeStatus(null); return }
     const { data } = await getSupabase()
       .from('kasboek_periode_status')
-      .select('gepubliceerd')
+      .select('status')
       .eq('locatie_naam', actieveLocatie.naam)
       .eq('periode', huidigePeriode)
       .maybeSingle()
-    setPeriodeStatus(data ? { gepubliceerd: (data as { gepubliceerd: boolean }).gepubliceerd } : { gepubliceerd: false })
+    setPeriodeStatus({ status: ((data as { status?: 'open' | 'afgerond' })?.status) ?? 'open' })
   }, [actieveLocatie, huidigePeriode])
 
   useEffect(() => { haalPeriodeStatusOp() }, [haalPeriodeStatusOp])
 
-  async function togglePubliceren() {
+  async function afronden() {
     if (!actieveLocatie) return
-    const nieuweStatus = !(periodeStatus?.gepubliceerd)
     const { error } = await getSupabase()
       .from('kasboek_periode_status')
       .upsert({
         locatie_naam: actieveLocatie.naam,
         periode: huidigePeriode,
-        gepubliceerd: nieuweStatus,
-        gepubliceerd_op: nieuweStatus ? new Date().toISOString() : null,
-        gepubliceerd_door: profiel?.naam ?? null,
+        status: 'afgerond',
+        afgerond_op: new Date().toISOString(),
+        afgerond_door: profiel?.naam ?? null,
       }, { onConflict: 'locatie_naam,periode' })
     if (error) {
-      setToast({ bericht: 'Publiceren mislukt: ' + error.message, type: 'error' })
+      setToast({ bericht: 'Afronden mislukt: ' + error.message, type: 'error' })
       return
     }
-    setPeriodeStatus({ gepubliceerd: nieuweStatus })
-    setToast({ bericht: nieuweStatus ? 'Kasboek gepubliceerd voor directie.' : 'Publicatie ingetrokken.', type: 'success' })
+    setPeriodeStatus({ status: 'afgerond' })
+    setToast({ bericht: 'Kasboekmaand afgerond en vergrendeld.', type: 'success' })
+    await maakMelding({
+      type: 'kasboek_afgerond',
+      titel: 'Kasboekmaand afgerond',
+      bericht: `${actieveLocatie.naam} — ${periodeLabel(huidigeDatum)} is afgerond door ${profiel?.naam ?? 'onbekend'}.`,
+      link: '/kasboek',
+      context: { locatie_naam: actieveLocatie.naam, periode: huidigePeriode },
+      aangemaakt_door: profiel?.naam ?? null,
+    })
+  }
+
+  async function heropenen() {
+    if (!actieveLocatie) return
+    const { error } = await getSupabase()
+      .from('kasboek_periode_status')
+      .upsert({
+        locatie_naam: actieveLocatie.naam,
+        periode: huidigePeriode,
+        status: 'open',
+        heropend_op: new Date().toISOString(),
+        heropend_door: profiel?.naam ?? null,
+      }, { onConflict: 'locatie_naam,periode' })
+    if (error) {
+      setToast({ bericht: 'Heropenen mislukt: ' + error.message, type: 'error' })
+      return
+    }
+    setPeriodeStatus({ status: 'open' })
+    setToast({ bericht: 'Kasboekmaand heropend.', type: 'success' })
   }
 
   // ── Boeking toevoegen ───────────────────────────────────────────────────────
   async function handleToevoegen(e: React.FormEvent) {
     e.preventDefault()
     if (!bedrag || !actieveLocatie) return
+    if (isAfgerond) { setFout('Deze maand is afgerond en kan niet meer gewijzigd worden.'); return }
     setOpslaan(true)
     setFout(null)
     const supabase = getSupabase()
@@ -602,6 +633,7 @@ export default function KasboekPage() {
   async function handleBewerken(e: React.FormEvent) {
     e.preventDefault()
     if (!bewerkEntry || !bewerkBedrag) return
+    if (isAfgerond) { setBewerkFout('Deze maand is afgerond en kan niet meer gewijzigd worden.'); return }
     setBewerkOpslaan(true)
     setBewerkFout(null)
     const supabase = getSupabase()
@@ -649,6 +681,7 @@ export default function KasboekPage() {
 
   // ── Boeking verwijderen ─────────────────────────────────────────────────────
   async function verwijder(id: string) {
+    if (isAfgerond) { setToast({ bericht: 'Deze maand is afgerond en kan niet meer gewijzigd worden.', type: 'error' }); return }
     await getSupabase().from('kasboek_entries').delete().eq('id', id)
     setToast({ bericht: 'Boeking verwijderd.', type: 'success' })
     await haalOp()
@@ -754,16 +787,20 @@ export default function KasboekPage() {
                 </button>
               </>
             )}
-            {/* Publiceren: directie ziet deze maand pas na publicatie */}
-            {actieveLocatie && magPubliceren && (
-              <button className="btn" onClick={togglePubliceren} title={periodeStatus?.gepubliceerd ? 'Verbergen voor directie' : 'Publiceren voor directie'}>
-                {periodeStatus?.gepubliceerd ? <Eye size={14} /> : <Send size={14} color="var(--primary)" />}
-                {periodeStatus?.gepubliceerd ? ' Verbergen' : ' Publiceren'}
+            {/* Afronden: vergrendelt de maand voor iedereen. Heropenen: alleen beheerders. */}
+            {actieveLocatie && !isAfgerond && magAfronden && (
+              <button className="btn" onClick={afronden} title="Maand afronden en vergrendelen">
+                <Lock size={14} color="var(--primary)" /> Afronden
               </button>
             )}
-            {actieveLocatie && isDirectieViewer && (
-              <span style={{ fontSize: 12, color: 'var(--text-muted)', padding: '6px 12px', borderRadius: 8, background: 'var(--bg)', border: '1px solid var(--border)' }}>
-                {periodeStatus?.gepubliceerd ? '● Gepubliceerd' : '○ Nog niet gepubliceerd'}
+            {actieveLocatie && isAfgerond && magHeropenen && (
+              <button className="btn" onClick={heropenen} title="Maand heropenen">
+                <LockOpen size={14} /> Heropenen
+              </button>
+            )}
+            {actieveLocatie && isAfgerond && !magHeropenen && (
+              <span style={{ fontSize: 12, color: 'var(--text-muted)', padding: '6px 12px', borderRadius: 8, background: 'var(--bg)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                <Lock size={12} /> Afgerond
               </span>
             )}
             {/* Lees-indicator voor read-only gebruikers */}
@@ -825,17 +862,17 @@ export default function KasboekPage() {
           </div>
         )}
 
-        {actieveLocatie && isDirectieViewer && !periodeStatus?.gepubliceerd && (
-          <div className="card">
-            <div className="empty-state" style={{ padding: 40 }}>
-              <Eye size={36} />
-              <h3>Nog niet gepubliceerd</h3>
-              <p>Het kasboek van {actieveLocatie.naam} voor {periodeLabel(huidigeDatum)} is nog niet gepubliceerd door degene die het invult.</p>
-            </div>
+        {/* Afgerond-melding */}
+        {actieveLocatie && isAfgerond && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'var(--bg)', border: '1px solid var(--border-dark)', borderRadius: 10, padding: '10px 14px', marginBottom: 16 }}>
+            <Lock size={16} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+            <p style={{ fontSize: 13, color: 'var(--text-muted)', flex: 1 }}>
+              Deze maand is afgerond en vergrendeld. Er kan door niemand meer iets gewijzigd worden{magHeropenen ? ' — heropen de maand om alsnog te wijzigen.' : '.'}
+            </p>
           </div>
         )}
 
-        {actieveLocatie && (!isDirectieViewer || periodeStatus?.gepubliceerd) && (
+        {actieveLocatie && (
           <>
             {/* Saldo kaarten */}
             <div className="grid-4col" style={{ marginBottom: 20 }}>
@@ -956,7 +993,11 @@ export default function KasboekPage() {
                         </div>
                       </div>
 
-                      {(!isSuperadmin && actieveLocatie && kasboekToegang(actieveLocatie.naam) !== 'bewerken') ? (
+                      {isAfgerond ? (
+                        <div style={{ padding: '8px 12px', borderRadius: 8, background: 'var(--bg)', border: '1px solid var(--border)', fontSize: 12, color: 'var(--text-muted)', textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                          <Lock size={12} /> Maand is afgerond — geen boekingen meer toe te voegen
+                        </div>
+                      ) : (!isSuperadmin && actieveLocatie && kasboekToegang(actieveLocatie.naam) !== 'bewerken') ? (
                         <div style={{ padding: '8px 12px', borderRadius: 8, background: 'var(--bg)', border: '1px solid var(--border)', fontSize: 12, color: 'var(--text-muted)', textAlign: 'center' }}>
                           Alleen lezen — je kunt geen boekingen toevoegen voor deze locatie
                         </div>
@@ -1053,7 +1094,7 @@ export default function KasboekPage() {
                               <Paperclip size={12} />
                             </span>
                           )}
-                          {magBewerkenKasboek && (
+                          {magBewerkenKasboek && !isAfgerond && (
                             <>
                               <button
                                 onClick={() => startBewerken(entry)}

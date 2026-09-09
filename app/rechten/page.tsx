@@ -5,7 +5,15 @@ import { getSupabase, ROL_LABELS, ROL_VOLGORDE, type Rol, type Profiel } from '@
 import { useAuth } from '@/components/AuthProvider'
 import Topbar from '@/components/Topbar'
 import Toast from '@/components/Toast'
-import { ShieldCheck, User, Users, ChevronDown, ChevronUp, Info } from 'lucide-react'
+import { ShieldCheck, User, Users, ChevronDown, ChevronUp, Info, Bell } from 'lucide-react'
+
+// Meldingtypes die het systeem kan versturen (zie lib/meldingen.ts)
+const MELDING_TYPES: { type: string; label: string; beschrijving: string }[] = [
+  { type: 'kasboek_afgerond', label: 'Kasboek afgerond', beschrijving: 'Zodra een kasboekmaand wordt afgerond' },
+  { type: 'brandoefening_afgerond', label: 'Brandoefening afgerond', beschrijving: 'Zodra een brandoefeningweek wordt afgerond' },
+]
+
+interface MeldingVoorkeurRij { id: string; type: string; profiel_id: string }
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -226,10 +234,11 @@ function leegRecht(): Omit<Recht, 'id' | 'rol' | 'profiel_id'> {
 export default function RechtenPage() {
   const { isSuperadmin } = useAuth()
 
-  const [tab, setTab] = useState<'rollen' | 'accounts' | 'locaties'>('rollen')
+  const [tab, setTab] = useState<'rollen' | 'accounts' | 'locaties' | 'meldingen'>('rollen')
   const [kasboekLocaties, setKasboekLocaties] = useState<string[]>([])
   const [maaltijdLocaties, setMaaltijdLocaties] = useState<string[]>([])
   const [locatieToegang, setLocatieToegang] = useState<{id:string;profiel_id:string;locatie_type:string;locatie_naam:string;toegang:string}[]>([])
+  const [meldingVoorkeuren, setMeldingVoorkeuren] = useState<MeldingVoorkeurRij[]>([])
   const [rechten, setRechten] = useState<Recht[]>([])
   const [profielen, setProfielen] = useState<Profiel[]>([])
   const [laden, setLaden] = useState(true)
@@ -240,12 +249,13 @@ export default function RechtenPage() {
   const haalOp = useCallback(async () => {
     setLaden(true)
     const supabase = getSupabase()
-    const [{ data: r }, { data: p }, { data: kl }, { data: ml }, { data: lt }] = await Promise.all([
+    const [{ data: r }, { data: p }, { data: kl }, { data: ml }, { data: lt }, { data: mv }] = await Promise.all([
       supabase.from('rechten').select('*'),
       supabase.from('profielen').select('*').neq('rol', 'superadmin').order('naam'),
       supabase.from('kasboek_locaties').select('naam').eq('actief', true).order('naam'),
       supabase.from('maaltijd_locaties').select('naam').eq('actief', true).order('naam'),
       supabase.from('locatie_toegang').select('*'),
+      supabase.from('melding_voorkeuren').select('*'),
     ])
     setRechten((r ?? []) as Recht[])
     setProfielen((p ?? []) as Profiel[])
@@ -254,6 +264,7 @@ export default function RechtenPage() {
     setKasboekLocaties(locatieNamen)
     setMaaltijdLocaties((ml ?? []).map((l: {naam: string}) => l.naam))
     setLocatieToegang(lt ?? [])
+    setMeldingVoorkeuren((mv ?? []) as MeldingVoorkeurRij[])
     setLaden(false)
   }, [])
 
@@ -331,7 +342,7 @@ export default function RechtenPage() {
 
         {/* Tabs */}
         <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', marginBottom: 20 }}>
-          {([['rollen', '🎭 Per rol'], ['accounts', '👤 Per account'], ['locaties', '📍 Locatietoegang']] as const).map(([key, label]) => (
+          {([['rollen', '🎭 Per rol'], ['accounts', '👤 Per account'], ['locaties', '📍 Locatietoegang'], ['meldingen', '🔔 Meldingen']] as const).map(([key, label]) => (
             <button
               key={key}
               onClick={() => setTab(key)}
@@ -396,6 +407,16 @@ export default function RechtenPage() {
                 kasboekLocaties={kasboekLocaties}
                 maaltijdLocaties={maaltijdLocaties}
                 locatieToegang={locatieToegang}
+                onRefresh={haalOp}
+                onToast={setToast}
+              />
+            )}
+
+            {/* Meldingen tab */}
+            {tab === 'meldingen' && (
+              <MeldingVoorkeuren
+                profielen={profielen}
+                voorkeuren={meldingVoorkeuren}
                 onRefresh={haalOp}
                 onToast={setToast}
               />
@@ -594,6 +615,100 @@ const LOCATIE_SECTIES = [
   { type: 'prikbord',         icon: '📌', label: 'Prikbord' },
   { type: 'taken',            icon: '✅', label: 'Taken van medewerkers' },
 ]
+
+function MeldingVoorkeuren({ profielen, voorkeuren, onRefresh, onToast }: {
+  profielen: Profiel[]
+  voorkeuren: MeldingVoorkeurRij[]
+  onRefresh: () => void
+  onToast: (t: { bericht: string; type: 'success' | 'error' }) => void
+}) {
+  const [lokaal, setLokaal] = useState<MeldingVoorkeurRij[]>(voorkeuren)
+  useEffect(() => { setLokaal(voorkeuren) }, [voorkeuren])
+
+  function isAangevinkt(type: string, profielId: string): boolean {
+    return lokaal.some(v => v.type === type && v.profiel_id === profielId)
+  }
+
+  async function toggle(type: string, profielId: string) {
+    const supabase = getSupabase()
+    const bestaand = lokaal.find(v => v.type === type && v.profiel_id === profielId)
+
+    if (bestaand) {
+      setLokaal(prev => prev.filter(v => v.id !== bestaand.id))
+      const { error } = await supabase.from('melding_voorkeuren').delete().eq('id', bestaand.id)
+      if (error) {
+        setLokaal(prev => [...prev, bestaand])
+        onToast({ bericht: 'Opslaan mislukt: ' + error.message, type: 'error' })
+      }
+    } else {
+      const tijdelijkId = `temp-${Date.now()}`
+      setLokaal(prev => [...prev, { id: tijdelijkId, type, profiel_id: profielId }])
+      const { data, error } = await supabase.from('melding_voorkeuren')
+        .insert({ type, profiel_id: profielId }).select().single()
+      if (error) {
+        setLokaal(prev => prev.filter(v => v.id !== tijdelijkId))
+        onToast({ bericht: 'Opslaan mislukt: ' + error.message, type: 'error' })
+      } else if (data) {
+        setLokaal(prev => prev.map(v => v.id === tijdelijkId ? (data as MeldingVoorkeurRij) : v))
+      }
+    }
+  }
+
+  if (profielen.length === 0) return (
+    <div className="empty-state" style={{ padding: 40 }}>
+      <User size={32} />
+      <h3>Geen medewerkers</h3>
+      <p>Voeg eerst medewerkers toe via de Medewerkers pagina.</p>
+    </div>
+  )
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div style={{ display: 'flex', gap: 12, background: 'var(--primary-xlight)', border: '1px solid var(--border-dark)', borderRadius: 10, padding: '12px 16px', fontSize: 13, color: 'var(--primary-text)', lineHeight: 1.6 }}>
+        <Bell size={16} style={{ flexShrink: 0, marginTop: 1 }} />
+        <div>Kies per meldingtype welke accounts een melding krijgen — bijvoorbeeld directie, zodra een kasboekmaand of brandoefening wordt afgerond.</div>
+      </div>
+
+      {MELDING_TYPES.map(mt => (
+        <div key={mt.type} className="card">
+          <div className="card-header">
+            <span className="card-title">{mt.label}</span>
+            <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{mt.beschrijving}</span>
+          </div>
+          <div>
+            {profielen.map((p, i) => (
+              <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 18px', borderBottom: i < profielen.length - 1 ? '1px solid var(--border)' : 'none' }}>
+                <div style={{ width: 26, height: 26, borderRadius: '50%', background: 'var(--primary)', color: '#fff', fontSize: 10, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  {p.naam.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase()}
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 13, fontWeight: 500 }}>{p.naam}</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{ROL_LABELS[p.rol]}</div>
+                </div>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 12, color: 'var(--text-muted)' }}>
+                  <div
+                    onClick={() => toggle(mt.type, p.id)}
+                    style={{
+                      width: 18, height: 18, borderRadius: 5,
+                      border: `2px solid ${isAangevinkt(mt.type, p.id) ? 'var(--primary)' : 'var(--border-dark)'}`,
+                      background: isAangevinkt(mt.type, p.id) ? 'var(--primary)' : 'transparent',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: 'all 0.12s',
+                    }}
+                  >
+                    {isAangevinkt(mt.type, p.id) && <span style={{ color: '#fff', fontSize: 11, fontWeight: 700 }}>✓</span>}
+                  </div>
+                  Melding ontvangen
+                </label>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// ─── LocatieToegang component ─────────────────────────────────────────────────
 
 function LocatieToegang({ profielen, kasboekLocaties, maaltijdLocaties, locatieToegang, onRefresh, onToast }: {
   profielen: Profiel[]
