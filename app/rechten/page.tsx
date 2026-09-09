@@ -252,6 +252,10 @@ export default function RechtenPage() {
   const [meldingVoorkeuren, setMeldingVoorkeuren] = useState<MeldingVoorkeurRij[]>([])
   const [rechten, setRechten] = useState<Recht[]>([])
   const [profielen, setProfielen] = useState<Profiel[]>([])
+  // Voor meldingen mag ook een superadmin zelf kiezen of die ze ontvangt —
+  // superadmins worden verder nergens in Rechtenbeheer getoond (zie banner),
+  // maar hier is het geen rechten- maar een voorkeurenlijst.
+  const [alleProfielen, setAlleProfielen] = useState<Profiel[]>([])
   const [laden, setLaden] = useState(true)
   const [opslaan, setOpslaan] = useState<string | null>(null)
   const [openSectie, setOpenSectie] = useState<string | null>(null)
@@ -260,9 +264,10 @@ export default function RechtenPage() {
   const haalOp = useCallback(async () => {
     setLaden(true)
     const supabase = getSupabase()
-    const [{ data: r }, { data: p }, { data: kl }, { data: ml }, { data: lt }, { data: mv }] = await Promise.all([
+    const [{ data: r }, { data: p }, { data: alleP }, { data: kl }, { data: ml }, { data: lt }, { data: mv }] = await Promise.all([
       supabase.from('rechten').select('*'),
       supabase.from('profielen').select('*').neq('rol', 'superadmin').order('naam'),
+      supabase.from('profielen').select('*').order('naam'),
       supabase.from('kasboek_locaties').select('naam').eq('actief', true).order('naam'),
       supabase.from('maaltijd_locaties').select('naam').eq('actief', true).order('naam'),
       supabase.from('locatie_toegang').select('*'),
@@ -270,6 +275,7 @@ export default function RechtenPage() {
     ])
     setRechten((r ?? []) as Recht[])
     setProfielen((p ?? []) as Profiel[])
+    setAlleProfielen((alleP ?? []) as Profiel[])
     // Kasboek locaties worden ook gebruikt voor weekplanningen en gesprekken
     const locatieNamen = (kl ?? []).map((l: {naam: string}) => l.naam)
     setKasboekLocaties(locatieNamen)
@@ -426,7 +432,7 @@ export default function RechtenPage() {
             {/* Meldingen tab */}
             {tab === 'meldingen' && (
               <MeldingVoorkeuren
-                profielen={profielen}
+                profielen={alleProfielen}
                 voorkeuren={meldingVoorkeuren}
                 onRefresh={haalOp}
                 onToast={setToast}
