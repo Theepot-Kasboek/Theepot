@@ -573,32 +573,40 @@ private struct VakantiePlanningDetailView: View {
         }
     }
 
+    /// Donkere "linktabel"-stijl, gespiegeld op de kop-tabel bovenaan de
+    /// documentweergave op het web: groene dagkop met onderstreepte titel,
+    /// daaronder de activiteiten als onderstreepte groene "hyperlinks" op een
+    /// donkere balk. Elke rij is minimaal 44pt hoog zodat hij op iPhone én
+    /// iPad met de vinger makkelijk te raken is (Apple's tikdoel-richtlijn).
     private func dagKolom(week: VakantieWeek, dag: Dag, breedte: CGFloat?, ruim: Bool) -> some View {
         let dagActiviteiten = activiteiten
             .filter { $0.weekId == week.id && $0.dag == dag }
             .sorted { $0.volgorde < $1.volgorde }
 
-        return VStack(alignment: .leading, spacing: ruim ? 8 : 6) {
-            VStack(alignment: .leading, spacing: 1) {
-                Text(dag.label).font(ruim ? .headline : .subheadline.weight(.bold))
+        return VStack(alignment: .leading, spacing: 0) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(dag.label)
+                    .font(ruim ? .headline : .subheadline.weight(.bold))
+                    .underline()
                 Text(dagDatumStr(week: week, dag: dag))
                     .font(ruim ? .caption : .caption2)
                     .opacity(0.85)
             }
             .foregroundStyle(.white)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, ruim ? 12 : 10).padding(.vertical, ruim ? 10 : 8)
+            .padding(.horizontal, ruim ? 14 : 10).padding(.vertical, ruim ? 12 : 10)
             .background(Color.theepotGroen)
-            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
 
             if dagActiviteiten.isEmpty && !magBewerken {
                 Text("—")
                     .font(.caption)
-                    .foregroundStyle(.tertiary)
-                    .padding(.horizontal, 10).padding(.vertical, 8)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, ruim ? 14 : 10).padding(.vertical, 12)
+                    .background(Color.black.opacity(0.85))
             } else {
-                VStack(spacing: ruim ? 8 : 6) {
-                    ForEach(dagActiviteiten) { activiteit in
+                VStack(spacing: 0) {
+                    ForEach(Array(dagActiviteiten.enumerated()), id: \.element.id) { index, activiteit in
                         Button {
                             if magBewerken {
                                 activiteitFormContext = ActiviteitFormContext(weekId: week.id, dag: dag, activiteit: activiteit)
@@ -614,17 +622,17 @@ private struct VakantiePlanningDetailView: View {
                                 }
                                 Text(activiteit.naam)
                                     .font(ruim ? .subheadline.weight(.semibold) : .caption.weight(.semibold))
-                                    .foregroundStyle(.primary)
+                                    .underline()
+                                    .foregroundStyle(Color.theepotGroenTekst)
                                     .multilineTextAlignment(.leading)
-                                    .lineLimit(2)
                                 Spacer(minLength: 0)
                             }
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.horizontal, ruim ? 12 : 10).padding(.vertical, ruim ? 9 : 7)
-                            .background(Color(.tertiarySystemBackground))
-                            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                            .padding(.horizontal, ruim ? 14 : 10).padding(.vertical, 8)
+                            .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
+                        .background(index.isMultiple(of: 2) ? Color.black.opacity(0.85) : Color.black.opacity(0.7))
                         .contextMenu {
                             if magBewerken {
                                 Button(role: .destructive) {
@@ -645,19 +653,20 @@ private struct VakantiePlanningDetailView: View {
                             }
                             .font(.caption.weight(.semibold))
                             .foregroundStyle(Color.theepotGroenTekst)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.horizontal, ruim ? 12 : 10).padding(.vertical, ruim ? 7 : 5)
+                            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                            .padding(.horizontal, ruim ? 14 : 10).padding(.vertical, 8)
+                            .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
+                        .background(dagActiviteiten.count.isMultiple(of: 2) ? Color.black.opacity(0.85) : Color.black.opacity(0.7))
                     }
                 }
             }
         }
         .frame(width: breedte, alignment: .leading)
         .frame(maxWidth: breedte == nil ? .infinity : nil)
-        .padding(ruim ? 10 : 8)
-        .background(Color(.secondarySystemBackground).opacity(0.5))
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).strokeBorder(Color.white.opacity(0.08), lineWidth: 1))
     }
 
     // ─── Documentweergave: dagen onder elkaar met volledige details + foto's ─
