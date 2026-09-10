@@ -271,7 +271,18 @@ export default function VakantieplanningenPage() {
   }
 
   async function verwijderActiviteit(id: string) {
-    await getSupabase().from('vakantie_activiteiten').delete().eq('id', id)
+    const supabase = getSupabase()
+    const act = activiteiten.find(a => a.id === id)
+    // Bij een losse activiteit (niet gekoppeld aan de activiteitenbank) horen de bijlagen
+    // alleen bij deze week-activiteit, dus die ruimen we mee op.
+    if (act && !act.activiteit_id) {
+      const { data: bijlagen } = await supabase.from('activiteit_bijlagen').select('bestand_pad').eq('activiteit_id', id)
+      if (bijlagen && bijlagen.length > 0) {
+        await supabase.storage.from('activiteit-bijlagen').remove(bijlagen.map(b => b.bestand_pad))
+      }
+      await supabase.from('activiteit_bijlagen').delete().eq('activiteit_id', id)
+    }
+    await supabase.from('vakantie_activiteiten').delete().eq('id', id)
     await haalActiviteitenOp(actievePlanning!.id)
     setToast({ bericht: 'Verwijderd.', type: 'success' })
   }
@@ -620,6 +631,7 @@ export default function VakantieplanningenPage() {
             dagDatumStr={dagDatumStr}
             tekstGrootte={tekstGrootte}
             magExporteren={magExporteren}
+            magBewerken={magBewerken}
           />
         )}
       </div>
@@ -867,13 +879,14 @@ function WeekOverzicht({ week, activiteiten, planning, dagDatumStr, onNieuw, onB
 
 // ─── Document weergave ────────────────────────────────────────────────────────
 
-function DocumentWeergave({ planning, weken, activiteiten, dagDatumStr, tekstGrootte, magExporteren = true }: {
+function DocumentWeergave({ planning, weken, activiteiten, dagDatumStr, tekstGrootte, magExporteren = true, magBewerken = false }: {
   planning: Planning
   weken: Week[]
   activiteiten: VakantieActiviteit[]
   dagDatumStr: (week: Week, dag: Dag) => string
   tekstGrootte: number
   magExporteren?: boolean
+  magBewerken?: boolean
 }) {
   const [downloadenBezig, setDownloadenBezig] = useState(false)
   const [venstBreedte, setVenstBreedte] = useState(typeof window !== 'undefined' ? window.innerWidth : 1200)
@@ -894,7 +907,7 @@ function DocumentWeergave({ planning, weken, activiteiten, dagDatumStr, tekstGro
 
   async function downloadAlleBijlagen() {
     if (!magExporteren) return
-    const actIds = activiteiten.filter(a => a.activiteit_id).map(a => a.activiteit_id as string)
+    const actIds = activiteiten.map(a => a.activiteit_id ?? a.id)
     if (actIds.length === 0) { alert('Geen activiteiten met bijlagen in deze planning.'); return }
     setDownloadenBezig(true)
     const supabase = getSupabase()
@@ -1027,11 +1040,9 @@ function DocumentWeergave({ planning, weken, activiteiten, dagDatumStr, tekstGro
                                   </div>
                                 </div>
                               )}
-                              {act.activiteit_id && (
-                                <div style={{ borderTop: '1px solid var(--border)', marginTop: 8, paddingTop: 10 }}>
-                                  <ActiviteitBijlagen activiteitId={act.activiteit_id} magBewerken={false} />
-                                </div>
-                              )}
+                              <div style={{ borderTop: '1px solid var(--border)', marginTop: 8, paddingTop: 10 }}>
+                                <ActiviteitBijlagen activiteitId={act.activiteit_id ?? act.id} magBewerken={magBewerken} />
+                              </div>
                             </div>
 
                             {/* Foto rechts — automatisch geschaald naar volledige foto */}
