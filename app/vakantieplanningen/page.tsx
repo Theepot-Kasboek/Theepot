@@ -10,7 +10,7 @@ import Toast from '@/components/Toast'
 import {
   Plus, X, ChevronDown, ChevronRight, Trash2,
   Calendar, Download, Eye, Upload, Pencil, GripVertical, Settings,
-  BookOpen, ArrowLeft, Send, Search
+  BookOpen, ArrowLeft, Send, Search, Package
 } from 'lucide-react'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -96,7 +96,7 @@ export default function VakantieplanningenPage() {
   const [bibliotheek, setBibliotheek] = useState<BibliotheekActiviteit[]>([])
   const [laden, setLaden] = useState(false)
   const [actieveWeek, setActieveWeek] = useState<string | null>(null)
-  const [weergave, setWeergave] = useState<'overzicht' | 'document'>('overzicht')
+  const [weergave, setWeergave] = useState<'overzicht' | 'document' | 'benodigdheden'>('overzicht')
   const [toast, setToast] = useState<{ bericht: string; type: 'success' | 'error' } | null>(null)
   const [vakanties, setVakanties] = useState<string[]>(() => {
     if (typeof window !== 'undefined') {
@@ -499,8 +499,8 @@ export default function VakantieplanningenPage() {
 
   const actieveWeekObj = weken.find(w => w.id === actieveWeek)
 
-  // Niet-bewerkende gebruikers zien alleen de documentweergave
-  if (!magBewerken && weergave !== 'document') {
+  // Niet-bewerkende gebruikers zien alleen de leesweergaven (document / benodigdheden)
+  if (!magBewerken && weergave === 'overzicht') {
     setWeergave('document')
   }
 
@@ -536,16 +536,14 @@ export default function VakantieplanningenPage() {
                 {actievePlanning.gepubliceerd ? <><Eye size={14} style={{ opacity: 0.5 }} /> Verbergen</> : <><Send size={14} color="var(--primary)" /> Publiceren</>}
               </button>
             )}
-            {/* Weergave toggle — alleen voor bewerkende gebruikers */}
-            {magBewerken && (
-              <div style={{ display: 'flex', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
-                {(['overzicht', 'document'] as const).map(w => (
-                  <button key={w} onClick={() => setWeergave(w)} style={{ padding: '6px 12px', border: 'none', fontSize: 12, fontWeight: 500, cursor: 'pointer', background: weergave === w ? 'var(--primary)' : 'transparent', color: weergave === w ? '#fff' : 'var(--text-muted)', transition: 'all 0.12s', textTransform: 'capitalize' }}>
-                    {w === 'overzicht' ? '📅 Overzicht' : '📄 Document'}
-                  </button>
-                ))}
-              </div>
-            )}
+            {/* Weergave toggle — Overzicht alleen voor bewerkende gebruikers, Document/Benodigdheden voor iedereen */}
+            <div style={{ display: 'flex', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
+              {(magBewerken ? (['overzicht', 'document', 'benodigdheden'] as const) : (['document', 'benodigdheden'] as const)).map(w => (
+                <button key={w} onClick={() => setWeergave(w)} style={{ padding: '6px 12px', border: 'none', fontSize: 12, fontWeight: 500, cursor: 'pointer', background: weergave === w ? 'var(--primary)' : 'transparent', color: weergave === w ? '#fff' : 'var(--text-muted)', transition: 'all 0.12s', textTransform: 'capitalize' }}>
+                  {w === 'overzicht' ? '📅 Overzicht' : w === 'document' ? '📄 Document' : '📦 Benodigdheden'}
+                </button>
+              ))}
+            </div>
             <button className="btn" onClick={() => { setActievePlanning(null); setWeken([]); setActiviteiten([]) }}>
               <ArrowLeft size={14} /> Terug
             </button>
@@ -623,7 +621,7 @@ export default function VakantieplanningenPage() {
           />
         )}
 
-        {(weergave === 'document' || !magBewerken) && (
+        {(weergave === 'document' || (!magBewerken && weergave !== 'benodigdheden')) && (
           <DocumentWeergave
             planning={actievePlanning}
             weken={weken}
@@ -632,6 +630,14 @@ export default function VakantieplanningenPage() {
             tekstGrootte={tekstGrootte}
             magExporteren={magExporteren}
             magBewerken={magBewerken}
+          />
+        )}
+
+        {weergave === 'benodigdheden' && (
+          <BenodigdhedenLijst
+            planning={actievePlanning}
+            weken={weken}
+            activiteiten={activiteiten}
           />
         )}
       </div>
@@ -1101,6 +1107,225 @@ function DocumentWeergave({ planning, weken, activiteiten, dagDatumStr, tekstGro
             style={{ maxWidth: '90vw', maxHeight: '90vh', width: 'auto', height: 'auto', objectFit: 'contain', borderRadius: 8 }}
           />
         </div>
+      )}
+    </div>
+  )
+}
+
+// ─── Benodigdheden ────────────────────────────────────────────────────────────
+
+interface BenodigdheidBron {
+  activiteitNaam: string
+  weekNr: number
+  dag: Dag
+  categorie: string
+}
+
+interface BenodigdheidItem {
+  naam: string
+  aantal: number
+  bronnen: BenodigdheidBron[]
+}
+
+function aggregeerBenodigdheden(activiteiten: VakantieActiviteit[], weken: Week[]): BenodigdheidItem[] {
+  const weekMap = new Map(weken.map(w => [w.id, w]))
+  const items = new Map<string, BenodigdheidItem>()
+
+  for (const act of activiteiten) {
+    const week = weekMap.get(act.week_id)
+    for (const ruw of act.benodigdheden ?? []) {
+      const naam = ruw.trim()
+      if (!naam) continue
+      const sleutel = naam.toLowerCase()
+      let item = items.get(sleutel)
+      if (!item) { item = { naam, aantal: 0, bronnen: [] }; items.set(sleutel, item) }
+      item.aantal += 1
+      item.bronnen.push({ activiteitNaam: act.naam, weekNr: week?.week_nummer ?? 0, dag: act.dag, categorie: act.categorie })
+    }
+  }
+
+  return Array.from(items.values()).sort((a, b) => a.naam.localeCompare(b.naam, 'nl'))
+}
+
+async function exportBenodigdhedenPDF(planning: Planning, items: BenodigdheidItem[], weekLabel: string) {
+  const { jsPDF } = await import('jspdf')
+  const doc = new jsPDF({ unit: 'mm', format: 'a4' })
+  const groen: [number, number, number] = [140, 198, 63]
+  const donkerGroen: [number, number, number] = [61, 107, 26]
+  const wit: [number, number, number] = [255, 255, 255]
+  const zwart: [number, number, number] = [30, 30, 30]
+  const grijs: [number, number, number] = [150, 150, 150]
+  const marge = 16
+  const breedte = 210 - marge * 2
+  let y = 0
+
+  doc.setFillColor(...groen); doc.rect(0, 0, 210, 28, 'F')
+  doc.setTextColor(...wit); doc.setFontSize(15); doc.setFont('helvetica', 'bold')
+  doc.text('Benodigdheden', marge, 12)
+  doc.setFontSize(9); doc.setFont('helvetica', 'normal')
+  doc.text(`${planning.naam} · ${planning.vakantie}`, marge, 20)
+  doc.text(weekLabel, 210 - marge, 20, { align: 'right' })
+  y = 40
+
+  doc.setTextColor(...grijs); doc.setFontSize(9); doc.setFont('helvetica', 'italic')
+  doc.text(`${items.length} item${items.length !== 1 ? 's' : ''}`, marge, y); y += 8
+
+  for (const item of items) {
+    if (y > 265) { doc.addPage(); y = 20 }
+    doc.setDrawColor(...grijs); doc.setLineWidth(0.4)
+    doc.rect(marge, y - 4, 4, 4)
+    doc.setTextColor(...zwart); doc.setFont('helvetica', 'normal'); doc.setFontSize(10.5)
+    doc.text(item.naam, marge + 8, y)
+    if (item.aantal > 1) {
+      doc.setTextColor(...grijs); doc.setFontSize(8)
+      doc.text(`(${item.aantal}×)`, marge + 8 + doc.getTextWidth(item.naam) + 4, y)
+    }
+    y += 5
+    doc.setTextColor(...donkerGroen); doc.setFont('helvetica', 'italic'); doc.setFontSize(7.5)
+    const bronTekst = item.bronnen.map(b => `${b.activiteitNaam} (wk ${b.weekNr}, ${DAG_KORT[b.dag]})`).join(', ')
+    const r = doc.splitTextToSize(bronTekst, breedte - 8)
+    doc.text(r, marge + 8, y); y += r.length * 4 + 5
+  }
+
+  const n = doc.getNumberOfPages()
+  for (let p = 1; p <= n; p++) {
+    doc.setPage(p); doc.setFillColor(245, 247, 245); doc.rect(0, 284, 210, 13, 'F')
+    doc.setFontSize(7); doc.setTextColor(...grijs)
+    doc.text(`De Theepot · Benodigdheden · ${planning.naam}`, marge, 291)
+    doc.text(`${p}/${n}`, 210 - marge, 291, { align: 'right' })
+  }
+  doc.save(`Benodigdheden_${planning.naam.replace(/\s+/g, '_')}.pdf`)
+}
+
+function BenodigdhedenLijst({ planning, weken, activiteiten }: {
+  planning: Planning
+  weken: Week[]
+  activiteiten: VakantieActiviteit[]
+}) {
+  const [weekFilter, setWeekFilter] = useState<string>('alle')
+  const [zoekterm, setZoekterm] = useState('')
+  const [uitgeklapt, setUitgeklapt] = useState<Set<string>>(new Set())
+  const [afgevinkt, setAfgevinkt] = useState<Set<string>>(() => {
+    if (typeof window === 'undefined') return new Set()
+    const opgeslagen = localStorage.getItem(`theepot_benodigdheden_${planning.id}`)
+    return opgeslagen ? new Set(JSON.parse(opgeslagen)) : new Set()
+  })
+
+  useEffect(() => {
+    localStorage.setItem(`theepot_benodigdheden_${planning.id}`, JSON.stringify(Array.from(afgevinkt)))
+  }, [afgevinkt, planning.id])
+
+  const gefilterdeActiviteiten = weekFilter === 'alle' ? activiteiten : activiteiten.filter(a => a.week_id === weekFilter)
+  const items = aggregeerBenodigdheden(gefilterdeActiviteiten, weken)
+    .filter(i => i.naam.toLowerCase().includes(zoekterm.trim().toLowerCase()))
+
+  const weekLabel = weekFilter === 'alle' ? 'Alle weken' : `Week ${weken.find(w => w.id === weekFilter)?.week_nummer ?? ''}`
+  const aantalAfgevinkt = items.filter(i => afgevinkt.has(i.naam.toLowerCase())).length
+
+  function toggleVink(naam: string) {
+    setAfgevinkt(prev => {
+      const nieuw = new Set(prev)
+      const key = naam.toLowerCase()
+      if (nieuw.has(key)) nieuw.delete(key); else nieuw.add(key)
+      return nieuw
+    })
+  }
+
+  function toggleUitgeklapt(naam: string) {
+    setUitgeklapt(prev => {
+      const nieuw = new Set(prev)
+      if (nieuw.has(naam)) nieuw.delete(naam); else nieuw.add(naam)
+      return nieuw
+    })
+  }
+
+  return (
+    <div style={{ width: '100%', maxWidth: 760, margin: '0 auto' }}>
+      {/* Titel */}
+      <div style={{ textAlign: 'center', marginBottom: 24, padding: '24px 0' }}>
+        <h1 style={{ fontFamily: 'Sora, sans-serif', fontSize: 24, fontWeight: 800, marginBottom: 6 }}>
+          <Package size={22} style={{ verticalAlign: -3, marginRight: 8 }} color="var(--primary)" />
+          Benodigdheden
+        </h1>
+        <div style={{ fontSize: 14, color: 'var(--text-muted)' }}>{planning.naam} · {planning.vakantie}</div>
+      </div>
+
+      {/* Filters */}
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 16 }}>
+        <select className="form-input" style={{ width: 'auto' }} value={weekFilter} onChange={e => setWeekFilter(e.target.value)}>
+          <option value="alle">Alle weken</option>
+          {weken.map(w => <option key={w.id} value={w.id}>Week {w.week_nummer} — {w.naam}</option>)}
+        </select>
+        <div style={{ position: 'relative', flex: 1, minWidth: 160 }}>
+          <Search size={13} color="var(--text-muted)" style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)' }} />
+          <input className="form-input" style={{ paddingLeft: 30 }} value={zoekterm} onChange={e => setZoekterm(e.target.value)} placeholder="Zoek item..." />
+        </div>
+        {items.length > 0 && (
+          <button className="btn btn-sm" onClick={() => exportBenodigdhedenPDF(planning, items, weekLabel)}>
+            <Download size={13} /> PDF
+          </button>
+        )}
+        {aantalAfgevinkt > 0 && (
+          <button className="btn btn-sm" onClick={() => setAfgevinkt(new Set())}>Vinkjes wissen</button>
+        )}
+      </div>
+
+      {items.length === 0 ? (
+        <div className="empty-state" style={{ padding: 40 }}>
+          <Package size={32} />
+          <h3>Geen benodigdheden</h3>
+          <p>{zoekterm ? 'Niets gevonden voor deze zoekterm.' : 'De geplande activiteiten hebben nog geen benodigdheden ingevuld.'}</p>
+        </div>
+      ) : (
+        <>
+          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 8 }}>
+            {aantalAfgevinkt}/{items.length} afgevinkt · {weekLabel}
+          </div>
+          <div className="card" style={{ overflow: 'hidden' }}>
+            {items.map((item, i) => {
+              const key = item.naam.toLowerCase()
+              const isAfgevinkt = afgevinkt.has(key)
+              const isUitgeklapt = uitgeklapt.has(key)
+              return (
+                <div key={key} style={{ borderBottom: i < items.length - 1 ? '1px solid var(--border)' : 'none' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px' }}>
+                    <input
+                      type="checkbox"
+                      checked={isAfgevinkt}
+                      onChange={() => toggleVink(item.naam)}
+                      style={{ width: 17, height: 17, accentColor: 'var(--primary)', cursor: 'pointer', flexShrink: 0 }}
+                    />
+                    <div
+                      style={{ flex: 1, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}
+                      onClick={() => toggleUitgeklapt(key)}
+                    >
+                      <span style={{ fontSize: 14, fontWeight: 500, color: isAfgevinkt ? 'var(--text-muted)' : 'var(--text)', textDecoration: isAfgevinkt ? 'line-through' : 'none' }}>
+                        {item.naam}
+                      </span>
+                      {item.aantal > 1 && (
+                        <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 20, background: 'var(--primary-xlight)', color: 'var(--primary-text)', fontWeight: 500, flexShrink: 0 }}>
+                          {item.aantal}× nodig
+                        </span>
+                      )}
+                    </div>
+                    <button onClick={() => toggleUitgeklapt(key)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex' }}>
+                      {isUitgeklapt ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
+                    </button>
+                  </div>
+                  {isUitgeklapt && (
+                    <div style={{ padding: '0 16px 12px 45px', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      {item.bronnen.map((b, bi) => (
+                        <div key={bi} style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                          🔹 {b.activiteitNaam} <span style={{ opacity: 0.7 }}>— week {b.weekNr}, {DAG_LABEL[b.dag]} · {b.categorie}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        </>
       )}
     </div>
   )
