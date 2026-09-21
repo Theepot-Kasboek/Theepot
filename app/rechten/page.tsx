@@ -293,13 +293,15 @@ export default function RechtenPage() {
     const supabase = getSupabase()
     const { id: _id, ...data } = recht
 
-    if (recht.id) {
-      await supabase.from('rechten').update(data).eq('id', recht.id)
-    } else {
-      await supabase.from('rechten').insert(data)
-    }
+    const { error } = recht.id
+      ? await supabase.from('rechten').update(data).eq('id', recht.id)
+      : await supabase.from('rechten').insert(data)
 
-    setToast({ bericht: 'Rechten opgeslagen!', type: 'success' })
+    if (error) {
+      setToast({ bericht: `Opslaan mislukt: ${error.message}`, type: 'error' })
+    } else {
+      setToast({ bericht: 'Rechten opgeslagen!', type: 'success' })
+    }
     setOpslaan(null)
     await haalOp()
   }
