@@ -73,6 +73,12 @@ function standaardActiefInWeek(kind: StandaardKind, weekStart: string): boolean 
 // Haalt een week op, of maakt hem aan (met kopie van de op dat moment actieve
 // standaard kinderen) als hij nog niet bestaat. Gedeeld door de weekweergave
 // én de maandexport, zodat beide exact dezelfde standaard-eters-logica gebruiken.
+//
+// Ook bij een al bestaande week worden ontbrekende, nu actieve standaard
+// kinderen alsnog aangevuld. Zonder dit blijven weken die al aangemaakt waren
+// vóórdat een standaard kind werd toegevoegd (of vóórdat zijn periode inging)
+// voor altijd zonder dat kind staan, terwijl de gebruiker verwacht dat een
+// standaard kind in élke week binnen zijn vanaf/tot-periode verschijnt.
 async function haalOfMaakWeek(
   locatieId: string,
   weekStart: string,
@@ -89,25 +95,30 @@ async function haalOfMaakWeek(
       maand: maandLabel(weekStart),
       week_start: weekStart,
     }).select().single()
-
-    if (nieuw) {
-      weekData = nieuw
-      const stdActief = standaardKinderen.filter(k => standaardActiefInWeek(k, weekStart))
-      if (stdActief.length > 0) {
-        const invoegen = stdActief.map(k => ({
-          week_id: nieuw.id, dag: k.dag, naam: k.naam,
-          bijzonderheden: k.bijzonderheden, aanwezig: true, is_extra: false, volgorde: k.volgorde,
-        }))
-        await supabase.from('maaltijd_registraties').insert(invoegen)
-      }
-    }
+    weekData = nieuw
   }
 
   if (!weekData) return null
+
   const { data: regData } = await supabase
     .from('maaltijd_registraties').select('*')
     .eq('week_id', weekData.id).order('volgorde')
-  return { week: weekData as Week, registraties: (regData ?? []) as Registratie[] }
+  let registraties = (regData ?? []) as Registratie[]
+
+  const stdActief = standaardKinderen.filter(k => standaardActiefInWeek(k, weekStart))
+  const ontbrekend = stdActief.filter(k =>
+    !registraties.some(r => !r.is_extra && r.dag === k.dag && r.naam === k.naam)
+  )
+  if (ontbrekend.length > 0) {
+    const invoegen = ontbrekend.map(k => ({
+      week_id: weekData!.id, dag: k.dag, naam: k.naam,
+      bijzonderheden: k.bijzonderheden, aanwezig: true, is_extra: false, volgorde: k.volgorde,
+    }))
+    const { data: toegevoegd } = await supabase.from('maaltijd_registraties').insert(invoegen).select()
+    if (toegevoegd) registraties = [...registraties, ...(toegevoegd as Registratie[])]
+  }
+
+  return { week: weekData as Week, registraties }
 }
 
 // ─── PDF Export ───────────────────────────────────────────────────────────────
