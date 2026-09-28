@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { useAuth } from '@/components/AuthProvider'
 import Topbar from '@/components/Topbar'
 import { getSupabase } from '@/lib/supabase'
@@ -84,6 +84,17 @@ export default function DashboardPage() {
   const [catalogusOpen, setCatalogusOpen] = useState(false)
   const [weerLocatie, setWeerLocatie] = useState('Lisse')
   const [weerLocatieInput, setWeerLocatieInput] = useState('')
+  const [gesleeptId, setGesleeptId] = useState<string | null>(null)
+
+  // Refs voor het slepen: houden de actuele stand bij zonder dat de window-listeners
+  // opnieuw gekoppeld moeten worden bij elke render.
+  const widgetsRef = useRef(widgets)
+  const slaOpslaanRef = useRef<(w: DashboardWidget[]) => void>(() => {})
+  const sleepInfo = useRef<{ id: string; x: number; y: number; sleeping: boolean } | null>(null)
+  const laatsteDoelId = useRef<string | null>(null)
+  const onderdrukKlik = useRef(false)
+
+  useEffect(() => { widgetsRef.current = widgets }, [widgets])
 
   // Laad opgeslagen lay-out
   useEffect(() => {
@@ -99,6 +110,60 @@ export default function DashboardPage() {
     localStorage.setItem(OPSLAG_KEY(user.id), JSON.stringify(w))
     setWidgets(w)
   }
+  useEffect(() => { slaOpslaanRef.current = slaOpslaan })
+
+  // Verplaatst de gesleepte widget live naar de positie van het doel en herschrijft volgorde 0..n-1
+  function verplaatsLive(sleepId: string, doelId: string) {
+    const gesorteerd = [...widgetsRef.current].sort((a, b) => a.volgorde - b.volgorde)
+    const sleepIdx = gesorteerd.findIndex(w => w.id === sleepId)
+    const doelIdx = gesorteerd.findIndex(w => w.id === doelId)
+    if (sleepIdx === -1 || doelIdx === -1) return
+    const [item] = gesorteerd.splice(sleepIdx, 1)
+    gesorteerd.splice(doelIdx, 0, item)
+    const herordend = gesorteerd.map((w, i) => ({ ...w, volgorde: i }))
+    widgetsRef.current = herordend
+    setWidgets(herordend)
+  }
+
+  // Window-listeners voor het slepen (muis en touch via Pointer Events)
+  useEffect(() => {
+    function onPointerMove(e: PointerEvent) {
+      const sleep = sleepInfo.current
+      if (!sleep) return
+      if (!sleep.sleeping) {
+        const afstand = Math.hypot(e.clientX - sleep.x, e.clientY - sleep.y)
+        if (afstand < 6) return
+        sleep.sleeping = true
+        setGesleeptId(sleep.id)
+      }
+      const el = document.elementFromPoint(e.clientX, e.clientY)
+      const doelEl = el?.closest('[data-widget-id]') as HTMLElement | null
+      const doelId = doelEl?.getAttribute('data-widget-id')
+      if (!doelId) return
+      if (doelId === sleep.id) { laatsteDoelId.current = null; return }
+      if (doelId === laatsteDoelId.current) return
+      laatsteDoelId.current = doelId
+      verplaatsLive(sleep.id, doelId)
+    }
+    function onPointerUp() {
+      const sleep = sleepInfo.current
+      if (sleep?.sleeping) {
+        slaOpslaanRef.current(widgetsRef.current)
+        onderdrukKlik.current = true
+      }
+      sleepInfo.current = null
+      laatsteDoelId.current = null
+      setGesleeptId(null)
+    }
+    window.addEventListener('pointermove', onPointerMove)
+    window.addEventListener('pointerup', onPointerUp)
+    window.addEventListener('pointercancel', onPointerUp)
+    return () => {
+      window.removeEventListener('pointermove', onPointerMove)
+      window.removeEventListener('pointerup', onPointerUp)
+      window.removeEventListener('pointercancel', onPointerUp)
+    }
+  }, [])
 
   function verwijderWidget(id: string) {
     slaOpslaan(widgets.filter(w => w.id !== id))
@@ -106,18 +171,9 @@ export default function DashboardPage() {
 
   function voegToe(id: string) {
     if (widgets.find(w => w.id === id)) return
-    slaOpslaan([...widgets, { id, size: '2x1', volgorde: widgets.length }])
+    const maxVolgorde = widgets.reduce((max, w) => Math.max(max, w.volgorde), -1)
+    slaOpslaan([...widgets, { id, size: '2x1', volgorde: maxVolgorde + 1 }])
     setCatalogusOpen(false)
-  }
-
-  function verplaats(id: string, richting: 'links' | 'rechts') {
-    const idx = widgets.findIndex(w => w.id === id)
-    if (idx === -1) return
-    const nieuw = [...widgets]
-    const swap = richting === 'links' ? idx - 1 : idx + 1
-    if (swap < 0 || swap >= nieuw.length) return
-    ;[nieuw[idx], nieuw[swap]] = [nieuw[swap], nieuw[idx]]
-    slaOpslaan(nieuw)
   }
 
   function zetGrootte(id: string, size: WidgetSize) {
@@ -164,15 +220,51 @@ export default function DashboardPage() {
 
       <div className="page-content">
 
+        {/* Sleephint */}
+        {bewerkmodus && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10, fontSize: 12, color: 'var(--text-muted)' }}>
+            <GripVertical size={14} />
+            Sleep een widget naar een andere plek om de volgorde te wijzigen.
+          </div>
+        )}
+
         {/* Widget grid */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14, alignItems: 'start' }}>
-          {gesorteerd.map((w, idx) => {
+          {gesorteerd.map((w) => {
             const kolommen = w.size === '1x1' ? 1 : w.size === '3x1' ? 3 : 2
+            const wordtGesleept = gesleeptId === w.id
             return (
-              <div key={w.id} style={{ gridColumn: `span ${kolommen}`, position: 'relative' }}>
+              <div key={w.id} data-widget-id={w.id}
+                style={{
+                  gridColumn: `span ${kolommen}`, position: 'relative',
+                  cursor: bewerkmodus ? (wordtGesleept ? 'grabbing' : 'grab') : 'default',
+                  userSelect: bewerkmodus ? 'none' : 'auto',
+                  opacity: wordtGesleept ? 0.5 : 1,
+                  transform: wordtGesleept ? 'scale(0.98)' : 'none',
+                }}
+                onPointerDown={e => {
+                  if (!bewerkmodus) return
+                  const doelEl = e.target as HTMLElement
+                  if (doelEl.closest('button, input, textarea, select')) return
+                  sleepInfo.current = { id: w.id, x: e.clientX, y: e.clientY, sleeping: false }
+                }}
+                onClickCapture={e => {
+                  if (onderdrukKlik.current) { e.preventDefault(); e.stopPropagation(); onderdrukKlik.current = false; return }
+                  if (bewerkmodus && (e.target as HTMLElement).closest('a')) e.preventDefault()
+                }}>
                 {/* Bewerkoverlay */}
                 {bewerkmodus && (
-                  <div style={{ position: 'absolute', top: 6, right: 6, zIndex: 10, display: 'flex', gap: 4 }}>
+                  <div style={{ position: 'absolute', top: 6, right: 6, zIndex: 10, display: 'flex', gap: 4, alignItems: 'center' }}>
+                    {/* Greep voor slepen op touch */}
+                    <div style={{ display: 'flex', alignItems: 'center', padding: '2px 4px', cursor: 'grab', touchAction: 'none' }}
+                      onPointerDown={e => {
+                        e.stopPropagation()
+                        sleepInfo.current = { id: w.id, x: e.clientX, y: e.clientY, sleeping: true }
+                        laatsteDoelId.current = null
+                        setGesleeptId(w.id)
+                      }}>
+                      <GripVertical size={13} color="var(--text-muted)" />
+                    </div>
                     {/* Grootte knoppen */}
                     {(['1x1','2x1','3x1'] as WidgetSize[]).map(s => (
                       <button key={s} onClick={() => zetGrootte(w.id, s)}
@@ -180,17 +272,13 @@ export default function DashboardPage() {
                         {s}
                       </button>
                     ))}
-                    <button onClick={() => verplaats(w.id, 'links')} disabled={idx === 0}
-                      style={{ fontSize: 11, padding: '2px 7px', borderRadius: 5, border: '1px solid var(--border)', background: 'var(--bg)', cursor: idx === 0 ? 'default' : 'pointer', color: 'var(--text-muted)', opacity: idx === 0 ? 0.3 : 1 }}>←</button>
-                    <button onClick={() => verplaats(w.id, 'rechts')} disabled={idx === gesorteerd.length - 1}
-                      style={{ fontSize: 11, padding: '2px 7px', borderRadius: 5, border: '1px solid var(--border)', background: 'var(--bg)', cursor: idx === gesorteerd.length - 1 ? 'default' : 'pointer', color: 'var(--text-muted)', opacity: idx === gesorteerd.length - 1 ? 0.3 : 1 }}>→</button>
                     <button onClick={() => verwijderWidget(w.id)}
                       style={{ fontSize: 11, padding: '2px 7px', borderRadius: 5, border: '1px solid #FECACA', background: 'var(--bg)', cursor: 'pointer', color: '#DC2626' }}>✕</button>
                   </div>
                 )}
 
                 {/* Widget inhoud */}
-                <div style={{ outline: bewerkmodus ? '2px dashed var(--border-dark)' : 'none', borderRadius: 14, overflow: 'hidden' }}>
+                <div style={{ outline: wordtGesleept ? '2px dashed var(--primary)' : bewerkmodus ? '2px dashed var(--border-dark)' : 'none', borderRadius: 14, overflow: 'hidden' }}>
                   {w.id === 'meldingen' && user && <MeldingenWidget profielId={user.id} />}
                   {w.id === 'prikbord' && user && profiel && <PrikbordWidget profiel={profiel} isSuperadmin={isSuperadmin} />}
                   {w.id === 'welkom' && user && profiel && <WelkomWidget profiel={profiel} />}
