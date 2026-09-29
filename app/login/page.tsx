@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { getSupabase } from '@/lib/supabase'
+import { getSupabase, gebruikersnaamNaarEmail } from '@/lib/supabase'
 import { Eye, EyeOff, LogIn } from 'lucide-react'
 
 export default function LoginPage() {
@@ -18,8 +18,10 @@ export default function LoginPage() {
     setLaden(true)
     setFout('')
 
+    const inlogEmail = email.includes('@') ? email.trim() : gebruikersnaamNaarEmail(email)
+
     const supabase = getSupabase()
-    const { error } = await supabase.auth.signInWithPassword({ email, password: wachtwoord })
+    const { error } = await supabase.auth.signInWithPassword({ email: inlogEmail, password: wachtwoord })
 
     if (error) {
       setFout('Verkeerde inloggegevens. Probeer het opnieuw.')
@@ -69,9 +71,9 @@ export default function LoginPage() {
           <div className="card-body">
             <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
               <div>
-                <label className="form-label">E-mailadres</label>
+                <label className="form-label">E-mailadres of gebruikersnaam</label>
                 <input
-                  type="email"
+                  type="text"
                   className="form-input"
                   placeholder="naam@bsodetheepot.nl"
                   value={email}

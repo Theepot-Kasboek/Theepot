@@ -9,6 +9,14 @@ export function getSupabase() {
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
+// Intern domein voor accounts die inloggen met een gebruikersnaam i.p.v. een echt e-mailadres.
+// Supabase Auth vereist altijd een geldig e-mailformaat; dit domein hoeft nooit bereikbaar te zijn.
+export const GEBRUIKERSNAAM_DOMEIN = 'intern.bsodetheepot.nl'
+
+export function gebruikersnaamNaarEmail(gebruikersnaam: string) {
+  return `${gebruikersnaam.trim().toLowerCase()}@${GEBRUIKERSNAAM_DOMEIN}`
+}
+
 export type Rol = 'superadmin' | 'directie' | 'leidinggevende' | 'locatie'
 
 export const ROL_LABELS: Record<Rol, string> = {
