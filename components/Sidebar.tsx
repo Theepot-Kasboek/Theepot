@@ -13,6 +13,7 @@ import { useAuth } from './AuthProvider'
 import { useTheme } from './ThemeProvider'
 import { getSupabase, ROL_LABELS } from '@/lib/supabase'
 import { haalPrikbordLocaties, isZichtbaarPrikbordBericht, type PrikbordZichtbaarheid } from '@/lib/prikbord'
+import { enkeleToegangHref } from '@/lib/paginaRechten'
 
 type PrikbordTelling = PrikbordZichtbaarheid & { gelezen_door: string[] | null }
 
@@ -33,6 +34,7 @@ export default function Sidebar({ isOpen, onClose }: { isOpen?: boolean; onClose
   const [ongelezen, setOngelezen] = useState(0)
   const [ongelezenprikbord, setOngelezenPrikbord] = useState(0)
   const magAllesZien = isSuperadmin || profiel?.rol === 'directie' || profiel?.rol === 'leidinggevende'
+  const enkeleHref = enkeleToegangHref(rechten as unknown as Record<string, string>, isSuperadmin)
 
 
   const initialen = profiel?.naam
@@ -217,7 +219,7 @@ export default function Sidebar({ isOpen, onClose }: { isOpen?: boolean; onClose
   return (
     <aside className={`sidebar${isOpen ? ' open' : ''}`}>
       {/* Logo */}
-      <Link href="/" className="sidebar-logo">
+      <Link href={enkeleHref ?? '/'} className="sidebar-logo">
         <Image
           src="/logo.jpg"
           alt="De Theepot"
@@ -242,6 +244,8 @@ export default function Sidebar({ isOpen, onClose }: { isOpen?: boolean; onClose
                 const toegang = (rechten as unknown as Record<string, string>)[item.vereistRecht]
                 if (toegang !== 'lezen' && toegang !== 'bewerken') return false
               }
+              // Account met toegang tot precies één pagina: toon alleen dat ene tabblad
+              if (enkeleHref && item.href !== enkeleHref) return false
               return true
             }
           )

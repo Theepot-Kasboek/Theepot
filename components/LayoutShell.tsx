@@ -1,14 +1,18 @@
 'use client'
 
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { useState, useEffect } from 'react'
 import Sidebar from './Sidebar'
 import SpeedDial from './SpeedDial'
+import { useAuth } from './AuthProvider'
+import { enkeleToegangHref } from '@/lib/paginaRechten'
 
 const GEEN_SIDEBAR = ['/login']
 
 export default function LayoutShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
+  const router = useRouter()
+  const { rechten, isSuperadmin, loading } = useAuth()
   const showSidebar = !GEEN_SIDEBAR.includes(pathname)
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
@@ -16,6 +20,15 @@ export default function LayoutShell({ children }: { children: React.ReactNode })
   useEffect(() => {
     setSidebarOpen(false)
   }, [pathname])
+
+  // Account met toegang tot precies één pagina: stuur elke andere route terug naar die pagina
+  useEffect(() => {
+    if (loading || pathname === '/login') return
+    const enkeleHref = enkeleToegangHref(rechten as unknown as Record<string, string>, isSuperadmin)
+    if (!enkeleHref) return
+    const inToegestaneZone = enkeleHref === '/' ? pathname === '/' : pathname.startsWith(enkeleHref)
+    if (!inToegestaneZone) router.replace(enkeleHref)
+  }, [loading, rechten, isSuperadmin, pathname, router])
 
   if (!showSidebar) {
     return <>{children}</>
