@@ -61,6 +61,32 @@ struct Rechten: Codable {
     static let geen = Rechten()
 }
 
+/// De pagina-velden van `Rechten` die overeenkomen met een tab, gekoppeld aan de
+/// sleutel van die tab (zie `HoofdTab.sleutel` in Views/DashboardView.swift).
+/// Spiegelt `PAGINA_ROUTES` uit lib/paginaRechten.ts.
+extension Rechten {
+    var paginaToegang: [String: Toegang] {
+        [
+            "meldingen": paginaPrikbord,
+            "chat": paginaChat,
+            "agenda": paginaAgenda,
+            "kasboek": paginaKasboek,
+            "maaltijdlijst": paginaMaaltijdlijst,
+            "vakantie": paginaVakantieplanningen,
+            "weekplanning": paginaWeekplanningen,
+        ]
+    }
+
+    /// Als een niet-superadmin account nog maar toegang heeft tot precies één van
+    /// de hierboven gekoppelde tabs, geeft dit de sleutel van die tab terug. Zo'n
+    /// account krijgt dan alleen die ene tab te zien (zie DashboardView.swift).
+    func enkeleToegangTabNaam(isSuperadmin: Bool) -> String? {
+        guard !isSuperadmin else { return nil }
+        let toegankelijk = paginaToegang.filter { $0.value != .geen }
+        return toegankelijk.count == 1 ? toegankelijk.first?.key : nil
+    }
+}
+
 /// Net als `normaliseerRechten` in components/AuthProvider.tsx: kolommen die nog
 /// niet in de tabel staan (een nieuw recht dat pas na een migratie bestaat) of
 /// null zijn, vallen terug op "geen recht" in plaats van het hele rechtenobject

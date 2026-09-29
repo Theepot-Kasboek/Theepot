@@ -67,6 +67,21 @@ enum HoofdTab: Int, CaseIterable, Identifiable {
         case .account: return "person.crop.circle.fill"
         }
     }
+
+    /// Sleutel die overeenkomt met `Rechten.paginaToegang` (Models/Rechten.swift).
+    /// `nil` voor tabs zonder eigen paginarecht (dashboard, taken, kilometers, account).
+    var sleutel: String? {
+        switch self {
+        case .meldingen: return "meldingen"
+        case .chat: return "chat"
+        case .agenda: return "agenda"
+        case .kasboek: return "kasboek"
+        case .maaltijdlijst: return "maaltijdlijst"
+        case .vakantie: return "vakantie"
+        case .weekplanning: return "weekplanning"
+        case .dashboard, .taken, .kilometers, .account: return nil
+        }
+    }
 }
 
 struct DashboardView: View {
@@ -75,6 +90,16 @@ struct DashboardView: View {
     @State private var tab: HoofdTab = .dashboard
 
     private let barOnderrand: CGFloat = 10
+
+    /// Heeft dit account nog maar toegang tot precies één module, dan bevat dit
+    /// alleen die tab plus Account (net als de uitlogknop in de webapp-sidebar
+    /// altijd zichtbaar blijft). Spiegelt lib/paginaRechten.ts + Sidebar.tsx.
+    private var zichtbareTabs: [HoofdTab] {
+        guard let enkeleNaam = session.rechten.enkeleToegangTabNaam(isSuperadmin: session.isSuperadmin) else {
+            return HoofdTab.allCases
+        }
+        return HoofdTab.allCases.filter { $0.sleutel == enkeleNaam || $0 == .account }
+    }
 
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -97,20 +122,28 @@ struct DashboardView: View {
                 Color.clear.frame(height: TheepotTabBar.hoogte + barOnderrand)
             }
 
-            TheepotTabBar(selectie: $tab)
+            TheepotTabBar(selectie: $tab, tabs: zichtbareTabs)
                 .frame(maxWidth: 760)
                 .padding(.horizontal, 14)
                 .padding(.bottom, barOnderrand)
         }
+        // Bij het bepalen van rechten (of zodra die wijzigen) buiten de toegestane
+        // tabs belanden kan niet: forceer dan de enige toegestane module.
+        .onChange(of: zichtbareTabs) { _, nieuw in
+            if !nieuw.contains(tab), let eerste = nieuw.first { tab = eerste }
+        }
+        .onAppear {
+            if !zichtbareTabs.contains(tab), let eerste = zichtbareTabs.first { tab = eerste }
+        }
         // Tik op een chat-pushmelding: naar de chattab, ChatListView pakt de
         // rest van de deeplink (openen van het juiste gesprek) zelf op.
         .onChange(of: meldingRouter.gewenstGesprekId) { _, gesprekId in
-            if gesprekId != nil { tab = .chat }
+            if gesprekId != nil && zichtbareTabs.contains(.chat) { tab = .chat }
         }
         // Zelfde patroon voor een agenda-herinnering: naar de agendatab, AgendaView
         // opent daar de bijbehorende afspraak.
         .onChange(of: meldingRouter.gewenstAfspraakId) { _, afspraakId in
-            if afspraakId != nil { tab = .agenda }
+            if afspraakId != nil && zichtbareTabs.contains(.agenda) { tab = .agenda }
         }
     }
 }
@@ -123,6 +156,7 @@ struct DashboardView: View {
 /// zijwaarts, zodat icoon én tekst altijd leesbaar blijven.
 private struct TheepotTabBar: View {
     @Binding var selectie: HoofdTab
+    var tabs: [HoofdTab] = HoofdTab.allCases
     @Namespace private var animatie
     @State private var balkBreedte: CGFloat = 0
 
@@ -132,7 +166,7 @@ private struct TheepotTabBar: View {
     private static let knopSpatie: CGFloat = 2
 
     private var knopBreedte: CGFloat {
-        let aantal = CGFloat(HoofdTab.allCases.count)
+        let aantal = CGFloat(tabs.count)
         let beschikbaar = balkBreedte - Self.binnenPadding * 2 - Self.knopSpatie * (aantal - 1)
         guard beschikbaar > 0 else { return Self.minKnopBreedte }
         return max(Self.minKnopBreedte, beschikbaar / aantal)
@@ -142,7 +176,7 @@ private struct TheepotTabBar: View {
         ScrollViewReader { proxy in
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: Self.knopSpatie) {
-                    ForEach(HoofdTab.allCases) { tab in
+                    ForEach(tabs) { tab in
                         tabKnop(tab)
                             .frame(width: knopBreedte)
                             .id(tab)

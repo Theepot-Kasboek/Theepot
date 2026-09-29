@@ -53,3 +53,30 @@ data class Rechten(
         val GEEN = Rechten()
     }
 }
+
+/**
+ * De pagina-velden van [Rechten] die overeenkomen met een tab in de app, gekoppeld
+ * aan hun `HoofdTab`-naam (als String, om een afhankelijkheid richting de UI-laag
+ * te vermijden — zie `TabScaffoldScreen.kt` voor de koppeling terug naar `HoofdTab`).
+ * Spiegelt `PAGINA_ROUTES` uit lib/paginaRechten.ts.
+ */
+fun Rechten.paginaToegang(): Map<String, Toegang> = mapOf(
+    "PRIKBORD" to paginaPrikbord,
+    "CHAT" to paginaChat,
+    "AGENDA" to paginaAgenda,
+    "KASBOEK" to paginaKasboek,
+    "MAALTIJDLIJST" to paginaMaaltijdlijst,
+    "VAKANTIE" to paginaVakantieplanningen,
+    "WEEKPLANNING" to paginaWeekplanningen,
+)
+
+/**
+ * Als een niet-superadmin account nog maar toegang heeft tot precies één van de
+ * hierboven gekoppelde tabs, geeft dit de naam van die tab terug. Zo'n account
+ * krijgt dan alleen die ene tab te zien (zie `TabScaffoldScreen.kt`).
+ */
+fun Rechten.enkeleToegangTabNaam(isSuperadmin: Boolean): String? {
+    if (isSuperadmin) return null
+    val toegankelijk = paginaToegang().filterValues { it != Toegang.GEEN }
+    return toegankelijk.keys.singleOrNull()
+}

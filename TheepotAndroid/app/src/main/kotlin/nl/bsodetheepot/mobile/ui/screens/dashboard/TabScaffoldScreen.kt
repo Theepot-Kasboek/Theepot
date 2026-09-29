@@ -34,12 +34,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
+import nl.bsodetheepot.mobile.data.models.enkeleToegangTabNaam
 import nl.bsodetheepot.mobile.data.push.MeldingRouter
 import nl.bsodetheepot.mobile.data.session.SessionViewModel
 import nl.bsodetheepot.mobile.ui.screens.account.AccountScreen
@@ -72,17 +74,29 @@ enum class HoofdTab(val label: String, val icon: ImageVector) {
     ACCOUNT("Account", Icons.Filled.AccountCircle),
 }
 
-private val tabs = HoofdTab.entries
+private val ALLE_TABS = HoofdTab.entries
 
 /**
  * Eén horizontaal scrollbare tabbalk voor alle modules — swipe of scroll de
  * balk zelf naar links/rechts voor de rest van de pagina's, of swipe de
  * inhoud (HorizontalPager schuift synchroon mee met de balk).
+ *
+ * Heeft een account nog maar toegang tot precies één module, dan bevat
+ * [tabs] alleen die ene tab (spiegelt de webapp: lib/paginaRechten.ts +
+ * components/Sidebar.tsx).
  */
 @Composable
 fun TabScaffoldScreen(session: SessionViewModel) {
+    val rechten by session.rechten.collectAsState()
+    val isSuperadmin = session.isSuperadmin
+    val enkeleTabNaam = remember(rechten, isSuperadmin) { rechten.enkeleToegangTabNaam(isSuperadmin) }
+    val tabs = remember(enkeleTabNaam) {
+        // Account blijft altijd bereikbaar (net als de uitlogknop in de webapp-sidebar).
+        if (enkeleTabNaam != null) ALLE_TABS.filter { it.name == enkeleTabNaam || it == HoofdTab.ACCOUNT } else ALLE_TABS
+    }
+
     val pagerState = rememberPagerState(
-        initialPage = tabs.indexOf(HoofdTab.HOME),
+        initialPage = maxOf(0, tabs.indexOf(HoofdTab.HOME)),
         pageCount = { tabs.size },
     )
     val balkState = rememberLazyListState()
@@ -95,15 +109,17 @@ fun TabScaffoldScreen(session: SessionViewModel) {
     // Tik op een chat-pushmelding: naar de chattab. ChatListScreen pakt de
     // rest van de deeplink (het juiste gesprek openen) zelf op.
     val gewenstGesprekId by MeldingRouter.gewenstGesprekId.collectAsState()
-    LaunchedEffect(gewenstGesprekId) {
-        if (gewenstGesprekId != null) pagerState.animateScrollToPage(tabs.indexOf(HoofdTab.CHAT))
+    LaunchedEffect(gewenstGesprekId, tabs) {
+        val index = tabs.indexOf(HoofdTab.CHAT)
+        if (gewenstGesprekId != null && index >= 0) pagerState.animateScrollToPage(index)
     }
 
     // Tik op een agenda-herinnering: naar de agendatab. AgendaScreen pakt de
     // rest van de deeplink (de juiste afspraak openen) zelf op.
     val gewenstAfspraakId by MeldingRouter.gewenstAfspraakId.collectAsState()
-    LaunchedEffect(gewenstAfspraakId) {
-        if (gewenstAfspraakId != null) pagerState.animateScrollToPage(tabs.indexOf(HoofdTab.AGENDA))
+    LaunchedEffect(gewenstAfspraakId, tabs) {
+        val index = tabs.indexOf(HoofdTab.AGENDA)
+        if (gewenstAfspraakId != null && index >= 0) pagerState.animateScrollToPage(index)
     }
 
     Scaffold(
