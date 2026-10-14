@@ -99,7 +99,7 @@ enum KilometerstandenService {
 
     /// Voegt een nieuwe stand toe. Gooit een fout als de stand niet hoger is dan
     /// de laatst bekende stand (zelfde validatie als de webapp).
-    static func voegToe(voertuigId: String, kilometerstand: Int, datum: String, notitie: String?, ingevoerdDoor: String) async throws {
+    static func voegToe(voertuigId: String, kilometerstand: Int, datum: String, tijd: String, notitie: String?, ingevoerdDoor: String) async throws {
         if let laatste = try await laatsteStand(voertuigId: voertuigId), kilometerstand <= laatste {
             throw KilometerstandenFout.nietHogerDanLaatste(laatste)
         }
@@ -107,12 +107,13 @@ enum KilometerstandenService {
             let voertuig_id: String
             let kilometerstand: Int
             let datum: String
+            let tijd: String
             let notitie: String?
             let ingevoerd_door: String
         }
         try await SupabaseManager.client
             .from("km_registraties")
-            .insert(Insert(voertuig_id: voertuigId, kilometerstand: kilometerstand, datum: datum, notitie: notitie, ingevoerd_door: ingevoerdDoor))
+            .insert(Insert(voertuig_id: voertuigId, kilometerstand: kilometerstand, datum: datum, tijd: tijd, notitie: notitie, ingevoerd_door: ingevoerdDoor))
             .execute()
     }
 }

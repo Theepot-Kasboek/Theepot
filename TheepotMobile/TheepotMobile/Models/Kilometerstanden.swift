@@ -31,13 +31,14 @@ struct KmRegistratie: Codable, Identifiable {
     let voertuigId: String
     var kilometerstand: Int
     var datum: String
+    var tijd: String?
     var notitie: String?
     let ingevoerdDoor: String?
 
     enum CodingKeys: String, CodingKey {
         case id
         case voertuigId = "voertuig_id"
-        case kilometerstand, datum, notitie
+        case kilometerstand, datum, tijd, notitie
         case ingevoerdDoor = "ingevoerd_door"
     }
 }

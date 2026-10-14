@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { getSupabase } from '@/lib/supabase'
-import { vandaagLokaal } from '@/lib/datum'
+import { vandaagLokaal, huidigeTijdLokaal } from '@/lib/datum'
 import { useAuth } from '@/components/AuthProvider'
 import Topbar from '@/components/Topbar'
 import Toast from '@/components/Toast'
@@ -30,6 +30,7 @@ interface KmRegistratie {
   voertuig_id: string
   kilometerstand: number
   datum: string
+  tijd: string | null
   notitie: string | null
   aangemaakt_op: string
   ingevoerd_door: string | null
@@ -298,7 +299,7 @@ export default function KilometerstandenPage() {
                               {verschil !== null && <span style={{ fontSize: 12, fontWeight: 400, color: 'var(--primary)', marginLeft: 8 }}>+{verschil.toLocaleString('nl-NL')} km</span>}
                             </div>
                             <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2, display: 'flex', gap: 10 }}>
-                              <span>📅 {fmtDatum(r.datum)}</span>
+                              <span>📅 {fmtDatum(r.datum)}{r.tijd && ` om ${r.tijd.slice(0, 5)}`}</span>
                               {r.profiel_naam && <span>👤 {r.profiel_naam}</span>}
                               {r.notitie && <span>📝 {r.notitie}</span>}
                             </div>
@@ -457,11 +458,12 @@ function VoertuigModal({ voertuig, onSave, onClose }: {
 function RegistratieModal({ voertuig, laasteStand, onSave, onClose }: {
   voertuig: Voertuig
   laasteStand: number | null
-  onSave: (data: { kilometerstand: number; datum: string; notitie: string | null }) => void
+  onSave: (data: { kilometerstand: number; datum: string; tijd: string; notitie: string | null }) => void
   onClose: () => void
 }) {
   const [stand, setStand] = useState('')
   const [datum, setDatum] = useState(vandaagLokaal)
+  const [tijd, setTijd] = useState(huidigeTijdLokaal)
   const [notitie, setNotitie] = useState('')
   const [fout, setFout] = useState('')
 
@@ -503,9 +505,15 @@ function RegistratieModal({ voertuig, laasteStand, onSave, onClose }: {
             {fout && <div style={{ fontSize: 12, color: '#DC2626', marginTop: 4 }}>{fout}</div>}
           </div>
 
-          <div>
-            <label className="form-label">Datum</label>
-            <input type="date" className="form-input" value={datum} onChange={e => setDatum(e.target.value)} />
+          <div style={{ display: 'flex', gap: 10 }}>
+            <div style={{ flex: 1 }}>
+              <label className="form-label">Datum</label>
+              <input type="date" className="form-input" value={datum} onChange={e => setDatum(e.target.value)} />
+            </div>
+            <div style={{ flex: 1 }}>
+              <label className="form-label">Tijd</label>
+              <input type="time" className="form-input" value={tijd} onChange={e => setTijd(e.target.value)} />
+            </div>
           </div>
 
           <div>
@@ -515,7 +523,7 @@ function RegistratieModal({ voertuig, laasteStand, onSave, onClose }: {
 
           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
             <button className="btn" onClick={onClose}>Annuleren</button>
-            <button className="btn btn-primary" onClick={() => { if (valideer()) onSave({ kilometerstand: parseInt(stand), datum, notitie: notitie.trim() || null }) }}>
+            <button className="btn btn-primary" onClick={() => { if (valideer()) onSave({ kilometerstand: parseInt(stand), datum, tijd, notitie: notitie.trim() || null }) }}>
               Opslaan
             </button>
           </div>

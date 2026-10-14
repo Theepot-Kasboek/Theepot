@@ -6,6 +6,7 @@ struct KilometerstandenView: View {
     @State private var gekozenVoertuig: KmVoertuig?
     @State private var kilometerstandTekst = ""
     @State private var datum = Date()
+    @State private var tijd = Date()
     @State private var notitie = ""
     @State private var laatsteStand: Int?
     @State private var foutmelding: String?
@@ -38,6 +39,7 @@ struct KilometerstandenView: View {
                             TextField("Kilometerstand", text: $kilometerstandTekst)
                                 .keyboardType(.numberPad)
                             DatePicker("Datum", selection: $datum, displayedComponents: .date)
+                            DatePicker("Tijd", selection: $tijd, displayedComponents: .hourAndMinute)
                             TextField("Notitie (optioneel)", text: $notitie)
                         }
                         if let foutmelding {
@@ -82,8 +84,9 @@ struct KilometerstandenView: View {
         defer { bezig = false }
 
         let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"
+        let tf = DateFormatter(); tf.dateFormat = "HH:mm"
         do {
-            try await KilometerstandenService.voegToe(voertuigId: voertuig.id, kilometerstand: stand, datum: f.string(from: datum), notitie: notitie.isEmpty ? nil : notitie, ingevoerdDoor: profielId)
+            try await KilometerstandenService.voegToe(voertuigId: voertuig.id, kilometerstand: stand, datum: f.string(from: datum), tijd: tf.string(from: tijd), notitie: notitie.isEmpty ? nil : notitie, ingevoerdDoor: profielId)
             succesmelding = "Kilometerstand opgeslagen."
             kilometerstandTekst = ""
             notitie = ""

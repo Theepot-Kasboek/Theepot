@@ -37,6 +37,7 @@ data class KmRegistratie(
     @SerialName("voertuig_id") val voertuigId: String,
     val kilometerstand: Int,
     val datum: String,
+    val tijd: String? = null,
     val notitie: String? = null,
     @SerialName("ingevoerd_door") val ingevoerdDoor: String? = null,
 )

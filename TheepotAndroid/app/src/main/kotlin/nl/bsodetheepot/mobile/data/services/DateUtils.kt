@@ -3,6 +3,7 @@ package nl.bsodetheepot.mobile.data.services
 import java.time.DayOfWeek
 import java.time.Instant
 import java.time.LocalDate
+import java.time.LocalTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -11,6 +12,7 @@ import java.util.Locale
 object DateUtils {
     val amsterdam: ZoneId = ZoneId.of("Europe/Amsterdam")
     private val isoDate = DateTimeFormatter.ofPattern("yyyy-MM-dd")
+    private val isoTime = DateTimeFormatter.ofPattern("HH:mm")
     private val maandFormatter = DateTimeFormatter.ofPattern("LLLL yyyy", Locale("nl", "NL"))
 
     fun vandaag(): LocalDate = LocalDate.now(amsterdam)
@@ -29,4 +31,6 @@ object DateUtils {
     fun maandLabel(date: LocalDate): String = date.format(maandFormatter)
 
     fun nowIso(): String = Instant.now().toString()
+
+    fun huidigeTijdStr(): String = LocalTime.now(amsterdam).format(isoTime)
 }

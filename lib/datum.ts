@@ -15,3 +15,9 @@ export function datumSleutel(datum: Date | string): string {
 export function vandaagLokaal(): string {
   return datumSleutel(new Date())
 }
+
+/** Het huidige tijdstip als "UU:MM" in lokale tijd — voor standaardwaarden in formulieren. */
+export function huidigeTijdLokaal(): string {
+  const d = new Date()
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+}

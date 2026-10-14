@@ -98,14 +98,14 @@ object KilometerstandenService {
     }.getOrNull()
 
     @Serializable
-    private data class Insert(val voertuig_id: String, val kilometerstand: Int, val datum: String, val notitie: String?, val ingevoerd_door: String?)
+    private data class Insert(val voertuig_id: String, val kilometerstand: Int, val datum: String, val tijd: String, val notitie: String?, val ingevoerd_door: String?)
 
-    suspend fun voegToe(voertuigId: String, kilometerstand: Int, datum: String, notitie: String?, ingevoerdDoor: String?) {
+    suspend fun voegToe(voertuigId: String, kilometerstand: Int, datum: String, tijd: String, notitie: String?, ingevoerdDoor: String?) {
         val laatste = laatsteStand(voertuigId)
         if (laatste != null && kilometerstand <= laatste) {
             throw NietHogerDanLaatsteFout(laatste)
         }
         SupabaseManager.client.postgrest["km_registraties"]
-            .insert(Insert(voertuigId, kilometerstand, datum, notitie, ingevoerdDoor))
+            .insert(Insert(voertuigId, kilometerstand, datum, tijd, notitie, ingevoerdDoor))
     }
 }

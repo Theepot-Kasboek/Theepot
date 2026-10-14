@@ -40,6 +40,7 @@ fun KilometerstandenScreen(session: SessionViewModel, onTerug: (() -> Unit)? = n
     var laatsteStand by remember { mutableStateOf<Int?>(null) }
     var nieuweStand by remember { mutableStateOf("") }
     var datum by remember { mutableStateOf(DateUtils.toDateStr(DateUtils.vandaag())) }
+    var tijd by remember { mutableStateOf(DateUtils.huidigeTijdStr()) }
     var notitie by remember { mutableStateOf("") }
     var foutmelding by remember { mutableStateOf<String?>(null) }
     var succesmelding by remember { mutableStateOf<String?>(null) }
@@ -94,6 +95,12 @@ fun KilometerstandenScreen(session: SessionViewModel, onTerug: (() -> Unit)? = n
                 modifier = Modifier.fillMaxWidth(),
             )
             OutlinedTextField(
+                value = tijd,
+                onValueChange = { tijd = it },
+                label = { Text("Tijd (uu:mm)") },
+                modifier = Modifier.fillMaxWidth(),
+            )
+            OutlinedTextField(
                 value = notitie,
                 onValueChange = { notitie = it },
                 label = { Text("Notitie (optioneel)") },
@@ -113,7 +120,7 @@ fun KilometerstandenScreen(session: SessionViewModel, onTerug: (() -> Unit)? = n
                     succesmelding = null
                     scope.launch {
                         runCatching {
-                            KilometerstandenService.voegToe(voertuig.id, standInt, datum, notitie.ifBlank { null }, profiel?.id)
+                            KilometerstandenService.voegToe(voertuig.id, standInt, datum, tijd, notitie.ifBlank { null }, profiel?.id)
                         }.onSuccess {
                             succesmelding = "Stand opgeslagen."
                             nieuweStand = ""
