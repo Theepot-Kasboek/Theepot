@@ -39,6 +39,7 @@ interface Week {
   week_nummer: number
   naam: string
   dag_subthemas: Partial<Record<Dag, string>> | null
+  gesloten_dagen: Partial<Record<Dag, boolean>> | null
 }
 
 interface VakantieActiviteit {
@@ -218,7 +219,7 @@ export default function VakantieplanningenPage() {
     await haalWekenOp(actievePlanning.id)
   }
 
-  async function bewerkWeekSubthema(weekId: string, data: { naam?: string; dag_subthemas?: Partial<Record<Dag, string>> }) {
+  async function bewerkWeekSubthema(weekId: string, data: { naam?: string; dag_subthemas?: Partial<Record<Dag, string>>; gesloten_dagen?: Partial<Record<Dag, boolean>> }) {
     if (!actievePlanning) return
     await getSupabase().from('vakantie_weken').update(data).eq('id', weekId)
     await haalWekenOp(actievePlanning.id)
@@ -370,9 +371,17 @@ export default function VakantieplanningenPage() {
     if (!actievePlanning) return ''
     try {
       const start = new Date(actiefStartDatum || actievePlanning.start_datum)
-      const dow = start.getDay() === 0 ? 6 : start.getDay() - 1
       const eersteMA = new Date(start)
-      eersteMA.setDate(start.getDate() - dow)
+      if (start.getDay() === 0) {
+        // Zondag: startdatum valt in het weekend vóór de vakantieweek, dus naar de volgende maandag.
+        eersteMA.setDate(start.getDate() + 1)
+      } else if (start.getDay() === 6) {
+        // Zaterdag: zelfde reden, naar de maandag erna.
+        eersteMA.setDate(start.getDate() + 2)
+      } else {
+        const dow = start.getDay() - 1
+        eersteMA.setDate(start.getDate() - dow)
+      }
       const dagIdx = DAGEN.indexOf(dag)
       const target = new Date(eersteMA)
       target.setDate(eersteMA.getDate() + (week.week_nummer - 1) * 7 + dagIdx)
@@ -701,13 +710,18 @@ function WeekOverzicht({ week, activiteiten, planning, dagDatumStr, onNieuw, onB
   onBewerk: (a: VakantieActiviteit) => void
   onVerwijder: (id: string) => void
   onJsonImport: (dag: Dag) => void
-  onSubthemaOp: (weekId: string, data: { naam?: string; dag_subthemas?: Partial<Record<Dag, string>> }) => void
+  onSubthemaOp: (weekId: string, data: { naam?: string; dag_subthemas?: Partial<Record<Dag, string>>; gesloten_dagen?: Partial<Record<Dag, boolean>> }) => void
   onVerplaats: (activiteitId: string, naarDag: Dag, naarIndex: number) => void
   bibliotheek: BibliotheekActiviteit[]
 }) {
   const perDag = planning.subthema_modus === 'dag'
   const [weekNaamInput, setWeekNaamInput] = useState(week.naam)
   const [dagInputs, setDagInputs] = useState<Partial<Record<Dag, string>>>(week.dag_subthemas ?? {})
+  const gesloten = week.gesloten_dagen ?? {}
+
+  function toggleGesloten(dag: Dag) {
+    onSubthemaOp(week.id, { gesloten_dagen: { ...gesloten, [dag]: !gesloten[dag] } })
+  }
   const [gesleepteId, setGesleepteId] = useState<string | null>(null)
   const [dropDoel, setDropDoel] = useState<{ dag: Dag; rijIdx: number } | null>(null)
 
@@ -753,9 +767,13 @@ function WeekOverzicht({ week, activiteiten, planning, dagDatumStr, onNieuw, onB
             <tr>
 
               {DAGEN.map((dag, i) => (
-                <th key={dag} style={{ padding: '10px 12px', background: 'var(--primary)', color: '#fff', fontFamily: 'Sora, sans-serif', fontSize: 13, textAlign: 'left', border: '1px solid var(--primary-dark)', borderRadius: i === 0 ? '8px 0 0 0' : i === DAGEN.length - 1 ? '0 8px 0 0' : 0 }}>
+                <th key={dag} style={{ padding: '10px 12px', background: gesloten[dag] ? 'var(--text-muted)' : 'var(--primary)', color: '#fff', fontFamily: 'Sora, sans-serif', fontSize: 13, textAlign: 'left', border: '1px solid var(--primary-dark)', borderRadius: i === 0 ? '8px 0 0 0' : i === DAGEN.length - 1 ? '0 8px 0 0' : 0 }}>
                   <div style={{ fontWeight: 700 }}>{DAG_LABEL[dag]}</div>
                   <div style={{ fontSize: 11, opacity: 0.85, fontWeight: 400 }}>{dagDatumStr(week, dag)}</div>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 400, marginTop: 4, cursor: 'pointer', opacity: 0.9 }}>
+                    <input type="checkbox" checked={!!gesloten[dag]} onChange={() => toggleGesloten(dag)} style={{ margin: 0 }} />
+                    Gesloten
+                  </label>
                 </th>
               ))}
             </tr>
@@ -790,6 +808,15 @@ function WeekOverzicht({ week, activiteiten, planning, dagDatumStr, onNieuw, onB
                   {DAGEN.map(dag => {
                     const act = activiteitenVan(dag)[rijIdx]
                     const isDropDoel = dropDoel?.dag === dag && dropDoel.rijIdx === rijIdx
+                    if (gesloten[dag]) {
+                      return (
+                        <td key={dag} style={{ padding: '6px 10px', border: '1px solid var(--border)', verticalAlign: 'middle', minWidth: 140, background: 'var(--bg)' }}>
+                          {rijIdx === 0 && (
+                            <span style={{ color: 'var(--text-muted)', fontSize: 12, fontStyle: 'italic' }}>Gesloten — geen programma</span>
+                          )}
+                        </td>
+                      )
+                    }
                     return (
                       <td
                         key={dag}
@@ -841,40 +868,43 @@ function WeekOverzicht({ week, activiteiten, planning, dagDatumStr, onNieuw, onB
             })}
             {/* Toevoegen rij */}
             <tr>
-              {DAGEN.map(dag => (
-                <td
-                  key={dag}
-                  style={{ padding: '6px 10px', border: '1px solid var(--border)', background: dropDoel?.dag === dag && dropDoel.rijIdx === -1 ? 'var(--primary-light)' : 'var(--bg)', transition: 'background 0.1s' }}
-                  onDragOver={e => { if (gesleepteId) { e.preventDefault(); e.dataTransfer.dropEffect = 'move' } }}
-                  onDragEnter={e => { if (gesleepteId) { e.preventDefault(); setDropDoel({ dag, rijIdx: -1 }) } }}
-                  onDragLeave={() => setDropDoel(prev => (prev?.dag === dag && prev.rijIdx === -1 ? null : prev))}
-                  onDrop={e => {
-                    e.preventDefault()
-                    const id = e.dataTransfer.getData('text/plain')
-                    setGesleepteId(null)
-                    setDropDoel(null)
-                    if (id) onVerplaats(id, dag, activiteitenVan(dag).length)
-                  }}
-                >
-                  <div style={{ display: 'flex', gap: 4 }}>
-                    <button
-                      onClick={() => onNieuw(dag)}
-                      className="btn btn-sm"
-                      style={{ fontSize: 11, padding: '3px 8px', flex: 1, justifyContent: 'center' }}
-                    >
-                      <Plus size={11} /> Activiteit
-                    </button>
-                    <button
-                      onClick={() => onJsonImport(dag)}
-                      className="btn btn-sm"
-                      style={{ fontSize: 11, padding: '3px 6px', fontFamily: 'monospace', fontWeight: 700 }}
-                      title="JSON importeren"
-                    >
-                      JSON
-                    </button>
-                  </div>
-                </td>
-              ))}
+              {DAGEN.map(dag => {
+                if (gesloten[dag]) return <td key={dag} style={{ padding: '6px 10px', border: '1px solid var(--border)', background: 'var(--bg)' }} />
+                return (
+                  <td
+                    key={dag}
+                    style={{ padding: '6px 10px', border: '1px solid var(--border)', background: dropDoel?.dag === dag && dropDoel.rijIdx === -1 ? 'var(--primary-light)' : 'var(--bg)', transition: 'background 0.1s' }}
+                    onDragOver={e => { if (gesleepteId) { e.preventDefault(); e.dataTransfer.dropEffect = 'move' } }}
+                    onDragEnter={e => { if (gesleepteId) { e.preventDefault(); setDropDoel({ dag, rijIdx: -1 }) } }}
+                    onDragLeave={() => setDropDoel(prev => (prev?.dag === dag && prev.rijIdx === -1 ? null : prev))}
+                    onDrop={e => {
+                      e.preventDefault()
+                      const id = e.dataTransfer.getData('text/plain')
+                      setGesleepteId(null)
+                      setDropDoel(null)
+                      if (id) onVerplaats(id, dag, activiteitenVan(dag).length)
+                    }}
+                  >
+                    <div style={{ display: 'flex', gap: 4 }}>
+                      <button
+                        onClick={() => onNieuw(dag)}
+                        className="btn btn-sm"
+                        style={{ fontSize: 11, padding: '3px 8px', flex: 1, justifyContent: 'center' }}
+                      >
+                        <Plus size={11} /> Activiteit
+                      </button>
+                      <button
+                        onClick={() => onJsonImport(dag)}
+                        className="btn btn-sm"
+                        style={{ fontSize: 11, padding: '3px 6px', fontFamily: 'monospace', fontWeight: 700 }}
+                        title="JSON importeren"
+                      >
+                        JSON
+                      </button>
+                    </div>
+                  </td>
+                )
+              })}
             </tr>
           </tbody>
         </table>
@@ -964,12 +994,18 @@ function DocumentWeergave({ planning, weken, activiteiten, dagDatumStr, tekstGro
                   <tr>
 
                     {DAGEN.map(dag => (
-                      <th key={dag} style={{ padding: '10px 14px', background: 'var(--primary)', color: '#fff', fontWeight: 700, fontSize: 13, textAlign: 'left', border: '1px solid var(--primary-dark)' }}>
-                        <a href={`#week-${week.week_nummer}-${dag}`} style={{ color: '#fff', textDecoration: 'underline', textUnderlineOffset: 3 }}>
-                          {DAG_LABEL[dag]}
-                        </a>
+                      <th key={dag} style={{ padding: '10px 14px', background: week.gesloten_dagen?.[dag] ? 'var(--text-muted)' : 'var(--primary)', color: '#fff', fontWeight: 700, fontSize: 13, textAlign: 'left', border: '1px solid var(--primary-dark)' }}>
+                        {week.gesloten_dagen?.[dag] ? (
+                          <span>{DAG_LABEL[dag]}</span>
+                        ) : (
+                          <a href={`#week-${week.week_nummer}-${dag}`} style={{ color: '#fff', textDecoration: 'underline', textUnderlineOffset: 3 }}>
+                            {DAG_LABEL[dag]}
+                          </a>
+                        )}
                         <div style={{ fontSize: 11, fontWeight: 400, opacity: 0.85 }}>{dagDatumStr(week, dag)}</div>
-                        {perDag && week.dag_subthemas?.[dag] && (
+                        {week.gesloten_dagen?.[dag] ? (
+                          <div style={{ fontSize: 11, fontWeight: 600, opacity: 0.95, marginTop: 2 }}>Gesloten</div>
+                        ) : perDag && week.dag_subthemas?.[dag] && (
                           <div style={{ fontSize: 11, fontWeight: 600, opacity: 0.95, marginTop: 2 }}>{week.dag_subthemas[dag]}</div>
                         )}
                       </th>
@@ -1004,6 +1040,7 @@ function DocumentWeergave({ planning, weken, activiteiten, dagDatumStr, tekstGro
             {/* Detail per dag */}
             <div style={{ marginTop: 28, display: 'flex', flexDirection: 'column', gap: 24 }}>
               {DAGEN.map(dag => {
+                if (week.gesloten_dagen?.[dag]) return null
                 const dagActs = activiteitenVan(week.id, dag)
                 if (dagActs.length === 0) return null
                 return (
