@@ -394,6 +394,8 @@ function weekStartsInMaand(maandSleutel: string): string[] {
 export default function MaaltijdlijstPage() {
   const { profiel, isSuperadmin, rechten, maaltijdToegang } = useAuth()
   const magZien = isSuperadmin || rechten.pagina_maaltijdlijst === 'lezen' || rechten.pagina_maaltijdlijst === 'bewerken'
+  const magOverzichtZien = isSuperadmin || profiel?.rol === 'directie' || profiel?.rol === 'leidinggevende'
+  const [actieveTab, setActieveTab] = useState<'week' | 'overzicht'>('week')
   const [toegestaneLocaties, setToegestaneLocaties] = useState<{naam: string; toegang: string}[]>([])
 
   const [locaties, setLocaties] = useState<Locatie[]>([])
@@ -615,6 +617,32 @@ export default function MaaltijdlijstPage() {
 
       <div className="page-content">
 
+        {/* Tabbladen: week-overzicht vs maandoverzicht per locatie (alleen directie/leidinggevende) */}
+        {magOverzichtZien && (
+          <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
+            {(['week', 'overzicht'] as const).map(tab => (
+              <button
+                key={tab}
+                onClick={() => setActieveTab(tab)}
+                style={{
+                  padding: '8px 18px', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                  border: '1.5px solid', transition: 'all 0.12s',
+                  borderColor: actieveTab === tab ? 'var(--primary)' : 'var(--border-dark)',
+                  background: actieveTab === tab ? 'var(--primary)' : 'var(--bg-card)',
+                  color: actieveTab === tab ? '#fff' : 'var(--text)',
+                }}
+              >
+                {tab === 'week' ? 'Weekoverzicht' : 'Maandoverzicht per locatie'}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {actieveTab === 'overzicht' && magOverzichtZien ? (
+          <MaandOverzichtTab locaties={locaties} />
+        ) : (
+        <>
+
         {/* Geen locaties */}
         {locaties.length === 0 && (
           <div className="empty-state">
@@ -756,6 +784,8 @@ export default function MaaltijdlijstPage() {
             )}
           </>
         )}
+        </>
+        )}
       </div>
 
       {toonOrientatieKeuze && <div style={{ position: 'fixed', inset: 0, zIndex: 20 }} onClick={() => setToonOrientatieKeuze(false)} />}
@@ -811,6 +841,108 @@ export default function MaaltijdlijstPage() {
 
       {toast && <Toast bericht={toast.bericht} type={toast.type} onClose={() => setToast(null)} />}
     </>
+  )
+}
+
+// ─── Maandoverzicht per locatie (directie/leidinggevende) ─────────────────────
+
+interface MaandTelling { naam: string; aantal: number }
+
+// Telt per locatie hoe vaak elk kind die kalendermaand daadwerkelijk heeft
+// meegegeten (aanwezig = true). Weken die nog niet bezocht zijn bestaan niet
+// in de database en leveren dus terecht 0 registraties op.
+function MaandOverzichtTab({ locaties }: { locaties: Locatie[] }) {
+  const [maand, setMaand] = useState(toDateStr(new Date()).slice(0, 7))
+  const [laden, setLaden] = useState(false)
+  const [tellingen, setTellingen] = useState<Record<string, MaandTelling[]>>({})
+
+  useEffect(() => {
+    if (locaties.length === 0) { setTellingen({}); return }
+
+    async function laad() {
+      setLaden(true)
+      const supabase = getSupabase()
+      const weekStarts = weekStartsInMaand(maand)
+      const resultaat: Record<string, MaandTelling[]> = {}
+
+      for (const loc of locaties) {
+        const { data: weken } = await supabase
+          .from('maaltijd_weken').select('id')
+          .eq('locatie_id', loc.id).in('week_start', weekStarts)
+
+        const weekIds = ((weken ?? []) as { id: string }[]).map(w => w.id)
+        if (weekIds.length === 0) { resultaat[loc.id] = []; continue }
+
+        const { data: regs } = await supabase
+          .from('maaltijd_registraties').select('naam')
+          .in('week_id', weekIds).eq('aanwezig', true)
+
+        const tellingMap = new Map<string, number>()
+        for (const r of (regs ?? []) as { naam: string }[]) {
+          tellingMap.set(r.naam, (tellingMap.get(r.naam) ?? 0) + 1)
+        }
+        resultaat[loc.id] = Array.from(tellingMap.entries())
+          .map(([naam, aantal]) => ({ naam, aantal }))
+          .sort((a, b) => b.aantal - a.aantal || a.naam.localeCompare(b.naam))
+      }
+
+      setTellingen(resultaat)
+      setLaden(false)
+    }
+    laad()
+  }, [maand, locaties])
+
+  return (
+    <div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
+        <label className="form-label" style={{ margin: 0 }}>Maand</label>
+        <input type="month" className="form-input" style={{ width: 180 }} value={maand} onChange={e => setMaand(e.target.value)} />
+      </div>
+
+      {laden ? (
+        <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>Laden...</div>
+      ) : locaties.length === 0 ? (
+        <div className="empty-state">
+          <MapPin size={36} />
+          <h3>Geen locaties</h3>
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+          {locaties.map(loc => {
+            const data = tellingen[loc.id] ?? []
+            return (
+              <div key={loc.id} className="card">
+                <div className="card-header">
+                  <span className="card-title">{loc.naam}</span>
+                </div>
+                <div className="card-body">
+                  {data.length === 0 ? (
+                    <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: 0, fontStyle: 'italic' }}>Geen meegegeten-registraties deze maand.</p>
+                  ) : (
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                      <thead>
+                        <tr>
+                          <th style={{ textAlign: 'left', padding: '6px 10px', borderBottom: '1px solid var(--border)', color: 'var(--text-muted)', fontWeight: 500 }}>Kind</th>
+                          <th style={{ textAlign: 'right', padding: '6px 10px', borderBottom: '1px solid var(--border)', color: 'var(--text-muted)', fontWeight: 500 }}>Aantal keer meegegeten</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {data.map(t => (
+                          <tr key={t.naam}>
+                            <td style={{ padding: '6px 10px', borderBottom: '1px solid var(--border)' }}>{t.naam}</td>
+                            <td style={{ padding: '6px 10px', borderBottom: '1px solid var(--border)', textAlign: 'right', fontWeight: 600 }}>{t.aantal}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
   )
 }
 
