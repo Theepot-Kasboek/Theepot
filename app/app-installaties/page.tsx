@@ -7,8 +7,8 @@ import { useAuth } from '@/components/AuthProvider'
 import Topbar from '@/components/Topbar'
 import Toast from '@/components/Toast'
 import {
-  Plus, X, Trash2, Pencil, Smartphone, Tablet, Apple, Bot,
-  ShieldCheck, Tag,
+  Plus, X, Trash2, Pencil, Smartphone, Apple, Bot,
+  ShieldCheck, Tag, ChevronDown, ChevronUp,
 } from 'lucide-react'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -56,6 +56,11 @@ export default function AppInstallatiesPage() {
   const [versieModal, setVersieModal] = useState<AppVersie | 'nieuw' | null>(null)
   const [apparaatModal, setApparaatModal] = useState<AppInstallatie | 'nieuw' | null>(null)
   const [toast, setToast] = useState<{ bericht: string; type: 'success' | 'error' } | null>(null)
+  const [ingeklapt, setIngeklapt] = useState<Record<string, boolean>>({})
+
+  function toggle(sectie: string) {
+    setIngeklapt(prev => ({ ...prev, [sectie]: !prev[sectie] }))
+  }
 
   const haalOp = useCallback(async () => {
     setLaden(true)
@@ -129,28 +134,46 @@ export default function AppInstallatiesPage() {
               <div style={{ fontSize: 13 }}>Nog geen versies geregistreerd</div>
             </div>
           ) : (
-            <div>
-              {versies.map((v, i) => (
-                <div key={v.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 14, padding: '12px 18px', borderBottom: i < versies.length - 1 ? '1px solid var(--border)' : 'none' }}>
-                  <div style={{ flexShrink: 0, marginTop: 2 }}><PlatformIcon platform={v.platform} /></div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 14, fontWeight: 700, fontFamily: 'Sora, sans-serif' }}>
-                      {v.platform === 'ios' ? 'iOS' : 'Android'} · versie {v.versie}
+            (['ios', 'android'] as const).map(platform => {
+              const versiesVoorPlatform = versies.filter(v => v.platform === platform)
+              if (versiesVoorPlatform.length === 0) return null
+              const sectieKey = `versies-${platform}`
+              const open = !ingeklapt[sectieKey]
+              return (
+                <div key={platform} style={{ borderTop: '1px solid var(--border)' }}>
+                  <button
+                    onClick={() => toggle(sectieKey)}
+                    style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '12px 18px', background: 'var(--bg-subtle, transparent)', border: 'none', cursor: 'pointer', textAlign: 'left' }}
+                  >
+                    <PlatformIcon platform={platform} size={18} />
+                    <span style={{ fontSize: 13, fontWeight: 700, fontFamily: 'Sora, sans-serif', flex: 1 }}>
+                      {platform === 'ios' ? 'iOS' : 'Android'}
+                    </span>
+                    <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{versiesVoorPlatform.length}</span>
+                    {open ? <ChevronUp size={16} color="var(--text-muted)" /> : <ChevronDown size={16} color="var(--text-muted)" />}
+                  </button>
+                  {open && versiesVoorPlatform.map((v) => (
+                    <div key={v.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 14, padding: '12px 18px', borderTop: '1px solid var(--border)' }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 14, fontWeight: 700, fontFamily: 'Sora, sans-serif' }}>
+                          versie {v.versie}
+                        </div>
+                        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
+                          Uitgebracht op {fmtDatum(v.uitgebracht_op)}
+                        </div>
+                        {v.wijzigingen && (
+                          <div style={{ fontSize: 12, color: 'var(--text)', marginTop: 6, whiteSpace: 'pre-wrap' }}>{v.wijzigingen}</div>
+                        )}
+                      </div>
+                      <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                        <button className="btn btn-sm" onClick={() => setVersieModal(v)}><Pencil size={12} /></button>
+                        <button className="btn btn-sm" style={{ color: '#DC2626', borderColor: '#FECACA' }} onClick={() => verwijderVersie(v.id)}><Trash2 size={12} /></button>
+                      </div>
                     </div>
-                    <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
-                      Uitgebracht op {fmtDatum(v.uitgebracht_op)}
-                    </div>
-                    {v.wijzigingen && (
-                      <div style={{ fontSize: 12, color: 'var(--text)', marginTop: 6, whiteSpace: 'pre-wrap' }}>{v.wijzigingen}</div>
-                    )}
-                  </div>
-                  <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-                    <button className="btn btn-sm" onClick={() => setVersieModal(v)}><Pencil size={12} /></button>
-                    <button className="btn btn-sm" style={{ color: '#DC2626', borderColor: '#FECACA' }} onClick={() => verwijderVersie(v.id)}><Trash2 size={12} /></button>
-                  </div>
+                  ))}
                 </div>
-              ))}
-            </div>
+              )
+            })
           )}
         </div>
 
@@ -171,30 +194,46 @@ export default function AppInstallatiesPage() {
               <button className="btn btn-sm btn-primary" style={{ marginTop: 10 }} onClick={() => setApparaatModal('nieuw')}><Plus size={12} /> Toevoegen</button>
             </div>
           ) : (
-            <div>
-              {installaties.map((a, i) => (
-                <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '12px 18px', borderBottom: i < installaties.length - 1 ? '1px solid var(--border)' : 'none' }}>
-                  <div style={{ flexShrink: 0 }}><PlatformIcon platform={a.platform} /></div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 14, fontWeight: 700, fontFamily: 'Sora, sans-serif' }}>{a.apparaat_naam}</div>
-                    <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                      <span>{a.platform === 'ios' ? 'iOS' : 'Android'}</span>
-                      <span>·</span>
-                      <span>versie {versieLabel(a.versie_id)}</span>
-                      <span>·</span>
-                      <span>geïnstalleerd {fmtDatum(a.geinstalleerd_op)}</span>
+            (['ios', 'android'] as const).map(platform => {
+              const installatiesVoorPlatform = installaties.filter(a => a.platform === platform)
+              if (installatiesVoorPlatform.length === 0) return null
+              const sectieKey = `apparaten-${platform}`
+              const open = !ingeklapt[sectieKey]
+              return (
+                <div key={platform} style={{ borderTop: '1px solid var(--border)' }}>
+                  <button
+                    onClick={() => toggle(sectieKey)}
+                    style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '12px 18px', background: 'var(--bg-subtle, transparent)', border: 'none', cursor: 'pointer', textAlign: 'left' }}
+                  >
+                    <PlatformIcon platform={platform} size={18} />
+                    <span style={{ fontSize: 13, fontWeight: 700, fontFamily: 'Sora, sans-serif', flex: 1 }}>
+                      {platform === 'ios' ? 'iOS' : 'Android'}
+                    </span>
+                    <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{installatiesVoorPlatform.length}</span>
+                    {open ? <ChevronUp size={16} color="var(--text-muted)" /> : <ChevronDown size={16} color="var(--text-muted)" />}
+                  </button>
+                  {open && installatiesVoorPlatform.map((a) => (
+                    <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '12px 18px', borderTop: '1px solid var(--border)' }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 14, fontWeight: 700, fontFamily: 'Sora, sans-serif' }}>{a.apparaat_naam}</div>
+                        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                          <span>versie {versieLabel(a.versie_id)}</span>
+                          <span>·</span>
+                          <span>geïnstalleerd {fmtDatum(a.geinstalleerd_op)}</span>
+                        </div>
+                        {a.notitie && (
+                          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>📝 {a.notitie}</div>
+                        )}
+                      </div>
+                      <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                        <button className="btn btn-sm" onClick={() => setApparaatModal(a)}><Pencil size={12} /></button>
+                        <button className="btn btn-sm" style={{ color: '#DC2626', borderColor: '#FECACA' }} onClick={() => verwijderApparaat(a.id)}><Trash2 size={12} /></button>
+                      </div>
                     </div>
-                    {a.notitie && (
-                      <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>📝 {a.notitie}</div>
-                    )}
-                  </div>
-                  <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-                    <button className="btn btn-sm" onClick={() => setApparaatModal(a)}><Pencil size={12} /></button>
-                    <button className="btn btn-sm" style={{ color: '#DC2626', borderColor: '#FECACA' }} onClick={() => verwijderApparaat(a.id)}><Trash2 size={12} /></button>
-                  </div>
+                  ))}
                 </div>
-              ))}
-            </div>
+              )
+            })
           )}
         </div>
       </div>
