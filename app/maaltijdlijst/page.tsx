@@ -375,6 +375,98 @@ async function exporteerMaandPDF(
   doc.save(`Maaltijdlijst_${locatieNaam}_${maandSleutel}.pdf`)
 }
 
+// ─── Export: maandoverzicht per locatie (tellingen) ────────────────────────────
+
+async function exporteerMaandOverzichtPDF(
+  maandSleutel: string, // "YYYY-MM"
+  locatieTellingen: { locatieNaam: string; tellingen: MaandTelling[] }[]
+) {
+  const { jsPDF } = await import('jspdf')
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
+
+  const groen: [number, number, number] = [140, 198, 63]
+  const donkerGroen: [number, number, number] = [61, 107, 26]
+  const wit: [number, number, number] = [255, 255, 255]
+  const zwart: [number, number, number] = [30, 30, 30]
+  const grijs: [number, number, number] = [180, 180, 180]
+
+  const paginaBreedte = 210
+  const paginaHoogte = 297
+  const marge = 14
+  const breedte = paginaBreedte - marge * 2
+  const rijH = 8
+  const maandNaam = new Date(`${maandSleutel}-01`).toLocaleDateString('nl-NL', { month: 'long', year: 'numeric' })
+
+  function tekenHeader() {
+    doc.setFillColor(...groen)
+    doc.rect(0, 0, paginaBreedte, 16, 'F')
+    doc.setTextColor(...wit)
+    doc.setFontSize(8.5)
+    doc.setFont('helvetica', 'bold')
+    doc.text('De Theepot — Maandoverzicht per locatie', marge, 10)
+    doc.setFont('helvetica', 'normal')
+    doc.text(new Date().toLocaleDateString('nl-NL'), paginaBreedte - marge, 10, { align: 'right' })
+  }
+
+  tekenHeader()
+  let y = 26
+  doc.setTextColor(...zwart)
+  doc.setFontSize(16)
+  doc.setFont('helvetica', 'bold')
+  doc.text(`Maandoverzicht — ${maandNaam}`, marge, y)
+  y += 10
+
+  locatieTellingen.forEach(({ locatieNaam, tellingen }) => {
+    if (y + 20 > paginaHoogte - 20) { doc.addPage(); tekenHeader(); y = 26 }
+
+    doc.setFontSize(12)
+    doc.setFont('helvetica', 'bold')
+    doc.setTextColor(...donkerGroen)
+    doc.text(locatieNaam, marge, y)
+    y += 7
+
+    if (tellingen.length === 0) {
+      doc.setFontSize(9)
+      doc.setFont('helvetica', 'italic')
+      doc.setTextColor(...grijs)
+      doc.text('Geen meegegeten-registraties deze maand.', marge, y)
+      y += 10
+      return
+    }
+
+    // Tabelheader
+    doc.setFillColor(...groen)
+    doc.rect(marge, y, breedte, rijH, 'F')
+    doc.setTextColor(...wit)
+    doc.setFontSize(8.5)
+    doc.setFont('helvetica', 'bold')
+    doc.text('Kind', marge + 3, y + 5.5)
+    doc.text('Aantal keer meegegeten', marge + breedte - 3, y + 5.5, { align: 'right' })
+    y += rijH
+
+    tellingen.forEach((t, i) => {
+      if (y + rijH > paginaHoogte - 20) { doc.addPage(); tekenHeader(); y = 26 }
+      doc.setFillColor(i % 2 === 1 ? 248 : 255, i % 2 === 1 ? 250 : 255, i % 2 === 1 ? 248 : 255)
+      doc.rect(marge, y, breedte, rijH, 'F')
+      doc.setDrawColor(...grijs)
+      doc.setLineWidth(0.25)
+      doc.rect(marge, y, breedte, rijH)
+      doc.setFontSize(8.5)
+      doc.setFont('helvetica', 'normal')
+      doc.setTextColor(...zwart)
+      doc.text(t.naam, marge + 3, y + 5.5)
+      doc.setFont('helvetica', 'bold')
+      doc.text(String(t.aantal), marge + breedte - 3, y + 5.5, { align: 'right' })
+      y += rijH
+    })
+
+    y += 8
+  })
+
+  tekenVoetteksten(doc, 'portrait', `De Theepot — Maandoverzicht per locatie — ${maandNaam}`)
+  doc.save(`Maandoverzicht_${maandSleutel}.pdf`)
+}
+
 // Geeft alle week-starts (maandagen) terug van weken die minstens één dag in de
 // opgegeven kalendermaand hebben ("YYYY-MM").
 function weekStartsInMaand(maandSleutel: string): string[] {
@@ -854,6 +946,7 @@ interface MaandTelling { naam: string; aantal: number }
 function MaandOverzichtTab({ locaties }: { locaties: Locatie[] }) {
   const [maand, setMaand] = useState(toDateStr(new Date()).slice(0, 7))
   const [laden, setLaden] = useState(false)
+  const [exporteren, setExporteren] = useState(false)
   const [tellingen, setTellingen] = useState<Record<string, MaandTelling[]>>({})
 
   useEffect(() => {
@@ -892,11 +985,24 @@ function MaandOverzichtTab({ locaties }: { locaties: Locatie[] }) {
     laad()
   }, [maand, locaties])
 
+  async function exporteerPDF() {
+    setExporteren(true)
+    try {
+      const locatieTellingen = locaties.map(loc => ({ locatieNaam: loc.naam, tellingen: tellingen[loc.id] ?? [] }))
+      await exporteerMaandOverzichtPDF(maand, locatieTellingen)
+    } finally {
+      setExporteren(false)
+    }
+  }
+
   return (
     <div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
         <label className="form-label" style={{ margin: 0 }}>Maand</label>
         <input type="month" className="form-input" style={{ width: 180 }} value={maand} onChange={e => setMaand(e.target.value)} />
+        <button className="btn btn-primary" onClick={exporteerPDF} disabled={laden || exporteren || locaties.length === 0} style={{ marginLeft: 'auto' }}>
+          <Download size={14} /> {exporteren ? 'Bezig...' : 'Export PDF'}
+        </button>
       </div>
 
       {laden ? (
