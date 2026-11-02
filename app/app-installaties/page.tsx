@@ -29,6 +29,7 @@ interface AppInstallatie {
   apparaat_naam: string
   platform: Platform
   versie_id: string | null
+  niet_geinstalleerd: boolean
   notitie: string | null
   geinstalleerd_op: string
   aangemaakt_op: string
@@ -216,10 +217,16 @@ export default function AppInstallatiesPage() {
                     <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '12px 18px', borderTop: '1px solid var(--border)' }}>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontSize: 14, fontWeight: 700, fontFamily: 'Sora, sans-serif' }}>{a.apparaat_naam}</div>
-                        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                          <span>versie {versieLabel(a.versie_id)}</span>
-                          <span>·</span>
-                          <span>geïnstalleerd {fmtDatum(a.geinstalleerd_op)}</span>
+                        <div style={{ fontSize: 11, color: a.niet_geinstalleerd ? '#DC2626' : 'var(--text-muted)', marginTop: 2, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                          {a.niet_geinstalleerd ? (
+                            <span>niet geïnstalleerd</span>
+                          ) : (
+                            <>
+                              <span>versie {versieLabel(a.versie_id)}</span>
+                              <span>·</span>
+                              <span>geïnstalleerd {fmtDatum(a.geinstalleerd_op)}</span>
+                            </>
+                          )}
                         </div>
                         {a.notitie && (
                           <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>📝 {a.notitie}</div>
@@ -355,13 +362,15 @@ function ApparaatModal({ apparaat, versies, onSave, onClose }: {
   onSave: (data: Omit<AppInstallatie, 'id' | 'aangemaakt_op'>) => void
   onClose: () => void
 }) {
+  const NIET_GEINSTALLEERD = 'NIET_GEINSTALLEERD'
   const [naam, setNaam] = useState(apparaat?.apparaat_naam ?? '')
   const [platform, setPlatform] = useState<Platform>(apparaat?.platform ?? 'android')
-  const [versieId, setVersieId] = useState(apparaat?.versie_id ?? '')
+  const [versieId, setVersieId] = useState(apparaat?.niet_geinstalleerd ? NIET_GEINSTALLEERD : (apparaat?.versie_id ?? ''))
   const [notitie, setNotitie] = useState(apparaat?.notitie ?? '')
   const [geinstalleerdOp, setGeinstalleerdOp] = useState(apparaat?.geinstalleerd_op ?? vandaagLokaal())
 
   const versiesVoorPlatform = versies.filter(v => v.platform === platform)
+  const nietGeinstalleerd = versieId === NIET_GEINSTALLEERD
 
   return (
     <div className="modal-backdrop" onClick={e => { if (e.target === e.currentTarget) onClose() }}>
@@ -394,16 +403,19 @@ function ApparaatModal({ apparaat, versies, onSave, onClose }: {
             <label className="form-label">Geïnstalleerde versie</label>
             <select className="form-select" value={versieId} onChange={e => setVersieId(e.target.value)}>
               <option value="">— Onbekend —</option>
+              <option value={NIET_GEINSTALLEERD}>Niet geïnstalleerd</option>
               {versiesVoorPlatform.map(v => (
                 <option key={v.id} value={v.id}>{v.versie}</option>
               ))}
             </select>
           </div>
 
-          <div>
-            <label className="form-label">Geïnstalleerd op</label>
-            <input type="date" className="form-input" value={geinstalleerdOp} onChange={e => setGeinstalleerdOp(e.target.value)} />
-          </div>
+          {!nietGeinstalleerd && (
+            <div>
+              <label className="form-label">Geïnstalleerd op</label>
+              <input type="date" className="form-input" value={geinstalleerdOp} onChange={e => setGeinstalleerdOp(e.target.value)} />
+            </div>
+          )}
 
           <div>
             <label className="form-label">Notitie (optioneel)</label>
@@ -413,7 +425,9 @@ function ApparaatModal({ apparaat, versies, onSave, onClose }: {
           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
             <button className="btn" onClick={onClose}>Annuleren</button>
             <button className="btn btn-primary" disabled={!naam.trim()} onClick={() => onSave({
-              apparaat_naam: naam.trim(), platform, versie_id: versieId || null,
+              apparaat_naam: naam.trim(), platform,
+              versie_id: nietGeinstalleerd ? null : (versieId || null),
+              niet_geinstalleerd: nietGeinstalleerd,
               notitie: notitie.trim() || null, geinstalleerd_op: geinstalleerdOp,
             })}>
               {apparaat ? 'Opslaan' : 'Toevoegen'}

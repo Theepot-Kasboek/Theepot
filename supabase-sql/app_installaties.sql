@@ -31,3 +31,6 @@ insert into app_versies (platform, versie, wijzigingen)
 values
   ('android', '1.1', 'Eerste versie van de native Android-app.'),
   ('ios', '1.1', 'Eerste versie van de native iOS-app.');
+
+-- Later toegevoegd: markeren dat een apparaat de app nog niet heeft (todo-lijst).
+alter table app_installaties add column if not exists niet_geinstalleerd boolean not null default false;
