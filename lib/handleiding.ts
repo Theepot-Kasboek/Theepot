@@ -17,10 +17,10 @@ export interface Hoofdstuk {
   blokken: Blok[]
 }
 
-export const HANDLEIDING_VERSIE = 'versie 3 augustus 2026'
+export const HANDLEIDING_VERSIE = 'versie 3 november 2026'
 
 export const HANDLEIDING_INLEIDING =
-  'Deze handleiding legt uit hoe je tien onderdelen van het dashboard in je dagelijkse werk gebruikt, ' +
+  'Deze handleiding legt uit hoe je twaalf onderdelen van het dashboard in je dagelijkse werk gebruikt, ' +
   'en hoe de app op je telefoon werkt. Houd hem ernaast als naslagwerk.'
 
 export const HANDLEIDING_SLOT =
@@ -55,8 +55,34 @@ export const HOOFDSTUKKEN: Hoofdstuk[] = [
     ],
   },
   {
-    id: 'kasboek',
+    id: 'startscherm',
     nummer: 'I',
+    titel: 'Het startscherm',
+    intro: 'De eerste pagina die je ziet na inloggen, opgebouwd uit widgets die je zelf naar wens indeelt.',
+    blokken: [
+      {
+        soort: 'stappen',
+        kop: 'Zo gebruik je het',
+        stappen: [
+          'Na het inloggen kom je op het dashboard: een scherm met widgets, bijvoorbeeld het prikbord, je taken, het weer of de weekagenda.',
+          'Klik op "Widget toevoegen" om een blok uit de lijst toe te voegen, bijvoorbeeld Kasboek, Nieuwsbrieven of Agenda vandaag.',
+          'Versleep een widget naar een andere plek om de volgorde aan te passen.',
+          'Gebruik het formaat-icoon op een widget om hem groter of kleiner te maken.',
+          'Wil je een widget niet meer zien? Klik op het kruisje erop; via "Widget toevoegen" zet je hem later gewoon terug.',
+        ],
+      },
+      {
+        soort: 'weetje',
+        label: 'Goed om te weten',
+        tekst:
+          'Je indeling wordt per account op dit apparaat onthouden. Open je het dashboard op een ander ' +
+          'apparaat of in een andere browser, dan zie je weer de standaardindeling totdat je die daar ook aanpast.',
+      },
+    ],
+  },
+  {
+    id: 'kasboek',
+    nummer: 'II',
     titel: 'Kasboek',
     intro: 'Voor het bijhouden van inkomsten en uitgaven per locatie, met bonnetjes en een maandoverzicht.',
     blokken: [
@@ -73,8 +99,17 @@ export const HOOFDSTUKKEN: Hoofdstuk[] = [
           'Blader met de pijltjes bovenaan naar een andere maand om eerdere boekingen terug te zien.',
           'Wil je een overzicht meenemen of afdrukken? Gebruik de knop "PDF" voor een export van de maand.',
           'Een boeking fout ingevoerd? Verwijder hem via het prullenbak-icoon op de rij.',
+          'Is de maand compleet en gecontroleerd? Klik op "Afronden" om de maand te vergrendelen — er kan dan door niemand meer iets in gewijzigd worden.',
         ],
         chips: ['Bedrag — verplicht', 'Categorie', 'Omschrijving', 'Bonnetje (foto/pdf)'],
+      },
+      {
+        soort: 'uitleg',
+        label: 'Afronden en heropenen',
+        tekst:
+          'Zodra een maand is **afgerond**, staat er een duidelijke melding en kan niemand meer iets in die ' +
+          'maand wijzigen — ook jij niet. Moet er toch nog iets aangepast worden, dan kan alleen een ' +
+          '**beheerder** de maand via "Heropenen" weer vrijgeven.',
       },
       {
         soort: 'uitleg',
@@ -98,7 +133,7 @@ export const HOOFDSTUKKEN: Hoofdstuk[] = [
   },
   {
     id: 'prikbord',
-    nummer: 'II',
+    nummer: 'III',
     titel: 'Prikbord',
     intro: "Voor mededelingen aan collega's, met een prioriteit en optioneel een vervaldatum.",
     blokken: [
@@ -128,7 +163,7 @@ export const HOOFDSTUKKEN: Hoofdstuk[] = [
   },
   {
     id: 'maaltijdlijst',
-    nummer: 'III',
+    nummer: 'IV',
     titel: 'Maaltijdlijst',
     intro: 'Voor het bijhouden van wie er heeft meegegeten en wat er per dag gegeten is.',
     blokken: [
@@ -151,6 +186,7 @@ export const HOOFDSTUKKEN: Hoofdstuk[] = [
           'Kies bovenin de dag; maandag tot en met vrijdag hebben elk hun eigen vaste lijst. Een stipje betekent dat daar al kinderen staan.',
           'Vul onderin "Naam kind" in, en eventueel "Bijzonderheden / allergie".',
           'Klik op "Toevoegen aan …" of druk op Enter; de knop noemt de gekozen dag.',
+          'Staat een kind er maar tijdelijk op? Geef bij het potloodje een datum "vanaf" en/of "tot" mee — buiten die periode wordt het kind niet meer automatisch ingevuld.',
           'Hoort een kind er niet meer bij? Klik op het kruisje achter de naam.',
           'Klaar? Klik op "Sluiten".',
         ],
@@ -160,9 +196,9 @@ export const HOOFDSTUKKEN: Hoofdstuk[] = [
         label: 'Vaste lijst per dag',
         tekst:
           'Zodra iemand een nieuwe week opent, worden de standaard kinderen automatisch op de juiste dagen ' +
-          'ingevuld — je hoeft ze dus niet elke week opnieuw in te typen. Let op: dat gebeurt op het moment ' +
-          'dat de week wordt aangemaakt. Pas je de standaardlijst later aan, dan verandert een week die al ' +
-          'bestond niet mee.',
+          'ingevuld — je hoeft ze dus niet elke week opnieuw in te typen, en dat geldt ook met terugwerkende ' +
+          'kracht voor weken die al bestaan. **Alleen** als een kind een "vanaf"- of "tot"-datum heeft, telt ' +
+          'dat mee: buiten die periode wordt het kind in die week niet ingevuld.',
       },
       {
         soort: 'weetje',
@@ -171,11 +207,20 @@ export const HOOFDSTUKKEN: Hoofdstuk[] = [
           'Iedereen met bewerkrechten voor een locatie kan zelf kinderen toevoegen of verwijderen én de ' +
           'standaardlijst beheren. Bij "alleen lezen"-rechten staan de knoppen uit en kun je de lijst alleen bekijken.',
       },
+      {
+        soort: 'weetje',
+        label: 'Voor leiding en directie',
+        tekst:
+          'Heb je de rol leidinggevende of directie? Dan heb je een extra tabblad "Maandoverzicht per ' +
+          'locatie", met daarin per locatie het aantal eters van die maand. Met "Export PDF" maak je daarvan ' +
+          'een overzicht voor alle locaties samen; weken die nog niet bezocht zijn, worden daarbij automatisch ' +
+          'aangemaakt met de standaard eters.',
+      },
     ],
   },
   {
     id: 'brandoefening',
-    nummer: 'IV',
+    nummer: 'V',
     titel: 'Brandoefening',
     intro: 'Voor het registreren van brandoefeningen per week, per dag.',
     blokken: [
@@ -190,6 +235,7 @@ export const HOOFDSTUKKEN: Hoofdstuk[] = [
           'Sla op — de dag krijgt daarna een vinkje in het overzicht.',
           'Wil je iets later aanpassen? Open de al ingevulde dag opnieuw via "Bewerken".',
           'Gebruik "PDF week" om de volledige week te exporteren, bijvoorbeeld voor het brandveiligheidsdossier.',
+          'Is de week compleet? Klik op "Afronden" om de week te vergrendelen; alleen een beheerder kan hem daarna nog via "Heropenen" terugzetten.',
         ],
         chips: [
           'Datum & tijd',
@@ -206,8 +252,46 @@ export const HOOFDSTUKKEN: Hoofdstuk[] = [
     ],
   },
   {
+    id: 'vakantieplanningen',
+    nummer: 'VI',
+    titel: 'Vakantieplanningen',
+    intro: 'Voor de planning tijdens de schoolvakanties: een thema en activiteit per dag, met een overzicht van alle benodigdheden.',
+    blokken: [
+      {
+        soort: 'stappen',
+        kop: 'Zo gebruik je het',
+        stappen: [
+          'Open Vakantieplanningen. Heb je geen bewerkrechten, dan zie je alleen de gepubliceerde planningen; concepten staan er dan niet bij.',
+          'Klik op een planning om hem te openen en kies boven aan "Document" voor de leesbare weekindeling, of "Benodigdheden" voor de verzamellijst van alles wat nodig is.',
+          'Heb je bewerkrechten? Kies dan "Overzicht" om de planning te bewerken: per week — of per dag, afhankelijk van de instelling — vul je een subthema in.',
+          'Is de locatie een dag gesloten tijdens de vakantie? Vink dat aan bij die dag; hij valt dan verder uit de planning.',
+          'Vul per dag een activiteit in: kies uit de activiteitenbibliotheek of typ er zelf één in, en zoek eventueel via "Foto zoeken" een voorbeeldafbeelding erbij.',
+          'Voeg bij een activiteit eventueel een bijlage toe, zoals een werkblad, of verwijder hem weer.',
+          'Versleep een activiteit naar een andere dag om de planning te herordenen.',
+          'Is de planning klaar? Klik op "Publiceren" zodat iedereen hem kan zien. Wil je hem terugzetten naar concept, klik dan op "Verbergen".',
+        ],
+        chips: ['Thema', 'Vakantieperiode', 'Subthema per week of per dag', 'Benodigdheden — automatisch'],
+      },
+      {
+        soort: 'uitleg',
+        label: 'Concept of gepubliceerd',
+        tekst:
+          'Een nieuwe planning begint als **concept** en is dan alleen zichtbaar voor wie bewerkrechten ' +
+          'heeft. Pas na **publiceren** kan iedereen de planning zien — in het dashboard en in de app.',
+      },
+      {
+        soort: 'weetje',
+        label: 'Goed om te weten',
+        tekst:
+          'Onder "Benodigdheden" staat een automatisch samengestelde lijst van alles wat voor de hele ' +
+          'planning nodig is, met de optie om alle bijlagen in één keer te downloaden. Heb je geen ' +
+          'bewerkrechten, dan kun je de planning alleen bekijken.',
+      },
+    ],
+  },
+  {
     id: 'weekplanningen',
-    nummer: 'V',
+    nummer: 'VII',
     titel: 'Weekplanningen',
     intro: 'Voor het plannen van een knutsel- of kookactiviteit en een groepsspel per week — voor de hele locatie of per groep, bijvoorbeeld 4+ en 8+.',
     blokken: [
@@ -229,7 +313,7 @@ export const HOOFDSTUKKEN: Hoofdstuk[] = [
   },
   {
     id: 'activiteitenbeheer',
-    nummer: 'VI',
+    nummer: 'VIII',
     titel: 'Activiteitenbeheer',
     intro:
       'De bibliotheek met activiteiten die je ook in weekplanningen kunt gebruiken. De AI-import knop laten we hier buiten beschouwing.',
@@ -251,7 +335,7 @@ export const HOOFDSTUKKEN: Hoofdstuk[] = [
   },
   {
     id: 'agenda',
-    nummer: 'VII',
+    nummer: 'IX',
     titel: 'Agenda',
     intro: 'Je persoonlijke agenda, plus gedeelde/algemene kalenders.',
     blokken: [
@@ -278,7 +362,7 @@ export const HOOFDSTUKKEN: Hoofdstuk[] = [
   },
   {
     id: 'taken-notities',
-    nummer: 'VIII',
+    nummer: 'X',
     titel: 'Taken & Notities',
     intro: 'Je eigen persoonlijke takenlijst en notities — niemand anders ziet dit.',
     blokken: [
@@ -298,7 +382,7 @@ export const HOOFDSTUKKEN: Hoofdstuk[] = [
   },
   {
     id: 'chat',
-    nummer: 'IX',
+    nummer: 'XI',
     titel: 'Chat',
     intro: "Onderling chatten met collega's, individueel of in een groep.",
     blokken: [
@@ -326,7 +410,7 @@ export const HOOFDSTUKKEN: Hoofdstuk[] = [
   },
   {
     id: 'kilometerstanden',
-    nummer: 'X',
+    nummer: 'XII',
     titel: 'Kilometerstanden',
     intro:
       "Voor het bijhouden van de kilometerstanden van de auto's en bussen, zodat je per periode ziet " +
@@ -340,11 +424,11 @@ export const HOOFDSTUKKEN: Hoofdstuk[] = [
           'Klik op een voertuig. Rechts zie je de huidige stand, hoeveel er in de laatste periode is gereden, en de hele geschiedenis.',
           'Klik op "Stand invoeren" om een nieuwe kilometerstand vast te leggen.',
           'Vul de kilometerstand in. De vorige stand staat er boven, en zodra je een hoger getal invult zie je meteen hoeveel kilometer erbij is gekomen.',
-          'De datum staat al op vandaag. Pas hem aan als je de stand op een eerdere dag hebt afgelezen.',
+          'De datum en het tijdstip staan al op dit moment. Pas ze aan als je de stand op een ander moment hebt afgelezen.',
           'Voeg eventueel een notitie toe, bijvoorbeeld "na grote beurt" of "tankbeurt".',
-          'Sla op — de stand komt bovenaan de geschiedenis te staan, met de datum en jouw naam erbij.',
+          'Sla op — de stand komt bovenaan de geschiedenis te staan, met datum, tijdstip en jouw naam erbij.',
         ],
-        chips: ['Kilometerstand — verplicht', 'Datum', 'Notitie'],
+        chips: ['Kilometerstand — verplicht', 'Datum', 'Tijdstip', 'Notitie'],
       },
       {
         soort: 'uitleg',
@@ -374,6 +458,7 @@ export const HOOFDSTUKKEN: Hoofdstuk[] = [
           'Daaronder staat de laatst bekende stand. Vergelijk die met wat je op de teller ziet, zodat je zeker weet dat je het goede voertuig te pakken hebt.',
           'Vul bij "Kilometerstand" de nieuwe stand in — alleen cijfers, dus zonder punt of komma.',
           'Controleer de datum. Op de iPhone kies je die met de datumkiezer en staat hij al op vandaag; op Android typ je hem als jjjj-mm-dd.',
+          'Controleer ook het tijdstip; dat staat al op het huidige moment.',
           'Voeg eventueel nog een notitie toe en tik op "Opslaan".',
           'Je krijgt de melding "Kilometerstand opgeslagen" te zien, en de laatst bekende stand springt naar het getal dat je net invulde. Is je stand niet hoger dan de vorige, dan verschijnt er in plaats daarvan een rode melding.',
         ],
@@ -390,7 +475,7 @@ export const HOOFDSTUKKEN: Hoofdstuk[] = [
   },
   {
     id: 'app-op-je-telefoon',
-    nummer: 'XI',
+    nummer: 'XIII',
     titel: 'De app op je telefoon',
     intro:
       'Naast het dashboard in de browser is er een aparte app voor de iPhone en voor Android. Het is geen ' +
@@ -457,8 +542,9 @@ export const HOOFDSTUKKEN: Hoofdstuk[] = [
           {
             naam: 'Vakantieplanningen',
             tekst:
-              'Meelezen in de gepubliceerde vakantieplanning. Heb je bewerkrechten, dan zie je ook wat nog ' +
-              'niet gepubliceerd is.',
+              'Bekijken van de vakantieplanning per week, met thema, activiteiten en benodigdheden — op ' +
+              'dezelfde manier als in het dashboard. Heb je bewerkrechten? Dan kun je de planning in de app ' +
+              'ook volledig bewerken en zie je ook wat nog niet gepubliceerd is.',
           },
           {
             naam: 'Weekplanningen',
@@ -473,7 +559,7 @@ export const HOOFDSTUKKEN: Hoofdstuk[] = [
             tekst:
               'Een nieuwe kilometerstand invullen bij een voertuig, met de laatst bekende stand erbij zodat ' +
               'je kunt controleren of je goed zit. De geschiedenis en het voertuigbeheer blijven in het ' +
-              'dashboard. Stap voor stap staat het in hoofdstuk X.',
+              'dashboard. Stap voor stap staat het in hoofdstuk XII.',
           },
         ],
       },
