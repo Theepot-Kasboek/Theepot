@@ -290,6 +290,17 @@ private struct AccountView: View {
                         Task { await session.signOut() }
                     }
                 }
+
+                // Zelfde superadmin-only item als "App-installaties" in Sidebar.tsx.
+                if session.isSuperadmin {
+                    Section("Beheer") {
+                        NavigationLink {
+                            AppInstallatiesView()
+                        } label: {
+                            Label("App-installaties", systemImage: "iphone.and.arrow.forward")
+                        }
+                    }
+                }
             }
             .navigationTitle("Account")
         }
