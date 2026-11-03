@@ -960,18 +960,25 @@ function MaandOverzichtTab({ locaties }: { locaties: Locatie[] }) {
 
       for (const loc of locaties) {
         const { data: weken } = await supabase
-          .from('maaltijd_weken').select('id')
+          .from('maaltijd_weken').select('id, week_start')
           .eq('locatie_id', loc.id).in('week_start', weekStarts)
 
-        const weekIds = ((weken ?? []) as { id: string }[]).map(w => w.id)
-        if (weekIds.length === 0) { resultaat[loc.id] = []; continue }
+        const wekenData = (weken ?? []) as { id: string; week_start: string }[]
+        if (wekenData.length === 0) { resultaat[loc.id] = []; continue }
+
+        const weekStartPerId = new Map(wekenData.map(w => [w.id, w.week_start]))
+        const weekIds = wekenData.map(w => w.id)
 
         const { data: regs } = await supabase
-          .from('maaltijd_registraties').select('naam')
+          .from('maaltijd_registraties').select('naam, dag, week_id')
           .in('week_id', weekIds).eq('aanwezig', true)
 
         const tellingMap = new Map<string, number>()
-        for (const r of (regs ?? []) as { naam: string }[]) {
+        for (const r of (regs ?? []) as { naam: string; dag: Dag; week_id: string }[]) {
+          const weekStart = weekStartPerId.get(r.week_id)
+          if (!weekStart) continue
+          const datum = dagDatum(weekStart, r.dag)
+          if (datum.slice(0, 7) !== maand) continue
           tellingMap.set(r.naam, (tellingMap.get(r.naam) ?? 0) + 1)
         }
         resultaat[loc.id] = Array.from(tellingMap.entries())
