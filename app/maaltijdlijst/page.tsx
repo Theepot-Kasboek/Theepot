@@ -58,6 +58,14 @@ function dagDatum(weekStart: string, dag: Dag): string {
   return d.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })
 }
 
+// ISO-datum (YYYY-MM-DD) van een dag binnen een week, voor datumvergelijkingen.
+function dagDatumIso(weekStart: string, dag: Dag): string {
+  const ma = new Date(weekStart)
+  const idx = DAGEN.indexOf(dag)
+  const d = new Date(ma); d.setDate(ma.getDate() + idx)
+  return toDateStr(d)
+}
+
 function maandLabel(weekStart: string): string {
   return new Date(weekStart).toLocaleDateString('nl-NL', { month: 'long', year: 'numeric' })
 }
@@ -977,7 +985,7 @@ function MaandOverzichtTab({ locaties }: { locaties: Locatie[] }) {
         for (const r of (regs ?? []) as { naam: string; dag: Dag; week_id: string }[]) {
           const weekStart = weekStartPerId.get(r.week_id)
           if (!weekStart) continue
-          const datum = dagDatum(weekStart, r.dag)
+          const datum = dagDatumIso(weekStart, r.dag)
           if (datum.slice(0, 7) !== maand) continue
           tellingMap.set(r.naam, (tellingMap.get(r.naam) ?? 0) + 1)
         }
