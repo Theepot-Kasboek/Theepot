@@ -271,6 +271,12 @@ export default function VakantieplanningenPage() {
     await haalActiviteitenOp(actievePlanning!.id)
   }
 
+  async function bewerkActiviteitTekst(id: string, data: { naam?: string; beschrijving?: string }) {
+    setActiviteiten(prev => prev.map(a => a.id === id ? { ...a, ...data } : a))
+    const supabase = getSupabase()
+    await supabase.from('vakantie_activiteiten').update(data).eq('id', id)
+  }
+
   async function verwijderActiviteit(id: string) {
     const supabase = getSupabase()
     const act = activiteiten.find(a => a.id === id)
@@ -639,6 +645,7 @@ export default function VakantieplanningenPage() {
             tekstGrootte={tekstGrootte}
             magExporteren={magExporteren}
             magBewerken={magBewerken}
+            onTekstOp={bewerkActiviteitTekst}
           />
         )}
 
@@ -915,7 +922,7 @@ function WeekOverzicht({ week, activiteiten, planning, dagDatumStr, onNieuw, onB
 
 // ─── Document weergave ────────────────────────────────────────────────────────
 
-function DocumentWeergave({ planning, weken, activiteiten, dagDatumStr, tekstGrootte, magExporteren = true, magBewerken = false }: {
+function DocumentWeergave({ planning, weken, activiteiten, dagDatumStr, tekstGrootte, magExporteren = true, magBewerken = false, onTekstOp }: {
   planning: Planning
   weken: Week[]
   activiteiten: VakantieActiviteit[]
@@ -923,10 +930,12 @@ function DocumentWeergave({ planning, weken, activiteiten, dagDatumStr, tekstGro
   tekstGrootte: number
   magExporteren?: boolean
   magBewerken?: boolean
+  onTekstOp?: (id: string, data: { naam?: string; beschrijving?: string }) => void
 }) {
   const [downloadenBezig, setDownloadenBezig] = useState(false)
   const [venstBreedte, setVenstBreedte] = useState(typeof window !== 'undefined' ? window.innerWidth : 1200)
   const [popupFoto, setPopupFoto] = useState<{ url: string; alt: string } | null>(null)
+  const [bewerkTekst, setBewerkTekst] = useState<Record<string, { naam?: string; beschrijving?: string }>>({})
   const kleinScherm = venstBreedte < 700
 
   useEffect(() => {
@@ -1065,9 +1074,35 @@ function DocumentWeergave({ planning, weken, activiteiten, dagDatumStr, tekstGro
                             {/* Tekst links */}
                             <div style={{ flex: 1, padding: '14px 18px', minWidth: 0 }}>
                               <div style={{ marginBottom: 8 }}>
-                                <span style={{ fontFamily: 'Sora, sans-serif', fontWeight: 700, fontSize: tekstGrootte + 3, color: 'var(--text)' }}>{act.naam}</span>
+                                {magBewerken ? (
+                                  <input
+                                    value={bewerkTekst[act.id]?.naam ?? act.naam}
+                                    onChange={e => setBewerkTekst(prev => ({ ...prev, [act.id]: { ...prev[act.id], naam: e.target.value } }))}
+                                    onBlur={e => {
+                                      const waarde = e.target.value
+                                      setBewerkTekst(prev => { const { [act.id]: huidig, ...rest } = prev; return huidig?.beschrijving !== undefined ? { ...rest, [act.id]: { beschrijving: huidig.beschrijving } } : rest })
+                                      if (waarde !== act.naam) onTekstOp?.(act.id, { naam: waarde })
+                                    }}
+                                    style={{ width: '100%', fontFamily: 'Sora, sans-serif', fontWeight: 700, fontSize: tekstGrootte + 3, color: 'var(--text)', background: 'transparent', border: '1px dashed var(--border)', borderRadius: 4, padding: '2px 6px' }}
+                                  />
+                                ) : (
+                                  <span style={{ fontFamily: 'Sora, sans-serif', fontWeight: 700, fontSize: tekstGrootte + 3, color: 'var(--text)' }}>{act.naam}</span>
+                                )}
                               </div>
-                              {act.beschrijving && (
+                              {magBewerken ? (
+                                <textarea
+                                  value={bewerkTekst[act.id]?.beschrijving ?? act.beschrijving ?? ''}
+                                  onChange={e => setBewerkTekst(prev => ({ ...prev, [act.id]: { ...prev[act.id], beschrijving: e.target.value } }))}
+                                  onBlur={e => {
+                                    const waarde = e.target.value
+                                    setBewerkTekst(prev => { const { [act.id]: huidig, ...rest } = prev; return huidig?.naam !== undefined ? { ...rest, [act.id]: { naam: huidig.naam } } : rest })
+                                    if (waarde !== (act.beschrijving ?? '')) onTekstOp?.(act.id, { beschrijving: waarde })
+                                  }}
+                                  rows={Math.max(2, Math.ceil((bewerkTekst[act.id]?.beschrijving ?? act.beschrijving ?? '').length / 60))}
+                                  placeholder="Beschrijving..."
+                                  style={{ width: '100%', fontSize: tekstGrootte, color: 'var(--text)', lineHeight: 1.75, margin: '0 0 10px 0', background: 'transparent', border: '1px dashed var(--border)', borderRadius: 4, padding: '6px 8px', fontFamily: 'inherit', resize: 'vertical' }}
+                                />
+                              ) : act.beschrijving && (
                                 <p style={{ fontSize: tekstGrootte, color: 'var(--text)', lineHeight: 1.75, margin: '0 0 10px 0' }}>{act.beschrijving}</p>
                               )}
                               {act.benodigdheden?.length > 0 && (
