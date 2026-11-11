@@ -9,7 +9,7 @@ import {
   FileText, Flame, Gauge, Activity, MessageCircle, Map,
   Scissors, BookOpen, Layers, Calendar, CheckSquare,
   MessageSquare, Newspaper, ClipboardList, Users, ShieldCheck,
-  Search, Trophy, Smartphone, LifeBuoy,
+  Search, Smartphone, LifeBuoy,
 } from 'lucide-react'
 
 interface SpeedDialItem {
@@ -40,7 +40,6 @@ const ALLE_ITEMS: SpeedDialItem[] = [
   { href: '/chat', label: 'Chat', icon: <MessageSquare size={18} />, vereistRecht: 'pagina_chat' },
   { href: '/nieuwsbrieven', label: 'Nieuwsbrieven', icon: <Newspaper size={18} />, vereistRecht: 'pagina_nieuwsbrieven' },
   { href: '/notulen', label: 'Notulen', icon: <ClipboardList size={18} /> },
-  { href: '/competitie', label: 'Competitie Activiteiten', icon: <Trophy size={18} />, superadminOnly: true },
   { href: '/support', label: 'Gebruikershandleiding', icon: <LifeBuoy size={18} /> },
   { href: '/medewerkers', label: 'Medewerkers', icon: <Users size={18} />, superadminOnly: true },
   { href: '/rechten', label: 'Rechtenbeheer', icon: <ShieldCheck size={18} />, superadminOnly: true },

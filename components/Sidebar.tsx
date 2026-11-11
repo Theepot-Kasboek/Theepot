@@ -7,7 +7,7 @@ import { useEffect, useState } from 'react'
 import {
   LayoutDashboard, Wallet, Map, BookOpen,
   Calendar, MessageSquare, ShieldCheck,
-  Users, LogOut, Sun, Moon, UtensilsCrossed, Scissors, MessageCircle, FileText, Newspaper, Flame, CheckSquare, Gauge, Pin, Layers, Archive, Search, Activity, ClipboardList, Smartphone, Trophy, LifeBuoy,
+  Users, LogOut, Sun, Moon, UtensilsCrossed, Scissors, MessageCircle, FileText, Newspaper, Flame, CheckSquare, Gauge, Pin, Layers, Archive, Search, Activity, ClipboardList, Smartphone, LifeBuoy,
 } from 'lucide-react'
 import { useAuth } from './AuthProvider'
 import { useTheme } from './ThemeProvider'
@@ -187,7 +187,6 @@ export default function Sidebar({ isOpen, onClose }: { isOpen?: boolean; onClose
         { href: '/weekplanningen', label: 'Weekplanningen', icon: <Scissors size={16} />, vereistRecht: 'pagina_weekplanningen' as const },
         { href: '/activiteiten', label: 'Activiteitenbeheer', icon: <BookOpen size={16} />, vereistRecht: 'pagina_activiteiten' as const },
         { href: '/ve-planning', label: 'VE Planning', icon: <Layers size={16} />, vereistRecht: 'pagina_ve_planning' as const },
-        { href: '/competitie', label: 'Competitie Activiteiten', icon: <Trophy size={16} />, superadminOnly: true },
       ],
     },
     {
