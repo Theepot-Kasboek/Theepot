@@ -9,7 +9,7 @@ import Toast from '@/components/Toast'
 import GeenToegang from '@/components/GeenToegang'
 import {
   ChevronLeft, ChevronRight, Plus, X, Calendar,
-  Clock, AlignLeft, Users, Pencil, Trash2, Share2, Eye, Upload, Bell, Link2
+  Clock, AlignLeft, Users, Pencil, Trash2, Share2, Eye, Upload, Bell, Link2, Search
 } from 'lucide-react'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -138,6 +138,11 @@ export default function AgendaPage() {
   const [icsModal, setIcsModal] = useState(false)
   const [abonneerModal, setAbonneerModal] = useState(false)
   const [klikDatum, setKlikDatum] = useState<Date | null>(null)
+  const [dagPopupDatum, setDagPopupDatum] = useState<Date | null>(null)
+
+  // Zoeken
+  const [zoekTerm, setZoekTerm] = useState('')
+  const [zoekOpen, setZoekOpen] = useState(false)
 
   const magAbonneren = isSuperadmin || profiel?.rol === 'directie' || profiel?.rol === 'leidinggevende'
 
@@ -228,6 +233,22 @@ export default function AgendaPage() {
 
   function afsprakenVanDag(dag: Date) {
     return zichtbareAfspraken.filter(a => isSameDag(new Date(a.start_tijd), dag))
+  }
+
+  const zoekResultaten = useMemo(() => {
+    const term = zoekTerm.trim().toLowerCase()
+    if (!term) return []
+    return zichtbareAfspraken
+      .filter(a => a.titel.toLowerCase().includes(term) || (a.beschrijving ?? '').toLowerCase().includes(term))
+      .sort((a, b) => new Date(a.start_tijd).getTime() - new Date(b.start_tijd).getTime())
+      .slice(0, 20)
+  }, [zichtbareAfspraken, zoekTerm])
+
+  function openZoekResultaat(a: Afspraak) {
+    setHuidigeDatum(new Date(a.start_tijd))
+    setDetailAfspraak(a)
+    setZoekOpen(false)
+    setZoekTerm('')
   }
 
   function kalenderVanAfspraak(a: Afspraak) {
@@ -382,7 +403,10 @@ export default function AgendaPage() {
                     )
                   })}
                   {dagAfspraken.length > 3 && (
-                    <div style={{ fontSize: 10, color: 'var(--text-muted)', paddingLeft: 6 }}>+{dagAfspraken.length - 3} meer</div>
+                    <div
+                      onClick={e => { e.stopPropagation(); setDagPopupDatum(dag) }}
+                      style={{ fontSize: 10, color: 'var(--primary)', fontWeight: 600, paddingLeft: 6, cursor: 'pointer' }}
+                    >+{dagAfspraken.length - 3} meer</div>
                   )}
                 </div>
               </div>
@@ -587,6 +611,51 @@ export default function AgendaPage() {
         }
         acties={
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            {/* Zoeken */}
+            <div style={{ position: 'relative' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 8, padding: '0 10px', height: 32 }}>
+                <Search size={14} color="var(--text-muted)" />
+                <input
+                  value={zoekTerm}
+                  onChange={e => { setZoekTerm(e.target.value); setZoekOpen(true) }}
+                  onFocus={() => setZoekOpen(true)}
+                  onBlur={() => setTimeout(() => setZoekOpen(false), 150)}
+                  placeholder="Zoek afspraken..."
+                  style={{ border: 'none', background: 'none', outline: 'none', fontSize: 13, width: 150, color: 'var(--text)' }}
+                />
+                {zoekTerm && (
+                  <button onClick={() => { setZoekTerm(''); setZoekOpen(false) }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex', padding: 0 }}>
+                    <X size={13} />
+                  </button>
+                )}
+              </div>
+              {zoekOpen && zoekTerm.trim() && (
+                <div style={{ position: 'absolute', top: '100%', right: 0, marginTop: 6, width: 320, maxHeight: 360, overflowY: 'auto', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 10, boxShadow: '0 8px 24px rgba(0,0,0,0.12)', zIndex: 50 }}>
+                  {zoekResultaten.length === 0 ? (
+                    <div style={{ padding: 16, fontSize: 13, color: 'var(--text-muted)', textAlign: 'center' }}>Geen afspraken gevonden.</div>
+                  ) : (
+                    zoekResultaten.map(a => {
+                      const kal = kalenderVanAfspraak(a)
+                      return (
+                        <div
+                          key={a.id}
+                          onMouseDown={() => openZoekResultaat(a)}
+                          style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '9px 12px', cursor: 'pointer', borderBottom: '1px solid var(--border)' }}
+                        >
+                          <div style={{ width: 4, alignSelf: 'stretch', borderRadius: 4, background: kal?.kleur ?? 'var(--primary)', flexShrink: 0 }} />
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: 13, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.titel}</div>
+                            <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                              {fmtDatum(a.start_tijd)}{!a.hele_dag && ` · ${fmtTijd(a.start_tijd)}`}{kal && ` · ${kal.naam}`}
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })
+                  )}
+                </div>
+              )}
+            </div>
             {/* Weergave switcher */}
             <div style={{ display: 'flex', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
               {(['maand', 'week', 'dag', 'lijst'] as Weergave[]).map(w => (
@@ -734,6 +803,43 @@ export default function AgendaPage() {
               <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
                 <button className="btn btn-primary" onClick={() => setKalenderPanelOpen(false)}>Klaar</button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── Dag-overzicht popup (maandweergave, meerdere afspraken) ───────────── */}
+      {dagPopupDatum && (
+        <div className="modal-backdrop" onClick={() => setDagPopupDatum(null)}>
+          <div className="modal-box" style={{ maxWidth: 420 }} onClick={e => e.stopPropagation()}>
+            <div className="card-header">
+              <span className="card-title" style={{ textTransform: 'capitalize' }}>{fmt(dagPopupDatum)}</span>
+              <button onClick={() => setDagPopupDatum(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex' }}><X size={18} /></button>
+            </div>
+            <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 400, overflowY: 'auto' }}>
+              {afsprakenVanDag(dagPopupDatum).map(a => {
+                const kal = kalenderVanAfspraak(a)
+                return (
+                  <div
+                    key={a.id}
+                    onClick={() => { setDagPopupDatum(null); setDetailAfspraak(a) }}
+                    style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '10px 12px', borderRadius: 8, background: 'var(--bg)', border: '1px solid var(--border)', cursor: 'pointer' }}
+                  >
+                    <div style={{ width: 4, alignSelf: 'stretch', borderRadius: 4, background: kal?.kleur ?? 'var(--primary)', flexShrink: 0 }} />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 500 }}>{a.titel}</div>
+                      <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                        {a.hele_dag ? 'Hele dag' : `${fmtTijd(a.start_tijd)} – ${fmtTijd(a.eind_tijd)}`}{kal && ` · ${kal.naam}`}
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+              {magBewerken && (
+                <button className="btn btn-sm" style={{ marginTop: 4 }} onClick={() => { const d = dagPopupDatum; setDagPopupDatum(null); openNieuw(d) }}>
+                  <Plus size={13} /> Afspraak toevoegen
+                </button>
+              )}
             </div>
           </div>
         </div>
