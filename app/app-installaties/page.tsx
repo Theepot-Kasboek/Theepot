@@ -117,7 +117,8 @@ export default function AppInstallatiesPage() {
         subtitel="Bijhouden op welke apparaten de app staat en welke versie"
       />
 
-      <div className="page-content" style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      <div className="page-content">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
 
         {/* Versies */}
         <div className="card">
@@ -242,6 +243,7 @@ export default function AppInstallatiesPage() {
               )
             })
           )}
+        </div>
         </div>
       </div>
 
