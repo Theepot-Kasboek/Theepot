@@ -107,3 +107,12 @@ export async function markeerAlleMeldingenGelezen(profielId: string): Promise<vo
     .eq('profiel_id', profielId)
     .is('gelezen_op', null)
 }
+
+// Wist alleen de koppeling voor deze ontvanger; de melding zelf blijft
+// bestaan voor eventuele andere ontvangers.
+export async function verwijderAlleMeldingen(profielId: string): Promise<void> {
+  await getSupabase()
+    .from('melding_ontvangers')
+    .delete()
+    .eq('profiel_id', profielId)
+}

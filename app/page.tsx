@@ -5,12 +5,12 @@ import { useAuth } from '@/components/AuthProvider'
 import Topbar from '@/components/Topbar'
 import { getSupabase } from '@/lib/supabase'
 import { haalPrikbordLocaties, isZichtbaarPrikbordBericht } from '@/lib/prikbord'
-import { haalMeldingenOp, markeerMeldingGelezen, markeerAlleMeldingenGelezen, type Melding } from '@/lib/meldingen'
+import { haalMeldingenOp, markeerMeldingGelezen, markeerAlleMeldingenGelezen, verwijderAlleMeldingen, type Melding } from '@/lib/meldingen'
 import {
   BookOpen, Calendar, MessageSquare, Users, Scissors,
   ChevronRight, Settings, X, GripVertical, Plus,
   Wallet, Cloud, CheckSquare, FileText, Flame, Newspaper,
-  UtensilsCrossed, Map, Eye, EyeOff, Edit3, Pin, AlertTriangle, Info, Bell,
+  UtensilsCrossed, Map, Eye, EyeOff, Edit3, Pin, AlertTriangle, Info, Bell, Trash2,
 } from 'lucide-react'
 import Link from 'next/link'
 
@@ -903,6 +903,12 @@ function MeldingenWidget({ profielId }: { profielId: string }) {
     setMeldingen(prev => prev.filter(m => m.gelezen_op))
   }
 
+  async function wisAlles() {
+    if (!confirm('Alle meldingen wissen?')) return
+    await verwijderAlleMeldingen(profielId)
+    setMeldingen([])
+  }
+
   return (
     <div className="card">
       <div className="card-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -915,19 +921,34 @@ function MeldingenWidget({ profielId }: { profielId: string }) {
             </span>
           )}
         </div>
-        {ongelezen > 0 && (
-          <button
-            onClick={markeerAllesGelezen}
-            title="Alles als gelezen markeren"
-            style={{
-              display: 'flex', alignItems: 'center', gap: 4, border: 'none', background: 'none',
-              color: 'var(--text-muted)', fontSize: 11, cursor: 'pointer', padding: '2px 4px',
-            }}
-          >
-            <CheckSquare size={13} />
-            Alles gelezen
-          </button>
-        )}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          {ongelezen > 0 && (
+            <button
+              onClick={markeerAllesGelezen}
+              title="Alles als gelezen markeren"
+              style={{
+                display: 'flex', alignItems: 'center', gap: 4, border: 'none', background: 'none',
+                color: 'var(--text-muted)', fontSize: 11, cursor: 'pointer', padding: '2px 4px',
+              }}
+            >
+              <CheckSquare size={13} />
+              Alles gelezen
+            </button>
+          )}
+          {meldingen.length > 0 && (
+            <button
+              onClick={wisAlles}
+              title="Alle meldingen wissen"
+              style={{
+                display: 'flex', alignItems: 'center', gap: 4, border: 'none', background: 'none',
+                color: 'var(--text-muted)', fontSize: 11, cursor: 'pointer', padding: '2px 4px',
+              }}
+            >
+              <Trash2 size={13} />
+              Wissen
+            </button>
+          )}
+        </div>
       </div>
 
       {laden ? (
