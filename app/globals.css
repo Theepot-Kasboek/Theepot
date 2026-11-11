@@ -276,6 +276,7 @@ h1, h2, h3, h4, h5, h6,
 
 .page-content {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
   padding: 20px;
 }
