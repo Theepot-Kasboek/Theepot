@@ -99,3 +99,11 @@ export async function markeerMeldingGelezen(meldingId: string, profielId: string
     .eq('melding_id', meldingId)
     .eq('profiel_id', profielId)
 }
+
+export async function markeerAlleMeldingenGelezen(profielId: string): Promise<void> {
+  await getSupabase()
+    .from('melding_ontvangers')
+    .update({ gelezen_op: new Date().toISOString() })
+    .eq('profiel_id', profielId)
+    .is('gelezen_op', null)
+}

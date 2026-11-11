@@ -5,7 +5,7 @@ import { useAuth } from '@/components/AuthProvider'
 import Topbar from '@/components/Topbar'
 import { getSupabase } from '@/lib/supabase'
 import { haalPrikbordLocaties, isZichtbaarPrikbordBericht } from '@/lib/prikbord'
-import { haalMeldingenOp, markeerMeldingGelezen, type Melding } from '@/lib/meldingen'
+import { haalMeldingenOp, markeerMeldingGelezen, markeerAlleMeldingenGelezen, type Melding } from '@/lib/meldingen'
 import {
   BookOpen, Calendar, MessageSquare, Users, Scissors,
   ChevronRight, Settings, X, GripVertical, Plus,
@@ -898,9 +898,14 @@ function MeldingenWidget({ profielId }: { profielId: string }) {
     setMeldingen(prev => prev.map(x => x.id === m.id ? { ...x, gelezen_op: new Date().toISOString() } : x))
   }
 
+  async function markeerAllesGelezen() {
+    await markeerAlleMeldingenGelezen(profielId)
+    setMeldingen(prev => prev.filter(m => m.gelezen_op))
+  }
+
   return (
     <div className="card">
-      <div className="card-header">
+      <div className="card-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <Bell size={15} color="var(--primary)" />
           <span className="card-title">Meldingen</span>
@@ -910,6 +915,19 @@ function MeldingenWidget({ profielId }: { profielId: string }) {
             </span>
           )}
         </div>
+        {ongelezen > 0 && (
+          <button
+            onClick={markeerAllesGelezen}
+            title="Alles als gelezen markeren"
+            style={{
+              display: 'flex', alignItems: 'center', gap: 4, border: 'none', background: 'none',
+              color: 'var(--text-muted)', fontSize: 11, cursor: 'pointer', padding: '2px 4px',
+            }}
+          >
+            <CheckSquare size={13} />
+            Alles gelezen
+          </button>
+        )}
       </div>
 
       {laden ? (
