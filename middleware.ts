@@ -28,8 +28,9 @@ export async function middleware(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
 
   const isLoginPage = request.nextUrl.pathname === '/login'
+  const isPubliekeEvenementAanmeldPagina = /^\/evenementen\/[^/]+\/aanmelden$/.test(request.nextUrl.pathname)
 
-  if (!user && !isLoginPage) {
+  if (!user && !isLoginPage && !isPubliekeEvenementAanmeldPagina) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
     return NextResponse.redirect(url)

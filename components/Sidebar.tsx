@@ -7,7 +7,7 @@ import { useEffect, useState } from 'react'
 import {
   LayoutDashboard, Wallet, Map, BookOpen,
   Calendar, MessageSquare, ShieldCheck,
-  Users, LogOut, Sun, Moon, UtensilsCrossed, Scissors, MessageCircle, FileText, Newspaper, Flame, CheckSquare, Gauge, Pin, Layers, Archive, Search, Activity, ClipboardList, Smartphone, LifeBuoy,
+  Users, LogOut, Sun, Moon, UtensilsCrossed, Scissors, MessageCircle, FileText, Newspaper, Flame, CheckSquare, Gauge, Pin, Layers, Archive, Search, Activity, ClipboardList, Smartphone, LifeBuoy, PartyPopper, Mail,
 } from 'lucide-react'
 import { useAuth } from './AuthProvider'
 import { useTheme } from './ThemeProvider'
@@ -196,6 +196,8 @@ export default function Sidebar({ isOpen, onClose }: { isOpen?: boolean; onClose
         { href: '/taken', label: 'Taken & Notities', icon: <CheckSquare size={16} /> },
         { href: '/chat', label: 'Chat', icon: <MessageSquare size={16} />, notificatie: ongelezen, vereistRecht: 'pagina_chat' as const },
         { href: '/nieuwsbrieven', label: 'Nieuwsbrieven', icon: <Newspaper size={16} />, vereistRecht: 'pagina_nieuwsbrieven' as const },
+        { href: '/campagnes', label: 'Campagnes', icon: <Mail size={16} />, vereistRecht: 'pagina_campagnes' as const },
+        { href: '/evenementen', label: 'Evenementen', icon: <PartyPopper size={16} />, vereistRecht: 'pagina_evenementen' as const },
         { href: '/notulen', label: 'Notulen', icon: <ClipboardList size={16} /> },
       ],
     },

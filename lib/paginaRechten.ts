@@ -15,6 +15,8 @@ export const PAGINA_ROUTES: { vereistRecht: string; href: string }[] = [
   { vereistRecht: 'pagina_agenda', href: '/agenda' },
   { vereistRecht: 'pagina_chat', href: '/chat' },
   { vereistRecht: 'pagina_nieuwsbrieven', href: '/nieuwsbrieven' },
+  { vereistRecht: 'pagina_evenementen', href: '/evenementen' },
+  { vereistRecht: 'pagina_campagnes', href: '/campagnes' },
 ]
 
 // Als een account (geen superadmin) toegang heeft tot precies één pagina, geeft dit

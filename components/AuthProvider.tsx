@@ -31,6 +31,8 @@ interface Rechten {
   pagina_brandoefening: Toegang
   pagina_nieuwsbrieven: Toegang
   pagina_notulen: Toegang
+  pagina_evenementen: Toegang
+  pagina_campagnes: Toegang
   kasboek_export: boolean
   kasboek_bonnetjes_inzien: boolean
   activiteiten_importeren: boolean
@@ -53,6 +55,7 @@ const SUPERADMIN_RECHTEN: Rechten = {
   pagina_maaltijdlijst: 'bewerken', pagina_weekplanningen: 'bewerken', pagina_gesprekken: 'bewerken',
   pagina_beleid: 'bewerken', pagina_brandoefening: 'bewerken', pagina_nieuwsbrieven: 'bewerken',
   pagina_notulen: 'bewerken',
+  pagina_evenementen: 'bewerken', pagina_campagnes: 'bewerken',
   kasboek_export: true, kasboek_bonnetjes_inzien: true,
   activiteiten_importeren: true, activiteiten_verwijderen: true,
   agenda_algemeen_bewerken: true, agenda_personeel_inzien: true,
@@ -69,6 +72,7 @@ const GEEN_RECHTEN: Rechten = {
   pagina_maaltijdlijst: 'geen', pagina_weekplanningen: 'geen', pagina_gesprekken: 'geen',
   pagina_beleid: 'geen', pagina_brandoefening: 'geen', pagina_nieuwsbrieven: 'geen',
   pagina_notulen: 'lezen',
+  pagina_evenementen: 'geen', pagina_campagnes: 'geen',
   kasboek_export: false, kasboek_bonnetjes_inzien: false,
   activiteiten_importeren: false, activiteiten_verwijderen: false,
   agenda_algemeen_bewerken: false, agenda_personeel_inzien: false,

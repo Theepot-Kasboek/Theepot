@@ -38,6 +38,8 @@ interface Recht {
   pagina_ve_planning: Toegang
   pagina_archief: Toegang
   pagina_activiteiten_log: Toegang
+  pagina_evenementen: Toegang
+  pagina_campagnes: Toegang
 
   prikbord_toevoegen: boolean
   chat_starten: boolean
@@ -179,6 +181,18 @@ const PAGINAS: PaginaDef[] = [
     icon: '📋',
     functies: [],
   },
+  {
+    key: 'pagina_evenementen',
+    label: 'Evenementen',
+    icon: '🎉',
+    functies: [],
+  },
+  {
+    key: 'pagina_campagnes',
+    label: 'Campagnes',
+    icon: '📧',
+    functies: [],
+  },
   // Niet in deze lijst (bewust):
   // - pagina_archief: er bestaat geen archiefpagina, dit recht deed niets
   // - pagina_medewerkers: medewerkersbeheer is altijd superadmin-only
@@ -213,6 +227,8 @@ function leegRecht(): Omit<Recht, 'id' | 'rol' | 'profiel_id'> {
     pagina_ve_planning: 'geen',
     pagina_archief: 'geen',
     pagina_activiteiten_log: 'geen',
+    pagina_evenementen: 'geen',
+    pagina_campagnes: 'geen',
     prikbord_toevoegen: false,
     kasboek_export: false,
     kasboek_bonnetjes_inzien: false,
