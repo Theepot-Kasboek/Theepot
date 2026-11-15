@@ -8,12 +8,16 @@ import { useAuth } from './AuthProvider'
 import { enkeleToegangHref } from '@/lib/paginaRechten'
 
 const GEEN_SIDEBAR = ['/login']
+// Publieke pagina's zonder login (gedeeld via een link) krijgen nooit de
+// dashboard-sidebar: die layout heeft overflow:hidden, wat deze pagina's
+// zou laten afkappen zonder dat er gescrold kan worden.
+const GEEN_SIDEBAR_PATROON = [/^\/evenementen\/[^/]+\/aanmelden$/]
 
 export default function LayoutShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const router = useRouter()
   const { rechten, isSuperadmin, loading } = useAuth()
-  const showSidebar = !GEEN_SIDEBAR.includes(pathname)
+  const showSidebar = !GEEN_SIDEBAR.includes(pathname) && !GEEN_SIDEBAR_PATROON.some(p => p.test(pathname))
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
   // Sluit sidebar bij navigatie
