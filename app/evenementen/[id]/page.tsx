@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Link2, Download, Trash2, Users, UserPlus, X, Plus, Settings, ArrowUp, ArrowDown } from 'lucide-react'
+import { ArrowLeft, Link2, Download, Trash2, Users, UserPlus, X, Plus, Settings, ArrowUp, ArrowDown, Search } from 'lucide-react'
 import { useAuth } from '@/components/AuthProvider'
 import {
   Evenement, EvenementAanmelding, EvenementVeld, haalAanmeldingenOp, wijzigEvenement, verwijderAanmelding, voegAanmeldingHandmatigToe,
@@ -32,6 +32,9 @@ export default function EvenementDetailPagina() {
   const [toonVelden, setToonVelden] = useState(false)
   const [nieuwVeld, setNieuwVeld] = useState<{ label: string; type: 'tekst' | 'keuze'; opties: string; meerdere: boolean; verplicht: boolean }>({ label: '', type: 'tekst', opties: '', meerdere: false, verplicht: false })
   const [opslaanVeld, setOpslaanVeld] = useState(false)
+  const [zoekterm, setZoekterm] = useState('')
+  const [sortering, setSortering] = useState<'datum-nieuw' | 'datum-oud' | 'naam-asc' | 'naam-desc'>('datum-nieuw')
+  const [veldFilters, setVeldFilters] = useState<Record<string, string[]>>({})
 
   function toon(bericht: string, type: 'success' | 'error' = 'success') {
     setToast({ bericht, type })
@@ -100,6 +103,35 @@ export default function EvenementDetailPagina() {
     setVelden(nieuw)
     await Promise.all([wijzigVeld(a.id, { volgorde: doel }), wijzigVeld(b.id, { volgorde: index })])
   }
+
+  function wisselVeldFilter(veldId: string, optie: string) {
+    setVeldFilters(prev => {
+      const huidig = prev[veldId] ?? []
+      const nieuw = huidig.includes(optie) ? huidig.filter(o => o !== optie) : [...huidig, optie]
+      return { ...prev, [veldId]: nieuw }
+    })
+  }
+
+  const keuzeVelden = velden.filter(v => v.type === 'keuze')
+  const filtersActief = zoekterm.trim() !== '' || Object.values(veldFilters).some(s => s.length > 0)
+
+  const zichtbareAanmeldingen = aanmeldingen
+    .filter(a => {
+      const zoek = zoekterm.trim().toLowerCase()
+      if (zoek && !(a.naam ?? '').toLowerCase().includes(zoek) && !a.email.toLowerCase().includes(zoek)) return false
+      return keuzeVelden.every(v => {
+        const selectie = veldFilters[v.id] ?? []
+        if (selectie.length === 0) return true
+        const gekozen = meerkeuzeOpties(antwoorden[a.id]?.[v.id] ?? '')
+        return gekozen.some(g => selectie.includes(g))
+      })
+    })
+    .sort((a, b) => {
+      if (sortering === 'naam-asc') return (a.naam ?? '').localeCompare(b.naam ?? '', 'nl')
+      if (sortering === 'naam-desc') return (b.naam ?? '').localeCompare(a.naam ?? '', 'nl')
+      if (sortering === 'datum-oud') return new Date(a.aangemeld_op).getTime() - new Date(b.aangemeld_op).getTime()
+      return new Date(b.aangemeld_op).getTime() - new Date(a.aangemeld_op).getTime()
+    })
 
   async function kopieerLink() {
     const url = `${window.location.origin}/evenementen/${evenementId}/aanmelden`
@@ -245,7 +277,7 @@ export default function EvenementDetailPagina() {
       <div className="page-content">
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10, marginBottom: 14 }}>
           <h2 style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 6 }}>
-            <Users size={15} /> {aanmeldingen.length} aanmelding{aanmeldingen.length === 1 ? '' : 'en'}
+            <Users size={15} /> {filtersActief ? `${zichtbareAanmeldingen.length} van ${aanmeldingen.length}` : aanmeldingen.length} aanmelding{aanmeldingen.length === 1 ? '' : 'en'}
           </h2>
           <div style={{ display: 'flex', gap: 8 }}>
             {magBewerken && (
@@ -260,10 +292,55 @@ export default function EvenementDetailPagina() {
           </div>
         </div>
 
+        {aanmeldingen.length > 0 && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
+            <div style={{ position: 'relative', flex: '1 1 220px', minWidth: 180 }}>
+              <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+              <input
+                className="form-input" style={{ paddingLeft: 30 }}
+                placeholder="Zoek op naam of e-mail..."
+                value={zoekterm} onChange={e => setZoekterm(e.target.value)}
+              />
+            </div>
+            <select className="form-input" style={{ width: 'auto' }} value={sortering} onChange={e => setSortering(e.target.value as typeof sortering)}>
+              <option value="datum-nieuw">Nieuwste eerst</option>
+              <option value="datum-oud">Oudste eerst</option>
+              <option value="naam-asc">Naam A-Z</option>
+              <option value="naam-desc">Naam Z-A</option>
+            </select>
+            {keuzeVelden.map(v => (
+              <details key={v.id} style={{ position: 'relative' }}>
+                <summary className="btn btn-sm" style={{ cursor: 'pointer' }}>
+                  {v.label}{(veldFilters[v.id]?.length ?? 0) > 0 ? ` (${veldFilters[v.id].length})` : ''}
+                </summary>
+                <div style={{
+                  position: 'absolute', zIndex: 20, marginTop: 4, background: 'var(--bg-card)', border: '1px solid var(--border)',
+                  borderRadius: 8, padding: 8, minWidth: 180, display: 'flex', flexDirection: 'column', gap: 4, boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
+                }}>
+                  {(v.opties ?? []).map(o => (
+                    <label key={o} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, whiteSpace: 'nowrap' }}>
+                      <input type="checkbox" checked={(veldFilters[v.id] ?? []).includes(o)} onChange={() => wisselVeldFilter(v.id, o)} />
+                      {o}
+                    </label>
+                  ))}
+                </div>
+              </details>
+            ))}
+            {filtersActief && (
+              <button className="btn btn-sm" onClick={() => { setZoekterm(''); setVeldFilters({}) }}><X size={13} /> Wis filters</button>
+            )}
+          </div>
+        )}
+
         {aanmeldingen.length === 0 ? (
           <div className="empty-state">
             <h3>Nog geen aanmeldingen</h3>
             <p>Deel de aanmeldlink om aanmeldingen te ontvangen.</p>
+          </div>
+        ) : zichtbareAanmeldingen.length === 0 ? (
+          <div className="empty-state">
+            <h3>Geen aanmeldingen gevonden</h3>
+            <p>Pas je zoekopdracht of filters aan.</p>
           </div>
         ) : (
           <div className="card table-scroll-x">
@@ -280,7 +357,7 @@ export default function EvenementDetailPagina() {
                 </tr>
               </thead>
               <tbody>
-                {aanmeldingen.map(a => (
+                {zichtbareAanmeldingen.map(a => (
                   <tr key={a.id} style={{ borderBottom: '1px solid var(--border)' }}>
                     <td style={{ padding: '10px 16px' }}>{a.naam || '—'}</td>
                     <td style={{ padding: '10px 16px', color: 'var(--text-muted)' }}>{a.email}</td>
