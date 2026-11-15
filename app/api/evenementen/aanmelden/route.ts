@@ -32,6 +32,12 @@ export async function GET(req: NextRequest) {
   }
   const gesloten = new Date() > new Date(evenement.sluit_aanmelden_op)
 
+  const { data: velden } = await supabase
+    .from('evenement_velden')
+    .select('id, label, type, opties, verplicht')
+    .eq('evenement_id', evenement_id)
+    .order('volgorde', { ascending: true })
+
   return NextResponse.json({
     titel: evenement.titel,
     omschrijving: evenement.omschrijving,
@@ -40,12 +46,13 @@ export async function GET(req: NextRequest) {
     status: evenement.status,
     vol,
     gesloten,
+    velden: velden ?? [],
   })
 }
 
 export async function POST(req: NextRequest) {
   try {
-    const { evenement_id, email, naam } = await req.json()
+    const { evenement_id, email, naam, antwoorden } = await req.json()
 
     if (!evenement_id || !email || !String(email).trim()) {
       return NextResponse.json({ error: 'Vul een e-mailadres in.' }, { status: 400 })
@@ -71,12 +78,33 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Aanmelden voor dit evenement is gesloten.' }, { status: 400 })
     }
 
+    const { data: velden } = await supabase
+      .from('evenement_velden')
+      .select('id, label, type, opties, verplicht')
+      .eq('evenement_id', evenement_id)
+
+    const ingevuld: Record<string, string> = antwoorden && typeof antwoorden === 'object' ? antwoorden : {}
+    const antwoordenOpSlaan: { veld_id: string; waarde: string }[] = []
+    for (const veld of velden ?? []) {
+      const waarde = String(ingevuld[veld.id] ?? '').trim()
+      if (veld.verplicht && !waarde) {
+        return NextResponse.json({ error: `Vul "${veld.label}" in.` }, { status: 400 })
+      }
+      if (waarde && veld.type === 'keuze' && !(veld.opties ?? []).includes(waarde)) {
+        return NextResponse.json({ error: `Ongeldige keuze voor "${veld.label}".` }, { status: 400 })
+      }
+      if (waarde) antwoordenOpSlaan.push({ veld_id: veld.id, waarde })
+    }
+
     const { data: bestaand } = await supabase
       .from('evenement_aanmeldingen')
       .select('id')
       .eq('evenement_id', evenement_id)
       .ilike('email', schoneEmail)
       .maybeSingle()
+
+    let aanmeldingId: string
+    let alAangemeld = false
 
     if (bestaand) {
       const { error } = await supabase
@@ -87,27 +115,35 @@ export async function POST(req: NextRequest) {
         })
         .eq('id', bestaand.id)
       if (error) throw error
-      return NextResponse.json({ succes: true, al_aangemeld: true })
-    }
-
-    if (evenement.max_aanmeldingen != null) {
-      const { count } = await supabase
-        .from('evenement_aanmeldingen')
-        .select('*', { count: 'exact', head: true })
-        .eq('evenement_id', evenement_id)
-      if ((count ?? 0) >= evenement.max_aanmeldingen) {
-        return NextResponse.json({ error: 'Dit evenement is helaas vol.' }, { status: 400 })
+      aanmeldingId = bestaand.id
+      alAangemeld = true
+    } else {
+      if (evenement.max_aanmeldingen != null) {
+        const { count } = await supabase
+          .from('evenement_aanmeldingen')
+          .select('*', { count: 'exact', head: true })
+          .eq('evenement_id', evenement_id)
+        if ((count ?? 0) >= evenement.max_aanmeldingen) {
+          return NextResponse.json({ error: 'Dit evenement is helaas vol.' }, { status: 400 })
+        }
       }
+
+      const { data, error } = await supabase.from('evenement_aanmeldingen').insert({
+        evenement_id,
+        email: schoneEmail,
+        naam: naam?.trim() || null,
+      }).select().single()
+      if (error) throw error
+      aanmeldingId = data.id
     }
 
-    const { error } = await supabase.from('evenement_aanmeldingen').insert({
-      evenement_id,
-      email: schoneEmail,
-      naam: naam?.trim() || null,
-    })
-    if (error) throw error
+    if (antwoordenOpSlaan.length > 0) {
+      const { error } = await supabase.from('evenement_veld_antwoorden')
+        .upsert(antwoordenOpSlaan.map(a => ({ aanmelding_id: aanmeldingId, ...a })), { onConflict: 'aanmelding_id,veld_id' })
+      if (error) throw error
+    }
 
-    return NextResponse.json({ succes: true })
+    return NextResponse.json({ succes: true, al_aangemeld: alAangemeld })
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err)
     console.error('[evenementen-aanmelden]', msg)

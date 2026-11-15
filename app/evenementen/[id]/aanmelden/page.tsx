@@ -3,6 +3,14 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 
+interface PubliekVeld {
+  id: string
+  label: string
+  type: 'tekst' | 'keuze'
+  opties: string[] | null
+  verplicht: boolean
+}
+
 interface PubliekEvenement {
   titel: string
   omschrijving: string | null
@@ -11,6 +19,7 @@ interface PubliekEvenement {
   status: 'actief' | 'geannuleerd'
   vol: boolean
   gesloten: boolean
+  velden: PubliekVeld[]
 }
 
 export default function EvenementAanmeldenPubliekePagina() {
@@ -22,6 +31,7 @@ export default function EvenementAanmeldenPubliekePagina() {
   const [nietGevonden, setNietGevonden] = useState(false)
 
   const [form, setForm] = useState({ naam: '', email: '' })
+  const [antwoorden, setAntwoorden] = useState<Record<string, string>>({})
   const [bezig, setBezig] = useState(false)
   const [fout, setFout] = useState<string | null>(null)
   const [verzonden, setVerzonden] = useState<'nieuw' | 'al_aangemeld' | null>(null)
@@ -44,6 +54,12 @@ export default function EvenementAanmeldenPubliekePagina() {
       setFout('Vul je e-mailadres in.')
       return
     }
+    for (const veld of evenement.velden) {
+      if (veld.verplicht && !antwoorden[veld.id]?.trim()) {
+        setFout(`Vul "${veld.label}" in.`)
+        return
+      }
+    }
     setBezig(true)
     setFout(null)
     try {
@@ -54,6 +70,7 @@ export default function EvenementAanmeldenPubliekePagina() {
           evenement_id: evenementId,
           email: form.email.trim(),
           naam: form.naam.trim() || null,
+          antwoorden,
         }),
       })
       const json = await res.json()
@@ -155,6 +172,33 @@ export default function EvenementAanmeldenPubliekePagina() {
                   style={{ width: '100%', padding: '12px 14px', borderRadius: 10, border: '1.5px solid #CBE6A6', fontSize: 15 }}
                 />
               </div>
+
+              {evenement.velden.map(veld => (
+                <div key={veld.id}>
+                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#4C7A20', marginBottom: 6 }}>
+                    {veld.label}{veld.verplicht ? ' *' : ''}
+                  </label>
+                  {veld.type === 'keuze' ? (
+                    <select
+                      value={antwoorden[veld.id] ?? ''}
+                      onChange={e => setAntwoorden(a => ({ ...a, [veld.id]: e.target.value }))}
+                      style={{ width: '100%', padding: '12px 14px', borderRadius: 10, border: '1.5px solid #CBE6A6', fontSize: 15, background: '#fff' }}
+                    >
+                      <option value="">{veld.verplicht ? 'Maak een keuze...' : 'Maak een keuze (optioneel)...'}</option>
+                      {(veld.opties ?? []).map(optie => (
+                        <option key={optie} value={optie}>{optie}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input
+                      value={antwoorden[veld.id] ?? ''}
+                      onChange={e => setAntwoorden(a => ({ ...a, [veld.id]: e.target.value }))}
+                      placeholder={veld.verplicht ? undefined : 'Optioneel'}
+                      style={{ width: '100%', padding: '12px 14px', borderRadius: 10, border: '1.5px solid #CBE6A6', fontSize: 15 }}
+                    />
+                  )}
+                </div>
+              ))}
 
               {fout && (
                 <div style={{ background: '#FEE2E2', border: '1px solid #FCA5A5', borderRadius: 8, padding: '10px 12px', fontSize: 13, color: '#991B1B' }}>

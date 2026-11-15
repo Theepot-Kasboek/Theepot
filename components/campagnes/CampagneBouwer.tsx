@@ -503,18 +503,15 @@ function BlokKaart({
               <input type="checkbox" checked={!!blok.lijn} onChange={e => onChange({ lijn: e.target.checked } as Partial<CampagneBlok>)} />
               Lijntje tonen
             </label>
-            {blok.lijn && (
-              <>
-                <label className="text-xs text-gray-400 flex items-center gap-1.5">
-                  Dikte
-                  <input type="range" min={1} max={8} step={1} value={blok.lijndikte ?? 1}
-                    onChange={e => onChange({ lijndikte: Number(e.target.value) } as Partial<CampagneBlok>)} className="w-20" />
-                  <span className="w-8 text-right">{blok.lijndikte ?? 1}px</span>
-                </label>
-                <input type="color" value={blok.lijnkleur || "#D9EBC0"} onChange={e => onChange({ lijnkleur: e.target.value } as Partial<CampagneBlok>)}
-                  className="w-8 h-8 rounded border border-gray-200 cursor-pointer" title="Lijnkleur" />
-              </>
-            )}
+            <label className={`text-xs flex items-center gap-1.5 ${blok.lijn ? "text-gray-400" : "text-gray-300"}`}>
+              Dikte
+              <input type="range" min={1} max={8} step={1} value={blok.lijndikte ?? 1} disabled={!blok.lijn}
+                onChange={e => onChange({ lijndikte: Number(e.target.value) } as Partial<CampagneBlok>)} className="w-20 disabled:opacity-50" />
+              <span className="w-8 text-right">{blok.lijndikte ?? 1}px</span>
+            </label>
+            <input type="color" value={blok.lijnkleur || "#D9EBC0"} disabled={!blok.lijn}
+              onChange={e => onChange({ lijnkleur: e.target.value } as Partial<CampagneBlok>)}
+              className="w-8 h-8 rounded border border-gray-200 cursor-pointer disabled:opacity-50" title="Lijnkleur" />
           </div>
         )}
 

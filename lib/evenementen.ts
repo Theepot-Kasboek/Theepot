@@ -27,6 +27,26 @@ export interface EvenementAanmelding {
   aangemeld_op: string
 }
 
+export type EvenementVeldType = 'tekst' | 'keuze'
+
+export interface EvenementVeld {
+  id: string
+  evenement_id: string
+  label: string
+  type: EvenementVeldType
+  opties: string[] | null
+  verplicht: boolean
+  volgorde: number
+  aangemaakt_op: string
+}
+
+export interface EvenementVeldAntwoord {
+  id: string
+  aanmelding_id: string
+  veld_id: string
+  waarde: string | null
+}
+
 export async function haalEvenementenOp(): Promise<Evenement[]> {
   const { data, error } = await getSupabase()
     .from('evenementen')
@@ -85,7 +105,7 @@ export async function verwijderAanmelding(id: string): Promise<void> {
 // aanmelding). Zelfde dedupe-logica als de publieke aanmeldroute: bestaand
 // e-mailadres voor dit evenement wordt bijgewerkt i.p.v. een duplicaat.
 export async function voegAanmeldingHandmatigToe(
-  evenementId: string, email: string, naam: string
+  evenementId: string, email: string, naam: string, antwoorden: Record<string, string> = {}
 ): Promise<{ bijgewerkt: boolean }> {
   const supabase = getSupabase()
   const schoneEmail = email.trim().toLowerCase()
@@ -97,20 +117,91 @@ export async function voegAanmeldingHandmatigToe(
     .ilike('email', schoneEmail)
     .maybeSingle()
 
+  let aanmeldingId: string
+  let bijgewerkt: boolean
+
   if (bestaand) {
     const { error } = await supabase
       .from('evenement_aanmeldingen')
       .update({ naam: naam.trim() || null, aangemeld_op: new Date().toISOString() })
       .eq('id', bestaand.id)
     if (error) throw new Error(error.message)
-    return { bijgewerkt: true }
+    aanmeldingId = bestaand.id
+    bijgewerkt = true
+  } else {
+    const { data, error } = await supabase.from('evenement_aanmeldingen').insert({
+      evenement_id: evenementId,
+      email: schoneEmail,
+      naam: naam.trim() || null,
+    }).select().single()
+    if (error) throw new Error(error.message)
+    aanmeldingId = data.id
+    bijgewerkt = false
   }
 
-  const { error } = await supabase.from('evenement_aanmeldingen').insert({
-    evenement_id: evenementId,
-    email: schoneEmail,
-    naam: naam.trim() || null,
-  })
+  await slaVeldAntwoordenOp(aanmeldingId, antwoorden)
+  return { bijgewerkt }
+}
+
+// --- Aanvullende velden per evenement -------------------------------------
+
+export async function haalVeldenOp(evenementId: string): Promise<EvenementVeld[]> {
+  const { data, error } = await getSupabase()
+    .from('evenement_velden')
+    .select('*')
+    .eq('evenement_id', evenementId)
+    .order('volgorde', { ascending: true })
   if (error) throw new Error(error.message)
-  return { bijgewerkt: false }
+  return data ?? []
+}
+
+export async function maakVeldAan(
+  evenementId: string, label: string, verplicht: boolean, volgorde: number,
+  type: EvenementVeldType = 'tekst', opties: string[] | null = null
+): Promise<EvenementVeld> {
+  const { data, error } = await getSupabase()
+    .from('evenement_velden')
+    .insert([{ evenement_id: evenementId, label, verplicht, volgorde, type, opties: type === 'keuze' ? opties : null }])
+    .select()
+    .single()
+  if (error) throw new Error(error.message)
+  return data
+}
+
+export async function wijzigVeld(id: string, w: Partial<Pick<EvenementVeld, 'label' | 'verplicht' | 'volgorde' | 'type' | 'opties'>>): Promise<void> {
+  const { error } = await getSupabase().from('evenement_velden').update(w).eq('id', id)
+  if (error) throw new Error(error.message)
+}
+
+export async function verwijderVeld(id: string): Promise<void> {
+  const { error } = await getSupabase().from('evenement_velden').delete().eq('id', id)
+  if (error) throw new Error(error.message)
+}
+
+// Antwoorden op de aanvullende velden, per aanmelding.
+
+export async function haalAntwoordenOp(aanmeldingIds: string[]): Promise<Record<string, Record<string, string>>> {
+  if (aanmeldingIds.length === 0) return {}
+  const { data, error } = await getSupabase()
+    .from('evenement_veld_antwoorden')
+    .select('aanmelding_id, veld_id, waarde')
+    .in('aanmelding_id', aanmeldingIds)
+  if (error) throw new Error(error.message)
+  const resultaat: Record<string, Record<string, string>> = {}
+  for (const rij of data ?? []) {
+    if (!resultaat[rij.aanmelding_id]) resultaat[rij.aanmelding_id] = {}
+    resultaat[rij.aanmelding_id][rij.veld_id] = rij.waarde ?? ''
+  }
+  return resultaat
+}
+
+export async function slaVeldAntwoordenOp(aanmeldingId: string, antwoorden: Record<string, string>): Promise<void> {
+  const rijen = Object.entries(antwoorden)
+    .filter(([, waarde]) => waarde != null && waarde !== '')
+    .map(([veldId, waarde]) => ({ aanmelding_id: aanmeldingId, veld_id: veldId, waarde }))
+  if (rijen.length === 0) return
+  const { error } = await getSupabase()
+    .from('evenement_veld_antwoorden')
+    .upsert(rijen, { onConflict: 'aanmelding_id,veld_id' })
+  if (error) throw new Error(error.message)
 }
