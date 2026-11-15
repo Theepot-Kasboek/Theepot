@@ -24,6 +24,9 @@ object DateUtils {
     fun maandaagVanWeek(date: LocalDate): LocalDate =
         date.with(DayOfWeek.MONDAY)
 
+    /** Eerste dag van de maand waarin `date` valt. */
+    fun startVanMaand(date: LocalDate): LocalDate = date.withDayOfMonth(1)
+
     fun toDateStr(date: LocalDate): String = date.format(isoDate)
 
     fun parseDateStr(s: String): LocalDate? = runCatching { LocalDate.parse(s, isoDate) }.getOrNull()

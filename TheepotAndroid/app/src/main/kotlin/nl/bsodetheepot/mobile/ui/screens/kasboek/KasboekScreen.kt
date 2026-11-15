@@ -268,6 +268,15 @@ private fun rememberBonnetjeScanner(onGescand: (ByteArray) -> Unit): () -> Unit 
     }
 
     fun startCamera() {
+        // Op apparaten zonder (werkende) camera-app — zoals sommige Chromebooks —
+        // resolvet deze intent niet. Zonder deze check crasht het scannen daar.
+        val captureIntent = android.content.Intent(android.provider.MediaStore.ACTION_IMAGE_CAPTURE)
+        if (captureIntent.resolveActivity(context.packageManager) == null) {
+            android.widget.Toast.makeText(
+                context, "Geen camera beschikbaar op dit apparaat", android.widget.Toast.LENGTH_SHORT,
+            ).show()
+            return
+        }
         val file = File.createTempFile("bonnetje_", ".jpg", context.cacheDir)
         val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
         fotoUri = uri
@@ -283,6 +292,23 @@ private fun rememberBonnetjeScanner(onGescand: (ByteArray) -> Unit): () -> Unit 
             PackageManager.PERMISSION_GRANTED
         if (heeftPermissie) startCamera() else permissieLauncher.launch(Manifest.permission.CAMERA)
     }
+}
+
+/**
+ * Alternatief voor de camera: een al bestaand bestand (bv. een gedownloade bon of
+ * ingescande foto) kiezen als bonnetje. Nodig op apparaten zonder (werkende) camera,
+ * zoals veel Chromebooks.
+ */
+@Composable
+private fun rememberBonnetjeBestandKiezer(onGekozen: (ByteArray) -> Unit): () -> Unit {
+    val context = LocalContext.current
+    val huidigeCallback by rememberUpdatedState(onGekozen)
+
+    val bestandLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        uri?.let { context.contentResolver.openInputStream(it)?.use { stream -> huidigeCallback(stream.readBytes()) } }
+    }
+
+    return { bestandLauncher.launch("image/*") }
 }
 
 @Composable
@@ -308,6 +334,10 @@ private fun BoekingBewerkenDialog(
     }
 
     val startScan = rememberBonnetjeScanner { bytes ->
+        nieuwBonnetje = bytes
+        bonnetjeVerwijderen = false
+    }
+    val kiesBestand = rememberBonnetjeBestandKiezer { bytes ->
         nieuwBonnetje = bytes
         bonnetjeVerwijderen = false
     }
@@ -351,15 +381,21 @@ private fun BoekingBewerkenDialog(
                 }
                 OutlinedTextField(value = omschrijving, onValueChange = { omschrijving = it }, label = { Text("Omschrijving") })
 
-                TextButton(onClick = startScan) {
-                    Icon(Icons.Filled.CameraAlt, contentDescription = null)
-                    Text(
-                        when {
-                            nieuwBonnetje != null -> "Nieuw bonnetje vastgelegd ✓"
-                            heeftBonnetje -> "Bonnetje vervangen"
-                            else -> "Scan bonnetje"
-                        },
-                    )
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    TextButton(onClick = startScan) {
+                        Icon(Icons.Filled.CameraAlt, contentDescription = null)
+                        Text(
+                            when {
+                                nieuwBonnetje != null -> "Nieuw bonnetje vastgelegd ✓"
+                                heeftBonnetje -> "Bonnetje vervangen"
+                                else -> "Scan bonnetje"
+                            },
+                        )
+                    }
+                    TextButton(onClick = kiesBestand) {
+                        Icon(Icons.Filled.AttachFile, contentDescription = null)
+                        Text("Kies bestand")
+                    }
                 }
 
                 if (heeftBonnetje) {
@@ -450,6 +486,7 @@ private fun NieuweBoekingDialog(
     }
 
     val startScan = rememberBonnetjeScanner { bytes -> bonnetjeBytes = bytes }
+    val kiesBestand = rememberBonnetjeBestandKiezer { bytes -> bonnetjeBytes = bytes }
 
     val bedrag = bedragTekst.replace(",", ".").toDoubleOrNull()
 
@@ -482,9 +519,15 @@ private fun NieuweBoekingDialog(
                 }
                 OutlinedTextField(value = omschrijving, onValueChange = { omschrijving = it }, label = { Text("Omschrijving") })
 
-                TextButton(onClick = startScan) {
-                    Icon(Icons.Filled.CameraAlt, contentDescription = null)
-                    Text(if (bonnetjeBytes != null) "Bonnetje vastgelegd ✓" else "Scan bonnetje")
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    TextButton(onClick = startScan) {
+                        Icon(Icons.Filled.CameraAlt, contentDescription = null)
+                        Text(if (bonnetjeBytes != null) "Bonnetje vastgelegd ✓" else "Scan bonnetje")
+                    }
+                    TextButton(onClick = kiesBestand) {
+                        Icon(Icons.Filled.AttachFile, contentDescription = null)
+                        Text("Kies bestand")
+                    }
                 }
             }
         },
