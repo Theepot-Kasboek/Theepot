@@ -40,16 +40,22 @@ create unique index if not exists uq_evenement_aanmelding_email
 -- personen", "Allergieën" als tekstveld, of "Dieetwens" als dropdown), elk
 -- verplicht of optioneel. Verschijnen op de publieke aanmeldpagina onder
 -- naam/e-mail. `opties` is alleen gevuld (en gebruikt) bij type 'keuze'.
+-- `meerdere` (alleen relevant bij type 'keuze') staat een dropdown toe als
+-- aanvinklijst met meerdere gekozen opties i.p.v. één keuze.
 create table if not exists evenement_velden (
   id            uuid primary key default gen_random_uuid(),
   evenement_id  uuid not null references evenementen(id) on delete cascade,
   label         text not null,
   type          text not null default 'tekst' check (type in ('tekst', 'keuze')),
   opties        text[],
+  meerdere      boolean not null default false,
   verplicht     boolean not null default false,
   volgorde      integer not null default 0,
   aangemaakt_op timestamptz not null default now()
 );
+
+-- Idempotent toevoegen voor wie evenementen.sql al eerder zonder `meerdere` heeft uitgevoerd.
+alter table evenement_velden add column if not exists meerdere boolean not null default false;
 
 create index if not exists idx_evenement_velden_event
   on evenement_velden (evenement_id, volgorde);

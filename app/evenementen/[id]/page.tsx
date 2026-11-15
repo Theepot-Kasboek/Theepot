@@ -7,7 +7,7 @@ import { ArrowLeft, Link2, Download, Trash2, Users, UserPlus, X, Plus, Settings,
 import { useAuth } from '@/components/AuthProvider'
 import {
   Evenement, EvenementAanmelding, EvenementVeld, haalAanmeldingenOp, wijzigEvenement, verwijderAanmelding, voegAanmeldingHandmatigToe,
-  haalVeldenOp, maakVeldAan, wijzigVeld, verwijderVeld, haalAntwoordenOp,
+  haalVeldenOp, maakVeldAan, wijzigVeld, verwijderVeld, haalAntwoordenOp, meerkeuzeOpties, wisselMeerkeuzeOptie,
 } from '@/lib/evenementen'
 import { getSupabase } from '@/lib/supabase'
 import Topbar from '@/components/Topbar'
@@ -30,7 +30,7 @@ export default function EvenementDetailPagina() {
   const [handmatigAntwoorden, setHandmatigAntwoorden] = useState<Record<string, string>>({})
   const [opslaanHandmatig, setOpslaanHandmatig] = useState(false)
   const [toonVelden, setToonVelden] = useState(false)
-  const [nieuwVeld, setNieuwVeld] = useState<{ label: string; type: 'tekst' | 'keuze'; opties: string; verplicht: boolean }>({ label: '', type: 'tekst', opties: '', verplicht: false })
+  const [nieuwVeld, setNieuwVeld] = useState<{ label: string; type: 'tekst' | 'keuze'; opties: string; meerdere: boolean; verplicht: boolean }>({ label: '', type: 'tekst', opties: '', meerdere: false, verplicht: false })
   const [opslaanVeld, setOpslaanVeld] = useState(false)
 
   function toon(bericht: string, type: 'success' | 'error' = 'success') {
@@ -69,9 +69,9 @@ export default function EvenementDetailPagina() {
     }
     setOpslaanVeld(true)
     try {
-      const veld = await maakVeldAan(evenement.id, nieuwVeld.label.trim(), nieuwVeld.verplicht, velden.length, nieuwVeld.type, opties)
+      const veld = await maakVeldAan(evenement.id, nieuwVeld.label.trim(), nieuwVeld.verplicht, velden.length, nieuwVeld.type, opties, nieuwVeld.meerdere)
       setVelden(prev => [...prev, veld])
-      setNieuwVeld({ label: '', type: 'tekst', opties: '', verplicht: false })
+      setNieuwVeld({ label: '', type: 'tekst', opties: '', meerdere: false, verplicht: false })
       toon('Veld toegevoegd')
     } catch (err) {
       toon('Toevoegen mislukt: ' + (err instanceof Error ? err.message : String(err)), 'error')
@@ -132,6 +132,10 @@ export default function EvenementDetailPagina() {
 
   async function handmatigOpslaan() {
     if (!evenement) return
+    if (!handmatig.naam.trim()) {
+      toon('Vul een naam in.', 'error')
+      return
+    }
     const email = handmatig.email.trim()
     if (!email) {
       toon('Vul een e-mailadres in.', 'error')
@@ -306,8 +310,8 @@ export default function EvenementDetailPagina() {
             </div>
             <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               <div>
-                <label className="form-label">Naam</label>
-                <input className="form-input" value={handmatig.naam} onChange={e => setHandmatig(h => ({ ...h, naam: e.target.value }))} placeholder="Voor- en achternaam (optioneel)" />
+                <label className="form-label">Naam *</label>
+                <input className="form-input" value={handmatig.naam} onChange={e => setHandmatig(h => ({ ...h, naam: e.target.value }))} placeholder="Voor- en achternaam" />
               </div>
               <div>
                 <label className="form-label">E-mail *</label>
@@ -316,7 +320,20 @@ export default function EvenementDetailPagina() {
               {velden.map(v => (
                 <div key={v.id}>
                   <label className="form-label">{v.label}{v.verplicht ? ' *' : ''}</label>
-                  {v.type === 'keuze' ? (
+                  {v.type === 'keuze' && v.meerdere ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, border: '1px solid var(--border)', borderRadius: 8, padding: '8px 10px' }}>
+                      {(v.opties ?? []).map(o => (
+                        <label key={o} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
+                          <input
+                            type="checkbox"
+                            checked={meerkeuzeOpties(handmatigAntwoorden[v.id] ?? '').includes(o)}
+                            onChange={() => setHandmatigAntwoorden(a => ({ ...a, [v.id]: wisselMeerkeuzeOptie(a[v.id] ?? '', o) }))}
+                          />
+                          {o}
+                        </label>
+                      ))}
+                    </div>
+                  ) : v.type === 'keuze' ? (
                     <select className="form-input" value={handmatigAntwoorden[v.id] ?? ''} onChange={e => setHandmatigAntwoorden(a => ({ ...a, [v.id]: e.target.value }))}>
                       <option value="">Maak een keuze...</option>
                       {(v.opties ?? []).map(o => <option key={o} value={o}>{o}</option>)}
@@ -343,6 +360,17 @@ export default function EvenementDetailPagina() {
               <button className="btn btn-sm" onClick={() => setToonVelden(false)}><X size={14} /></button>
             </div>
             <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)' }}>Standaardvelden</div>
+              {[{ label: 'Naam' }, { label: 'E-mail' }].map(v => (
+                <div key={v.label} style={{ display: 'flex', alignItems: 'center', gap: 8, border: '1px solid var(--border)', borderRadius: 8, padding: '8px 10px', background: 'var(--bg)' }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600 }}>{v.label}</div>
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Tekstveld · Altijd verplicht</div>
+                  </div>
+                </div>
+              ))}
+
+              <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginTop: 4 }}>Aanvullende velden</div>
               {velden.length === 0 && (
                 <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: 0 }}>
                   Nog geen aanvullende velden. Voeg een invulvakje of dropdown toe die bezoekers naast naam en e-mail moeten (of mogen) invullen.
@@ -353,7 +381,7 @@ export default function EvenementDetailPagina() {
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 13, fontWeight: 600 }}>{v.label}</div>
                     <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                      {v.type === 'keuze' ? `Dropdown: ${(v.opties ?? []).join(', ')}` : 'Tekstveld'} · {v.verplicht ? 'Verplicht' : 'Optioneel'}
+                      {v.type === 'keuze' ? `Dropdown${v.meerdere ? ' (meerdere toegestaan)' : ''}: ${(v.opties ?? []).join(', ')}` : 'Tekstveld'} · {v.verplicht ? 'Verplicht' : 'Optioneel'}
                     </div>
                   </div>
                   <button className="btn btn-sm" disabled={i === 0} onClick={() => veldVerplaatsen(i, -1)} title="Omhoog"><ArrowUp size={13} /></button>
@@ -376,7 +404,13 @@ export default function EvenementDetailPagina() {
                   </label>
                 </div>
                 {nieuwVeld.type === 'keuze' && (
-                  <input className="form-input" placeholder="Opties, gescheiden door komma's" value={nieuwVeld.opties} onChange={e => setNieuwVeld(v => ({ ...v, opties: e.target.value }))} />
+                  <>
+                    <input className="form-input" placeholder="Opties, gescheiden door komma's" value={nieuwVeld.opties} onChange={e => setNieuwVeld(v => ({ ...v, opties: e.target.value }))} />
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
+                      <input type="checkbox" checked={nieuwVeld.meerdere} onChange={e => setNieuwVeld(v => ({ ...v, meerdere: e.target.checked }))} />
+                      Meerdere opties mogen aangevinkt worden
+                    </label>
+                  </>
                 )}
                 <button className="btn btn-primary" style={{ alignSelf: 'flex-start' }} onClick={veldOpslaan} disabled={opslaanVeld}>
                   <Plus size={14} /> {opslaanVeld ? 'Toevoegen...' : 'Veld toevoegen'}

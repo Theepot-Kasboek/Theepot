@@ -34,7 +34,7 @@ export async function GET(req: NextRequest) {
 
   const { data: velden } = await supabase
     .from('evenement_velden')
-    .select('id, label, type, opties, verplicht')
+    .select('id, label, type, opties, meerdere, verplicht')
     .eq('evenement_id', evenement_id)
     .order('volgorde', { ascending: true })
 
@@ -54,7 +54,10 @@ export async function POST(req: NextRequest) {
   try {
     const { evenement_id, email, naam, antwoorden } = await req.json()
 
-    if (!evenement_id || !email || !String(email).trim()) {
+    if (!evenement_id || !naam || !String(naam).trim()) {
+      return NextResponse.json({ error: 'Vul je naam in.' }, { status: 400 })
+    }
+    if (!email || !String(email).trim()) {
       return NextResponse.json({ error: 'Vul een e-mailadres in.' }, { status: 400 })
     }
     const schoneEmail = String(email).trim().toLowerCase()
@@ -80,20 +83,21 @@ export async function POST(req: NextRequest) {
 
     const { data: velden } = await supabase
       .from('evenement_velden')
-      .select('id, label, type, opties, verplicht')
+      .select('id, label, type, opties, meerdere, verplicht')
       .eq('evenement_id', evenement_id)
 
     const ingevuld: Record<string, string> = antwoorden && typeof antwoorden === 'object' ? antwoorden : {}
     const antwoordenOpSlaan: { veld_id: string; waarde: string }[] = []
     for (const veld of velden ?? []) {
-      const waarde = String(ingevuld[veld.id] ?? '').trim()
-      if (veld.verplicht && !waarde) {
+      const ruw = String(ingevuld[veld.id] ?? '').trim()
+      const gekozen = veld.meerdere ? ruw.split(',').map(s => s.trim()).filter(Boolean) : (ruw ? [ruw] : [])
+      if (veld.verplicht && gekozen.length === 0) {
         return NextResponse.json({ error: `Vul "${veld.label}" in.` }, { status: 400 })
       }
-      if (waarde && veld.type === 'keuze' && !(veld.opties ?? []).includes(waarde)) {
+      if (veld.type === 'keuze' && gekozen.some(g => !(veld.opties ?? []).includes(g))) {
         return NextResponse.json({ error: `Ongeldige keuze voor "${veld.label}".` }, { status: 400 })
       }
-      if (waarde) antwoordenOpSlaan.push({ veld_id: veld.id, waarde })
+      if (gekozen.length > 0) antwoordenOpSlaan.push({ veld_id: veld.id, waarde: gekozen.join(', ') })
     }
 
     const { data: bestaand } = await supabase

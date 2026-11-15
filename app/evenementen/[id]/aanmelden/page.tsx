@@ -2,12 +2,14 @@
 
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
+import { meerkeuzeOpties, wisselMeerkeuzeOptie } from '@/lib/evenementen'
 
 interface PubliekVeld {
   id: string
   label: string
   type: 'tekst' | 'keuze'
   opties: string[] | null
+  meerdere: boolean
   verplicht: boolean
 }
 
@@ -50,6 +52,10 @@ export default function EvenementAanmeldenPubliekePagina() {
 
   async function versturen() {
     if (!evenement) return
+    if (!form.naam.trim()) {
+      setFout('Vul je naam in.')
+      return
+    }
     if (!form.email.trim()) {
       setFout('Vul je e-mailadres in.')
       return
@@ -153,12 +159,12 @@ export default function EvenementAanmeldenPubliekePagina() {
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
               <div>
-                <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#4C7A20', marginBottom: 6 }}>Naam</label>
+                <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#4C7A20', marginBottom: 6 }}>Naam *</label>
                 <input
                   value={form.naam}
                   onChange={e => setForm(f => ({ ...f, naam: e.target.value }))}
-                  placeholder="Voor- en achternaam (optioneel)"
-                  style={{ width: '100%', padding: '12px 14px', borderRadius: 10, border: '1.5px solid #CBE6A6', fontSize: 15 }}
+                  placeholder="Voor- en achternaam"
+                  style={{ width: '100%', padding: '12px 14px', borderRadius: 10, border: '1.5px solid #CBE6A6', fontSize: 15, color: '#4C7A20' }}
                 />
               </div>
 
@@ -169,7 +175,7 @@ export default function EvenementAanmeldenPubliekePagina() {
                   value={form.email}
                   onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
                   placeholder="naam@voorbeeld.nl"
-                  style={{ width: '100%', padding: '12px 14px', borderRadius: 10, border: '1.5px solid #CBE6A6', fontSize: 15 }}
+                  style={{ width: '100%', padding: '12px 14px', borderRadius: 10, border: '1.5px solid #CBE6A6', fontSize: 15, color: '#4C7A20' }}
                 />
               </div>
 
@@ -178,11 +184,24 @@ export default function EvenementAanmeldenPubliekePagina() {
                   <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#4C7A20', marginBottom: 6 }}>
                     {veld.label}{veld.verplicht ? ' *' : ''}
                   </label>
-                  {veld.type === 'keuze' ? (
+                  {veld.type === 'keuze' && veld.meerdere ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, border: '1.5px solid #CBE6A6', borderRadius: 10, padding: '10px 14px' }}>
+                      {(veld.opties ?? []).map(optie => (
+                        <label key={optie} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, color: '#4C7A20' }}>
+                          <input
+                            type="checkbox"
+                            checked={meerkeuzeOpties(antwoorden[veld.id] ?? '').includes(optie)}
+                            onChange={() => setAntwoorden(a => ({ ...a, [veld.id]: wisselMeerkeuzeOptie(a[veld.id] ?? '', optie) }))}
+                          />
+                          {optie}
+                        </label>
+                      ))}
+                    </div>
+                  ) : veld.type === 'keuze' ? (
                     <select
                       value={antwoorden[veld.id] ?? ''}
                       onChange={e => setAntwoorden(a => ({ ...a, [veld.id]: e.target.value }))}
-                      style={{ width: '100%', padding: '12px 14px', borderRadius: 10, border: '1.5px solid #CBE6A6', fontSize: 15, background: '#fff' }}
+                      style={{ width: '100%', padding: '12px 14px', borderRadius: 10, border: '1.5px solid #CBE6A6', fontSize: 15, background: '#fff', color: '#4C7A20' }}
                     >
                       <option value="">{veld.verplicht ? 'Maak een keuze...' : 'Maak een keuze (optioneel)...'}</option>
                       {(veld.opties ?? []).map(optie => (
@@ -194,7 +213,7 @@ export default function EvenementAanmeldenPubliekePagina() {
                       value={antwoorden[veld.id] ?? ''}
                       onChange={e => setAntwoorden(a => ({ ...a, [veld.id]: e.target.value }))}
                       placeholder={veld.verplicht ? undefined : 'Optioneel'}
-                      style={{ width: '100%', padding: '12px 14px', borderRadius: 10, border: '1.5px solid #CBE6A6', fontSize: 15 }}
+                      style={{ width: '100%', padding: '12px 14px', borderRadius: 10, border: '1.5px solid #CBE6A6', fontSize: 15, color: '#4C7A20' }}
                     />
                   )}
                 </div>

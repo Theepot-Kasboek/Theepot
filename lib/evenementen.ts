@@ -35,9 +35,24 @@ export interface EvenementVeld {
   label: string
   type: EvenementVeldType
   opties: string[] | null
+  meerdere: boolean
   verplicht: boolean
   volgorde: number
   aangemaakt_op: string
+}
+
+// Eén opgeslagen antwoord-string voor een meerdere-keuze-veld bestaat uit de
+// gekozen opties, gescheiden door ", ". Hiermee schakel je één optie aan/uit.
+export function wisselMeerkeuzeOptie(huidig: string, optie: string): string {
+  const items = huidig ? huidig.split(',').map(s => s.trim()).filter(Boolean) : []
+  const idx = items.indexOf(optie)
+  if (idx >= 0) items.splice(idx, 1)
+  else items.push(optie)
+  return items.join(', ')
+}
+
+export function meerkeuzeOpties(waarde: string): string[] {
+  return waarde ? waarde.split(',').map(s => s.trim()).filter(Boolean) : []
 }
 
 export interface EvenementVeldAntwoord {
@@ -157,18 +172,18 @@ export async function haalVeldenOp(evenementId: string): Promise<EvenementVeld[]
 
 export async function maakVeldAan(
   evenementId: string, label: string, verplicht: boolean, volgorde: number,
-  type: EvenementVeldType = 'tekst', opties: string[] | null = null
+  type: EvenementVeldType = 'tekst', opties: string[] | null = null, meerdere: boolean = false
 ): Promise<EvenementVeld> {
   const { data, error } = await getSupabase()
     .from('evenement_velden')
-    .insert([{ evenement_id: evenementId, label, verplicht, volgorde, type, opties: type === 'keuze' ? opties : null }])
+    .insert([{ evenement_id: evenementId, label, verplicht, volgorde, type, opties: type === 'keuze' ? opties : null, meerdere: type === 'keuze' && meerdere }])
     .select()
     .single()
   if (error) throw new Error(error.message)
   return data
 }
 
-export async function wijzigVeld(id: string, w: Partial<Pick<EvenementVeld, 'label' | 'verplicht' | 'volgorde' | 'type' | 'opties'>>): Promise<void> {
+export async function wijzigVeld(id: string, w: Partial<Pick<EvenementVeld, 'label' | 'verplicht' | 'volgorde' | 'type' | 'opties' | 'meerdere'>>): Promise<void> {
   const { error } = await getSupabase().from('evenement_velden').update(w).eq('id', id)
   if (error) throw new Error(error.message)
 }
