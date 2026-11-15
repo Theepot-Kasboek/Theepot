@@ -42,7 +42,7 @@ const PALET: { type: CampagneBlok["type"]; label: string; icoon: typeof Type }[]
   { type: "socials", label: "Social media", icoon: Share2 },
 ];
 
-const veld = "w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#8CC63F]";
+const veld = "w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-[#1A2E0D] bg-white focus:outline-none focus:ring-2 focus:ring-[#8CC63F]";
 
 export default function CampagneBouwer({
   blokken, onChange, magBewerken, onQrDataUrlsChange, sjablonen = [], onSjabloonOpslaan, onSjabloonVerwijderen,
@@ -526,7 +526,7 @@ function BlokKaart({
   );
 }
 
-const stijlVeld = "border border-gray-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#8CC63F] bg-white";
+const stijlVeld = "border border-gray-200 rounded-lg px-2 py-1.5 text-xs text-[#1A2E0D] focus:outline-none focus:ring-2 focus:ring-[#8CC63F] bg-white";
 
 function htmlAlign(u: Uitlijning | undefined): "left" | "center" | "right" {
   return u === "midden" ? "center" : u === "rechts" ? "right" : "left";
@@ -630,7 +630,7 @@ function ReclameBlokVeld({ blok, onChange, uploadBezig, onUpload, fileInputRef }
           <input ref={el => { inputRef.current = el; fileInputRef(el); }} type="file" accept="image/*" className="hidden"
             onChange={e => { const f = e.target.files?.[0]; if (f) onUpload(f); }} />
           <button type="button" onClick={() => inputRef.current?.click()} disabled={uploadBezig}
-            className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-50">
+            className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border border-gray-200 text-[#374151] hover:bg-gray-50 disabled:opacity-50">
             <Upload size={13} /> {uploadBezig ? "Uploaden…" : blok.pad ? "Vervangen" : "Afbeelding kiezen"}
           </button>
         </div>
@@ -655,7 +655,7 @@ function ReclameBlokVeld({ blok, onChange, uploadBezig, onUpload, fileInputRef }
   );
 }
 
-const kolomVeld = "w-full border border-gray-200 rounded-md px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-[#8CC63F]";
+const kolomVeld = "w-full border border-gray-200 rounded-md px-2 py-1 text-xs text-[#1A2E0D] bg-white focus:outline-none focus:ring-2 focus:ring-[#8CC63F]";
 
 const KNOP_ONDER_STANDAARD: KnopInhoud = { label: "Lees verder", url: "" };
 
@@ -668,7 +668,7 @@ function KnopOnderVeld({ knopOnder, onChange }: {
   if (!knopOnder) {
     return (
       <button type="button" onClick={() => onChange({ ...KNOP_ONDER_STANDAARD })}
-        className="flex items-center gap-1.5 text-xs font-medium px-2 py-1 rounded-md border border-gray-200 hover:bg-gray-50">
+        className="flex items-center gap-1.5 text-xs font-medium px-2 py-1 rounded-md border border-gray-200 text-[#374151] hover:bg-gray-50">
         <Link2 size={11} /> Knop toevoegen
       </button>
     );
@@ -708,7 +708,7 @@ function KolomEditor({ kant, kolom, uploadBezig, onChange, onUpload }: {
       <div className="flex items-center justify-between">
         <span className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">{kant === "links" ? "Eerste" : "Tweede"}</span>
         <select value={kolom.soort} onChange={e => onChange(nieuweKolomInhoud(e.target.value as Kolom["soort"]) as unknown as Record<string, unknown>)}
-          className="text-xs border border-gray-200 rounded-md px-1.5 py-1 bg-white">
+          className="text-xs border border-gray-200 rounded-md px-1.5 py-1 bg-white text-[#374151]">
           <option value="tekst">Tekst</option>
           <option value="afbeelding">Afbeelding</option>
           <option value="knop">Knop / link</option>
@@ -741,7 +741,7 @@ function KolomEditor({ kant, kolom, uploadBezig, onChange, onUpload }: {
             )}
             <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) onUpload(f); }} />
             <button type="button" onClick={() => inputRef.current?.click()} disabled={uploadBezig}
-              className="text-[11px] font-medium px-2 py-1 rounded-md border border-gray-200 hover:bg-gray-50 disabled:opacity-50">
+              className="text-[11px] font-medium px-2 py-1 rounded-md border border-gray-200 text-[#374151] hover:bg-gray-50 disabled:opacity-50">
               {uploadBezig ? "Bezig…" : "Kiezen"}
             </button>
           </div>
@@ -779,7 +779,7 @@ function KolomEditor({ kant, kolom, uploadBezig, onChange, onUpload }: {
             )}
             <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) onUpload(f); }} />
             <button type="button" onClick={() => inputRef.current?.click()} disabled={uploadBezig}
-              className="text-[11px] font-medium px-2 py-1 rounded-md border border-gray-200 hover:bg-gray-50 disabled:opacity-50">
+              className="text-[11px] font-medium px-2 py-1 rounded-md border border-gray-200 text-[#374151] hover:bg-gray-50 disabled:opacity-50">
               {uploadBezig ? "Bezig…" : "Kiezen"}
             </button>
           </div>
@@ -836,7 +836,7 @@ function RijBlokVeld({ blok, onChange, uploadBezigKolom, onKolomChange, onKolomU
           </label>
         )}
         <button type="button" onClick={onWisselKanten}
-          className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border border-gray-200 hover:bg-gray-50">
+          className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border border-gray-200 text-[#374151] hover:bg-gray-50">
           <ArrowLeftRight size={12} /> {horizontaal ? "Wissel links/rechts" : "Wissel volgorde"}
         </button>
       </div>
@@ -880,7 +880,7 @@ function SocialsBlokVeld({ blok, onChange }: {
               </svg>
             )}
             <select value={l.platform} onChange={e => updateLink(i, { platform: e.target.value as SocialPlatform })}
-              className="text-xs border border-gray-200 rounded-md px-2 py-1.5 bg-white w-28 flex-shrink-0">
+              className="text-xs border border-gray-200 rounded-md px-2 py-1.5 bg-white w-28 flex-shrink-0 text-[#374151]">
               {SOCIAL_PLATFORMS.map(p => <option key={p.waarde} value={p.waarde}>{p.label}</option>)}
             </select>
             <input value={l.url} onChange={e => updateLink(i, { url: e.target.value })} placeholder="https://..." className={veld} />
@@ -892,7 +892,7 @@ function SocialsBlokVeld({ blok, onChange }: {
       })}
       {blok.links.length < SOCIAL_PLATFORMS.length && (
         <button type="button" onClick={voegLinkToe}
-          className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border border-gray-200 hover:bg-gray-50">
+          className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border border-gray-200 text-[#374151] hover:bg-gray-50">
           + Platform toevoegen
         </button>
       )}
@@ -928,7 +928,7 @@ function AfbeeldingBlokVeld({ blok, onChange, uploadBezig, onUpload, fileInputRe
             onChange={e => { const f = e.target.files?.[0]; if (f) onUpload(f); }}
           />
           <button type="button" onClick={() => inputRef.current?.click()} disabled={uploadBezig}
-            className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-50">
+            className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border border-gray-200 text-[#374151] hover:bg-gray-50 disabled:opacity-50">
             <Upload size={13} /> {uploadBezig ? "Uploaden…" : blok.pad ? "Vervangen" : "Foto kiezen"}
           </button>
           <input value={blok.bijschrift} onChange={e => onChange({ bijschrift: e.target.value } as Partial<CampagneBlok>)}
