@@ -39,6 +39,19 @@ export interface TekstBlok extends TekstStijlVelden {
   // Optionele kop boven de tekst van dit blok.
   kop?: string
   kopStijl?: Omit<TekstStijlVelden, 'regelafstand'>
+  // Optionele foto boven of onder de tekst van dit blok (zie BlokAfbeelding).
+  extraAfbeelding?: BlokAfbeelding
+}
+
+// Extra, losse foto boven of onder de inhoud van een blok (niet te
+// verwarren met AfbeeldingInhoud, dat is de hoofdinhoud van een afbeelding-
+// of reclameblok). Elk bloktype waar dit zinvol is (dus niet 'afbeelding'
+// zelf en niet 'scheiding') kan een optioneel extraAfbeelding-veld hebben.
+export interface BlokAfbeelding {
+  pad: string | null
+  positie: 'boven' | 'onder'
+  breedte?: number // percentage, 20-100
+  link?: string
 }
 
 export interface AfbeeldingInhoud {
@@ -69,6 +82,7 @@ export interface KnopBlok extends KnopInhoud {
   id: string
   type: 'knop'
   uitlijning?: Uitlijning
+  extraAfbeelding?: BlokAfbeelding
 }
 
 export interface QrBlok {
@@ -79,6 +93,7 @@ export interface QrBlok {
   grootte?: number // px, 80-240
   uitlijning?: Uitlijning
   bijschriftStijl?: Omit<TekstStijlVelden, 'regelafstand'>
+  extraAfbeelding?: BlokAfbeelding
 }
 
 export interface ReclameInhoud {
@@ -93,6 +108,7 @@ export interface ReclameInhoud {
 export interface ReclameBlok extends ReclameInhoud {
   id: string
   type: 'reclame'
+  extraAfbeelding?: BlokAfbeelding
 }
 
 export interface ScheidingBlok {
@@ -150,6 +166,7 @@ export interface SocialsBlok {
   type: 'socials'
   links: SocialLink[]
   uitlijning?: Uitlijning
+  extraAfbeelding?: BlokAfbeelding
 }
 
 // Eén kant van een CombinatieBlok: elk los blok-type kan hier staan.
@@ -171,6 +188,7 @@ export interface CombinatieBlok {
   breedteEerste?: number // percentage van de eerste kolom bij horizontaal, 20-80
   links: Kolom
   rechts: Kolom
+  extraAfbeelding?: BlokAfbeelding
 }
 
 export type CampagneBlok = TekstBlok | AfbeeldingBlok | KnopBlok | QrBlok | ReclameBlok | ScheidingBlok | SocialsBlok | CombinatieBlok
@@ -305,6 +323,12 @@ function leegKolomInhoud(kolom: Kolom): Kolom {
 // van een heel-nieuwsbrief-sjabloon voor blokken die je niet als "bewaren"
 // markeert.
 export function leegBlokInhoud(blok: CampagneBlok): CampagneBlok {
+  const leeg = leegBlokInhoudKern(blok)
+  if (leeg.type === 'afbeelding' || leeg.type === 'scheiding' || !leeg.extraAfbeelding) return leeg
+  return { ...leeg, extraAfbeelding: { ...leeg.extraAfbeelding, pad: null } }
+}
+
+function leegBlokInhoudKern(blok: CampagneBlok): CampagneBlok {
   switch (blok.type) {
     case 'tekst':
       return { ...blok, tekst: '', ...(blok.kop !== undefined ? { kop: '' } : {}) }
@@ -431,6 +455,18 @@ function afbeeldingInhoudNaarHtml(data: AfbeeldingInhoud, align: 'left' | 'cente
   return `<div style="text-align:${align};">${omlijnd}${bijschrift}</div>`
 }
 
+// Losse foto boven/onder de inhoud van een blok (zie BlokAfbeelding) —
+// anders dan afbeeldingInhoudNaarHtml heeft deze geen bijschrift, puur de
+// foto zelf, altijd gecentreerd met wat marge naar de rest van het blok.
+function extraAfbeeldingNaarHtml(afb: BlokAfbeelding | undefined, maxBreedtePx: number): string {
+  if (!afb?.pad) return ''
+  const breedte = afb.breedte ?? 100
+  const img = `<img src="${afbeeldingUrl(afb.pad)}" alt="" style="width:${breedte}%;max-width:${Math.round(maxBreedtePx * breedte / 100)}px;display:block;border-radius:8px;margin:0 auto;" />`
+  const omlijnd = afb.link ? `<a href="${escapeHtml(afb.link)}" target="_blank" rel="noopener noreferrer">${img}</a>` : img
+  const marge = afb.positie === 'onder' ? 'margin:12px 0 0;' : 'margin:0 0 12px;'
+  return `<div style="text-align:center;${marge}">${omlijnd}</div>`
+}
+
 function knopInhoudNaarHtml(data: KnopInhoud, align: 'left' | 'center' | 'right'): string {
   if (!data.url) return ''
   const achtergrond = data.achtergrondkleur || STANDAARD_MERKKLEUR
@@ -495,7 +531,9 @@ function kolomNaarHtml(kolom: Kolom, maxBreedtePx: number): string {
   }
 }
 
-function blokNaarHtml(blok: CampagneBlok, qrDataUrls: Record<string, string>): string {
+// Kerninhoud van een blok (de eigen switch per type), zonder de optionele
+// extraAfbeelding erboven/eronder — zie blokNaarHtml daaronder voor de wrap.
+function blokKernNaarHtml(blok: CampagneBlok, qrDataUrls: Record<string, string>): string {
   switch (blok.type) {
     case 'tekst': {
       const grootte = blok.tekstgrootte || 15
@@ -584,6 +622,26 @@ function blokNaarHtml(blok: CampagneBlok, qrDataUrls: Record<string, string>): s
   }
 }
 
+// Bloktypen waar een extraAfbeelding boven/onder bij past — 'afbeelding'
+// (is zelf al een foto) en 'scheiding' (een lege/lijn-spacer) slaan we over.
+function blokExtraAfbeelding(blok: CampagneBlok): BlokAfbeelding | undefined {
+  switch (blok.type) {
+    case 'afbeelding':
+    case 'scheiding':
+      return undefined
+    default:
+      return blok.extraAfbeelding
+  }
+}
+
+function blokNaarHtml(blok: CampagneBlok, qrDataUrls: Record<string, string>): string {
+  const kern = blokKernNaarHtml(blok, qrDataUrls)
+  const extra = blokExtraAfbeelding(blok)
+  const img = extraAfbeeldingNaarHtml(extra, EMAIL_INHOUD_BREEDTE)
+  if (!img) return kern
+  return extra?.positie === 'onder' ? `${kern}${img}` : `${img}${kern}`
+}
+
 // Zet een campagne om naar verzendklare HTML. qrDataUrls bevat per QR-blok-id
 // een vooraf gegenereerde data-URL (zie CampagneBouwer) — deze functie
 // genereert zelf geen QR-codes omdat dat async is. huisstijl is optioneel:
@@ -643,6 +701,7 @@ function kolomHeeftInhoud(kolom: Kolom): boolean {
 }
 
 export function heeftBlokInhoud(blok: CampagneBlok): boolean {
+  if (blok.type !== 'afbeelding' && blok.type !== 'scheiding' && blok.extraAfbeelding?.pad) return true
   switch (blok.type) {
     case 'tekst': return !!rijkeTekstNaarPlat(blok.tekst) || !!blok.kop?.trim()
     case 'afbeelding': return !!blok.pad

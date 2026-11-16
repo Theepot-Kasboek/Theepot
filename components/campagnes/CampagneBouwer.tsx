@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import { getSupabase } from "@/lib/supabase";
 import {
-  CampagneBlok, Kolom, Uitlijning, TekstStijlVelden, KnopInhoud, SocialPlatform, BlokSjabloon, SOCIAL_PLATFORMS,
+  CampagneBlok, Kolom, Uitlijning, TekstStijlVelden, KnopInhoud, SocialPlatform, BlokSjabloon, SOCIAL_PLATFORMS, BlokAfbeelding,
   nieuwBlok, nieuweKolomInhoud, kloonBlok, afbeeldingUrl, CAMPAGNE_AFBEELDINGEN_BUCKET, LETTERTYPEN,
   sanitizeRijkeTekst,
 } from "@/lib/campagnes";
@@ -142,6 +142,19 @@ export default function CampagneBouwer({
     updateBlok(blokId, { pad } as Partial<CampagneBlok>);
   }
 
+  async function uploadExtraAfbeelding(blokId: string, bestand: File) {
+    const sleutel = `${blokId}-extra`;
+    setUploadBezig(sleutel);
+    const ext = bestand.name.split(".").pop() || "jpg";
+    const pad = `campagnes/${sleutel}.${ext}`;
+    const { error } = await getSupabase().storage.from(CAMPAGNE_AFBEELDINGEN_BUCKET).upload(pad, bestand, { upsert: true });
+    setUploadBezig(null);
+    if (error) { alert("Upload mislukt: " + error.message); return; }
+    const huidig = blokken.find(b => b.id === blokId);
+    const bestaand = huidig && huidig.type !== "afbeelding" && huidig.type !== "scheiding" ? huidig.extraAfbeelding : undefined;
+    updateBlok(blokId, { extraAfbeelding: { ...bestaand, pad, positie: bestaand?.positie ?? "boven" } } as Partial<CampagneBlok>);
+  }
+
   async function uploadKolomAfbeelding(blokId: string, kant: "links" | "rechts", bestand: File) {
     const sleutel = `${blokId}-${kant}`;
     setUploadBezig(sleutel);
@@ -236,11 +249,13 @@ export default function CampagneBouwer({
                     magBewerken={magBewerken}
                     uploadBezig={uploadBezig === blok.id}
                     uploadBezigKolom={kant => uploadBezig === `${blok.id}-${kant}`}
+                    uploadBezigExtra={uploadBezig === `${blok.id}-extra`}
                     qrDataUrl={qrDataUrls[blok.id]}
                     onSelect={() => setActief(blok.id)}
                     onChange={patch => updateBlok(blok.id, patch)}
                     onVerwijder={() => verwijderBlok(blok.id)}
                     onUpload={bestand => uploadAfbeelding(blok.id, bestand)}
+                    onUploadExtra={bestand => uploadExtraAfbeelding(blok.id, bestand)}
                     onKolomChange={(kant, patch) => updateRijKolom(blok.id, kant, patch)}
                     onKolomUpload={(kant, bestand) => uploadKolomAfbeelding(blok.id, kant, bestand)}
                     onWisselKanten={() => wisselRijKanten(blok.id)}
@@ -335,19 +350,21 @@ function useDroppableSafe(id: string) {
 }
 
 function BlokKaart({
-  blok, actief, magBewerken, uploadBezig, uploadBezigKolom, qrDataUrl, onSelect, onChange, onVerwijder, onUpload,
-  onKolomChange, onKolomUpload, onWisselKanten, onDupliceren, onOpslaanAlsSjabloon, fileInputRef,
+  blok, actief, magBewerken, uploadBezig, uploadBezigKolom, uploadBezigExtra, qrDataUrl, onSelect, onChange, onVerwijder, onUpload,
+  onUploadExtra, onKolomChange, onKolomUpload, onWisselKanten, onDupliceren, onOpslaanAlsSjabloon, fileInputRef,
 }: {
   blok: CampagneBlok;
   actief: boolean;
   magBewerken: boolean;
   uploadBezig: boolean;
   uploadBezigKolom: (kant: "links" | "rechts") => boolean;
+  uploadBezigExtra: boolean;
   qrDataUrl?: string;
   onSelect: () => void;
   onChange: (patch: Partial<CampagneBlok>) => void;
   onVerwijder: () => void;
   onUpload: (bestand: File) => void;
+  onUploadExtra: (bestand: File) => void;
   onKolomChange: (kant: "links" | "rechts", patch: Record<string, unknown>) => void;
   onKolomUpload: (kant: "links" | "rechts", bestand: File) => void;
   onWisselKanten: () => void;
@@ -519,6 +536,17 @@ function BlokKaart({
 
         {blok.type === "socials" && (
           <SocialsBlokVeld blok={blok} onChange={onChange} />
+        )}
+
+        {blok.type !== "afbeelding" && blok.type !== "scheiding" && (
+          <ExtraAfbeeldingVeld
+            afbeelding={blok.extraAfbeelding}
+            uploadBezig={uploadBezigExtra}
+            onUpload={onUploadExtra}
+            onChange={patch => onChange({
+              extraAfbeelding: patch === undefined ? undefined : { ...blok.extraAfbeelding, ...patch },
+            } as Partial<CampagneBlok>)}
+          />
         )}
       </fieldset>
     </div>
@@ -1070,6 +1098,68 @@ function AfbeeldingBlokVeld({ blok, onChange, uploadBezig, onUpload, fileInputRe
       {blok.bijschrift && (
         <TekstStijlRij stijl={blok.bijschriftStijl} onChange={patch => onChange({ bijschriftStijl: { ...blok.bijschriftStijl, ...patch } } as Partial<CampagneBlok>)} />
       )}
+    </div>
+  );
+}
+
+// Optionele, losse foto boven of onder de inhoud van een blok — voor elk
+// bloktype behalve "afbeelding" (is zelf al een foto) en "scheiding".
+// onChange(undefined) verwijdert de foto weer helemaal.
+function ExtraAfbeeldingVeld({ afbeelding, uploadBezig, onUpload, onChange }: {
+  afbeelding: BlokAfbeelding | undefined;
+  uploadBezig: boolean;
+  onUpload: (bestand: File) => void;
+  onChange: (patch: Partial<BlokAfbeelding> | undefined) => void;
+}) {
+  const inputRef = useRef<HTMLInputElement | null>(null);
+
+  if (!afbeelding) {
+    return (
+      <button type="button" onClick={() => onChange({ pad: null, positie: "boven" })}
+        className="flex items-center gap-1.5 text-xs font-medium text-gray-400 hover:text-[#3D6B1A] border-t border-gray-50 pt-2">
+        <ImageIcon size={13} /> Foto boven/onder toevoegen
+      </button>
+    );
+  }
+
+  return (
+    <div className="border-t border-gray-100 pt-2 space-y-1.5">
+      <div className="flex items-center gap-3">
+        {afbeelding.pad ? (
+          <img src={afbeeldingUrl(afbeelding.pad)} alt="" className="w-14 h-14 object-cover rounded-md border border-gray-100" />
+        ) : (
+          <div className="w-14 h-14 rounded-md border-2 border-dashed border-gray-200 flex items-center justify-center text-gray-300">
+            <ImageIcon size={16} />
+          </div>
+        )}
+        <input ref={inputRef} type="file" accept="image/*" className="hidden"
+          onChange={e => { const f = e.target.files?.[0]; if (f) onUpload(f); }} />
+        <button type="button" onClick={() => inputRef.current?.click()} disabled={uploadBezig}
+          className="flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg border border-gray-200 text-[#374151] hover:bg-gray-50 disabled:opacity-50">
+          <Upload size={13} /> {uploadBezig ? "Uploaden…" : afbeelding.pad ? "Vervangen" : "Foto kiezen"}
+        </button>
+        <button type="button" onClick={() => onChange(undefined)} className="text-gray-300 hover:text-red-500 ml-auto flex-shrink-0" title="Foto verwijderen">
+          <X size={14} />
+        </button>
+      </div>
+      <div className="flex items-center gap-2.5 flex-wrap">
+        <div className="flex items-center gap-0.5 bg-gray-50 rounded-lg p-0.5">
+          <button type="button" onClick={() => onChange({ positie: "boven" })} title="Boven de inhoud"
+            className={`px-2 py-1 rounded-md text-[11px] font-medium ${afbeelding.positie === "boven" ? "bg-white shadow-sm text-[#3D6B1A]" : "text-gray-400 hover:text-gray-600"}`}>
+            Boven
+          </button>
+          <button type="button" onClick={() => onChange({ positie: "onder" })} title="Onder de inhoud"
+            className={`px-2 py-1 rounded-md text-[11px] font-medium ${afbeelding.positie === "onder" ? "bg-white shadow-sm text-[#3D6B1A]" : "text-gray-400 hover:text-gray-600"}`}>
+            Onder
+          </button>
+        </div>
+        <label className="text-xs text-gray-400 flex items-center gap-1.5">
+          Breedte
+          <input type="range" min={20} max={100} step={5} value={afbeelding.breedte ?? 100}
+            onChange={e => onChange({ breedte: Number(e.target.value) })} className="w-20" />
+          <span className="w-9 text-right">{afbeelding.breedte ?? 100}%</span>
+        </label>
+      </div>
     </div>
   );
 }
