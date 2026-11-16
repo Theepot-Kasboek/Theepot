@@ -14,11 +14,13 @@ import { CSS } from "@dnd-kit/utilities";
 import {
   Type, Image as ImageIcon, Link2, QrCode, Trash2, GripVertical, Upload, AlignLeft, AlignCenter, AlignRight,
   Megaphone, Columns2, ArrowLeftRight, Bold, Italic, SeparatorHorizontal, Share2, Copy, Rows2, BookmarkPlus, Bookmark, X,
+  Heading,
 } from "lucide-react";
 import { getSupabase } from "@/lib/supabase";
 import {
   CampagneBlok, Kolom, Uitlijning, TekstStijlVelden, KnopInhoud, SocialPlatform, BlokSjabloon, SOCIAL_PLATFORMS,
   nieuwBlok, nieuweKolomInhoud, kloonBlok, afbeeldingUrl, CAMPAGNE_AFBEELDINGEN_BUCKET, LETTERTYPEN,
+  sanitizeRijkeTekst,
 } from "@/lib/campagnes";
 
 interface Props {
@@ -382,17 +384,45 @@ function BlokKaart({
       <fieldset disabled={!magBewerken} className="pr-20 space-y-2.5">
         {blok.type === "tekst" && (
           <>
-            <textarea
-              value={blok.tekst}
-              onChange={e => onChange({ tekst: e.target.value } as Partial<CampagneBlok>)}
-              placeholder={"Typ hier je tekst...\n• of begin een regel met een bolletje voor een lijst"}
-              rows={4}
+            {blok.kop !== undefined ? (
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <input
+                    value={blok.kop}
+                    onChange={e => onChange({ kop: e.target.value } as Partial<CampagneBlok>)}
+                    placeholder="Kop..."
+                    style={{
+                      fontFamily: blok.kopStijl?.lettertype || LETTERTYPEN[0].waarde,
+                      color: blok.kopStijl?.kleur || "#1A2E0D",
+                      fontWeight: blok.kopStijl?.vet === false ? 400 : 700,
+                      fontStyle: blok.kopStijl?.cursief ? "italic" : "normal",
+                      fontSize: "20px",
+                    }}
+                    className="w-full border-none focus:outline-none bg-transparent"
+                  />
+                  <button type="button" onClick={() => onChange({ kop: undefined, kopStijl: undefined } as Partial<CampagneBlok>)}
+                    className="text-gray-300 hover:text-red-500 p-1 flex-shrink-0" title="Kop verwijderen">
+                    <X size={14} />
+                  </button>
+                </div>
+                <TekstStijlRij stijl={blok.kopStijl} onChange={patch => onChange({ kopStijl: { ...blok.kopStijl, ...patch } } as Partial<CampagneBlok>)} />
+              </div>
+            ) : (
+              <button type="button" onClick={() => onChange({ kop: "" } as Partial<CampagneBlok>)}
+                className="flex items-center gap-1.5 text-xs font-medium text-gray-400 hover:text-[#3D6B1A]">
+                <Heading size={13} /> Kop toevoegen
+              </button>
+            )}
+
+            <RijkeTekstEditor
+              html={blok.tekst}
+              onChange={tekst => onChange({ tekst } as Partial<CampagneBlok>)}
+              placeholder={"Typ hier je tekst... (selecteer tekst om vet/cursief te maken)\n• of begin een regel met een bolletje voor een lijst"}
               style={{
                 fontFamily: blok.lettertype || LETTERTYPEN[0].waarde, fontSize: (blok.tekstgrootte || 15) + "px",
                 color: blok.kleur || "#1A2E0D", textAlign: htmlAlign(blok.uitlijning),
                 fontWeight: blok.vet ? 700 : 400, fontStyle: blok.cursief ? "italic" : "normal", lineHeight: blok.regelafstand ?? 1.5,
               }}
-              className="w-full resize-none border-none focus:outline-none bg-transparent"
             />
             <StijlRij>
               <input type="number" min={10} max={36} value={blok.tekstgrootte || 15}
@@ -400,7 +430,13 @@ function BlokKaart({
                 className={`${stijlVeld} w-16`} title="Tekstgrootte (px)" />
               <UitlijningKnoppen waarde={blok.uitlijning} onChange={u => onChange({ uitlijning: u } as Partial<CampagneBlok>)} />
             </StijlRij>
-            <TekstStijlRij stijl={blok} onChange={patch => onChange(patch as Partial<CampagneBlok>)} toonRegelafstand />
+            <StijlRij>
+              <LettertypeSelect waarde={blok.lettertype} onChange={v => onChange({ lettertype: v } as Partial<CampagneBlok>)} />
+              <input type="color" value={blok.kleur || "#1A2E0D"} onChange={e => onChange({ kleur: e.target.value } as Partial<CampagneBlok>)}
+                className="w-8 h-8 rounded border border-gray-200 cursor-pointer" title="Tekstkleur" />
+              <RijkeTekstBoldItalicKnoppen />
+              <RegelafstandVeld waarde={blok.regelafstand} onChange={v => onChange({ regelafstand: v } as Partial<CampagneBlok>)} />
+            </StijlRij>
           </>
         )}
 
@@ -556,6 +592,76 @@ function LettertypeSelect({ waarde, onChange }: { waarde: string | undefined; on
     <select value={waarde || LETTERTYPEN[0].waarde} onChange={e => onChange(e.target.value)} className={stijlVeld} title="Lettertype">
       {LETTERTYPEN.map(l => <option key={l.waarde} value={l.waarde}>{l.label}</option>)}
     </select>
+  );
+}
+
+// Rijke-tekst-editor (contentEditable) voor het tekstblok: hiermee kan je
+// een los stukje tekst selecteren en alleen dát vet/cursief maken i.p.v. het
+// hele blok. Ongecontroleerd element (zoals een textarea-vervanger hoort te
+// zijn) — React zet de inhoud alleen bij het laden/wisselen van blok, niet
+// bij elke toetsaanslag, anders springt de cursor steeds naar het begin.
+function RijkeTekstEditor({ html, onChange, placeholder, style }: {
+  html: string; onChange: (html: string) => void; placeholder: string; style: React.CSSProperties;
+}) {
+  const ref = useRef<HTMLDivElement | null>(null);
+  const laatsteHtml = useRef<string>("");
+
+  useEffect(() => {
+    if (!ref.current) return;
+    if (html !== laatsteHtml.current && document.activeElement !== ref.current) {
+      ref.current.innerHTML = sanitizeRijkeTekst(html);
+      laatsteHtml.current = html;
+    }
+  }, [html]);
+
+  return (
+    <div
+      ref={ref}
+      contentEditable
+      suppressContentEditableWarning
+      onInput={() => {
+        if (!ref.current) return;
+        const nieuw = ref.current.innerHTML;
+        laatsteHtml.current = nieuw;
+        onChange(nieuw);
+      }}
+      onFocus={() => { try { document.execCommand("defaultParagraphSeparator", false, "p"); } catch {} }}
+      data-placeholder={placeholder}
+      style={style}
+      className="rijke-tekst-editor w-full min-h-[90px] border-none focus:outline-none bg-transparent"
+    />
+  );
+}
+
+// Werkt op de huidige tekstselectie van de browser (niet op een specifiek
+// blok): zolang de knoppen onMouseDown preventDefault doen, verliest de
+// contentEditable zijn selectie niet, dus execCommand werkt altijd op de
+// tekst die de gebruiker net in dít blok had geselecteerd.
+function RijkeTekstBoldItalicKnoppen() {
+  const [, forceerUpdate] = useState(0);
+
+  const commandoActief = (commando: "bold" | "italic") => {
+    try { return document.queryCommandState(commando); } catch { return false; }
+  };
+
+  const toepassen = (commando: "bold" | "italic") => (e: React.MouseEvent) => {
+    e.preventDefault();
+    document.execCommand(commando);
+    forceerUpdate(n => n + 1);
+    document.activeElement?.dispatchEvent(new Event("input", { bubbles: true }));
+  };
+
+  return (
+    <div className="flex items-center gap-0.5 bg-gray-50 rounded-lg p-0.5" onMouseDown={e => e.preventDefault()}>
+      <button type="button" onClick={toepassen("bold")} title="Vet (selecteer eerst tekst)"
+        className={`p-1.5 rounded-md ${commandoActief("bold") ? "bg-white shadow-sm text-[#3D6B1A]" : "text-gray-400 hover:text-gray-600"}`}>
+        <Bold size={13} />
+      </button>
+      <button type="button" onClick={toepassen("italic")} title="Cursief (selecteer eerst tekst)"
+        className={`p-1.5 rounded-md ${commandoActief("italic") ? "bg-white shadow-sm text-[#3D6B1A]" : "text-gray-400 hover:text-gray-600"}`}>
+        <Italic size={13} />
+      </button>
+    </div>
   );
 }
 

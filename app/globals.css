@@ -789,3 +789,25 @@ h1, h2, h3, h4, h5, h6,
     position: static;
   }
 }
+
+/* ─── CAMPAGNES: rijke-tekst-editor ──────────────────── */
+
+/* contentEditable heeft geen native placeholder-attribuut */
+.rijke-tekst-editor:empty::before {
+  content: attr(data-placeholder);
+  color: #9CA3AF;
+  white-space: pre-line;
+}
+
+.rijke-tekst-editor p {
+  margin: 0 0 8px;
+}
+
+.rijke-tekst-editor p:last-child {
+  margin-bottom: 0;
+}
+
+.rijke-tekst-editor ul {
+  margin: 0 0 8px;
+  padding-left: 20px;
+}

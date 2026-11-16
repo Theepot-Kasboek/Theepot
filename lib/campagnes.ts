@@ -28,9 +28,17 @@ export interface TekstStijlVelden {
 export interface TekstBlok extends TekstStijlVelden {
   id: string
   type: 'tekst'
+  // Rijke tekst: opgeslagen als beperkte HTML (alleen <p>/<br>/<strong>/<em>/
+  // <b>/<i>/<ul>/<li>, zie sanitizeRijkeTekst) zodat losse stukjes tekst
+  // binnen het blok hun eigen vet/cursief kunnen hebben i.p.v. het hele blok.
+  // Oudere campagnes bevatten hier nog platte tekst (met \n en • -bullets);
+  // isRijkeTekstHtml() onderscheidt de twee vormen bij het renderen.
   tekst: string
   tekstgrootte?: number
   uitlijning?: Uitlijning
+  // Optionele kop boven de tekst van dit blok.
+  kop?: string
+  kopStijl?: Omit<TekstStijlVelden, 'regelafstand'>
 }
 
 export interface AfbeeldingInhoud {
@@ -299,7 +307,7 @@ function leegKolomInhoud(kolom: Kolom): Kolom {
 export function leegBlokInhoud(blok: CampagneBlok): CampagneBlok {
   switch (blok.type) {
     case 'tekst':
-      return { ...blok, tekst: '' }
+      return { ...blok, tekst: '', ...(blok.kop !== undefined ? { kop: '' } : {}) }
     case 'afbeelding':
       return { ...blok, pad: null, bijschrift: '', link: '' }
     case 'knop':
@@ -349,7 +357,45 @@ function tekstStijlCss(stijl: TekstStijlVelden | undefined, opts: { grootte?: nu
   return `font-family:${lettertype};color:${kleur};font-weight:${gewicht};font-style:${schuin};${opts.grootte !== undefined ? `font-size:${opts.grootte}px;` : ''}${regel !== undefined ? `line-height:${regel};` : ''}`
 }
 
+// Tags die de rijke-tekst-editor (contentEditable) mag produceren en die
+// zonder verdere opmaak de mail in mogen. Alles daarbuiten (attributen,
+// scripts, andere tags) wordt eruit gesloopt in sanitizeRijkeTekst.
+const RIJKE_TEKST_TOEGESTANE_TAGS = new Set(['p', 'br', 'strong', 'em', 'b', 'i', 'ul', 'li'])
+
+// Onderscheidt rijke HTML (nieuw, per-fragment vet/cursief) van platte tekst
+// (oude campagnes, met \n en • -bullets) zodat tekstNaarHtml allebei kan
+// renderen.
+export function isRijkeTekstHtml(tekst: string): boolean {
+  return /<(p|br|strong|em|b|i|ul|li)(\s|\/|>)/i.test(tekst)
+}
+
+// Striptwrapt elke tag die niet in de allowlist staat (inhoud blijft staan,
+// alleen de tag zelf verdwijnt) en verwijdert alle attributen van de
+// overgebleven tags. Zo kan HTML uit een contentEditable-element nooit
+// scripts, event-handlers of onverwachte opmaak de mail in smokkelen.
+export function sanitizeRijkeTekst(html: string): string {
+  let schoon = html.replace(/<(script|style)[^>]*>[\s\S]*?<\/\1>/gi, '')
+  schoon = schoon.replace(/<\/?([a-zA-Z0-9]+)([^>]*)>/g, (match, tag: string) => {
+    const naam = tag.toLowerCase()
+    if (!RIJKE_TEKST_TOEGESTANE_TAGS.has(naam)) return ''
+    return match.startsWith('</') ? `</${naam}>` : `<${naam}>`
+  })
+  return schoon
+}
+
+// Rijke tekst (al sanitized) krijgt alleen e-mailvriendelijke marges/padding
+// op de blok-tags; <strong>/<em>/<b>/<i> blijven ongemoeid staan.
+function rijkeTekstNaarHtml(html: string): string {
+  let out = sanitizeRijkeTekst(html)
+  out = out.replace(/<p>/g, '<p style="margin:0 0 12px;">')
+  out = out.replace(/<ul>/g, '<ul style="margin:0 0 12px;padding-left:20px;">')
+  out = out.replace(/<li>/g, '<li style="margin-bottom:4px;">')
+  return out
+}
+
 function tekstNaarHtml(tekst: string): string {
+  if (isRijkeTekstHtml(tekst)) return rijkeTekstNaarHtml(tekst)
+
   const regels = tekst.split('\n')
   const html: string[] = []
   let bulletsOpen = false
@@ -367,6 +413,12 @@ function tekstNaarHtml(tekst: string): string {
   }
   if (bulletsOpen) html.push('</ul>')
   return html.join('\n')
+}
+
+// Platte-tekstvorm van tekst/kop, voor leegte-checks ("heeft dit blok
+// inhoud") ongeacht of het rijke HTML of oude platte tekst is.
+function rijkeTekstNaarPlat(tekst: string): string {
+  return tekst.replace(/<[^>]*>/g, '').trim()
 }
 
 function afbeeldingInhoudNaarHtml(data: AfbeeldingInhoud, align: 'left' | 'center' | 'right', maxBreedtePx: number): string {
@@ -447,7 +499,9 @@ function blokNaarHtml(blok: CampagneBlok, qrDataUrls: Record<string, string>): s
       const grootte = blok.tekstgrootte || 15
       const align = uitlijningNaarHtml(blok.uitlijning)
       const css = tekstStijlCss(blok, { grootte, regelafstandStandaard: 1.5 })
-      return `<div style="${css}text-align:${align};">${tekstNaarHtml(blok.tekst)}</div>`
+      const kopCss = tekstStijlCss({ vet: true, ...blok.kopStijl }, { grootte: 20 })
+      const kop = blok.kop?.trim() ? `<div style="${kopCss}margin:0 0 8px;">${escapeHtml(blok.kop)}</div>` : ''
+      return `<div style="text-align:${align};">${kop}<div style="${css}">${tekstNaarHtml(blok.tekst)}</div></div>`
     }
 
     case 'afbeelding': {
@@ -588,7 +642,7 @@ function kolomHeeftInhoud(kolom: Kolom): boolean {
 
 export function heeftBlokInhoud(blok: CampagneBlok): boolean {
   switch (blok.type) {
-    case 'tekst': return !!blok.tekst.trim()
+    case 'tekst': return !!rijkeTekstNaarPlat(blok.tekst) || !!blok.kop?.trim()
     case 'afbeelding': return !!blok.pad
     case 'knop': return !!blok.label.trim() && !!blok.url.trim()
     case 'qr': return !!blok.waarde.trim()
