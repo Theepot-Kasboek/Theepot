@@ -198,7 +198,7 @@ export default function Sidebar({ isOpen, onClose }: { isOpen?: boolean; onClose
         { href: '/nieuwsbrieven', label: 'Nieuwsbrieven', icon: <Newspaper size={16} />, vereistRecht: 'pagina_nieuwsbrieven' as const },
         { href: '/campagnes', label: 'Campagnes', icon: <Mail size={16} />, vereistRecht: 'pagina_campagnes' as const },
         { href: '/evenementen', label: 'Evenementen', icon: <PartyPopper size={16} />, vereistRecht: 'pagina_evenementen' as const },
-        { href: '/notulen', label: 'Notulen', icon: <ClipboardList size={16} /> },
+        { href: '/notulen', label: 'Notulen', icon: <ClipboardList size={16} />, superadminOnly: true },
       ],
     },
     {

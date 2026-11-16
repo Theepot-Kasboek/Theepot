@@ -142,11 +142,11 @@ async function exportHTML(notulen: Notulen) {
 // ─── Hoofd pagina ─────────────────────────────────────────────────────────────
 
 export default function NotulenPage() {
-  const { profiel, isSuperadmin, rechten } = useAuth()
+  const { profiel, isSuperadmin } = useAuth()
 
-  // Notulen opstellen: alleen superadmin/directie
-  const magZien = isSuperadmin || profiel?.rol === 'directie' || rechten.pagina_notulen === 'lezen' || rechten.pagina_notulen === 'bewerken'
-  const magBewerken = isSuperadmin || profiel?.rol === 'directie'
+  // Notulen: voorlopig alleen zichtbaar voor superadmin
+  const magZien = isSuperadmin
+  const magBewerken = isSuperadmin
 
   const [notulenLijst, setNotulenLijst] = useState<Notulen[]>([])
   const [actieve, setActieve] = useState<Notulen | null>(null)
