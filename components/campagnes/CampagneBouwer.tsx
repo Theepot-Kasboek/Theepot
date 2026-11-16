@@ -384,35 +384,7 @@ function BlokKaart({
       <fieldset disabled={!magBewerken} className="pr-20 space-y-2.5">
         {blok.type === "tekst" && (
           <>
-            {blok.kop !== undefined ? (
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <input
-                    value={blok.kop}
-                    onChange={e => onChange({ kop: e.target.value } as Partial<CampagneBlok>)}
-                    placeholder="Kop..."
-                    style={{
-                      fontFamily: blok.kopStijl?.lettertype || LETTERTYPEN[0].waarde,
-                      color: blok.kopStijl?.kleur || "#1A2E0D",
-                      fontWeight: blok.kopStijl?.vet === false ? 400 : 700,
-                      fontStyle: blok.kopStijl?.cursief ? "italic" : "normal",
-                      fontSize: "20px",
-                    }}
-                    className="w-full border-none focus:outline-none bg-transparent"
-                  />
-                  <button type="button" onClick={() => onChange({ kop: undefined, kopStijl: undefined } as Partial<CampagneBlok>)}
-                    className="text-gray-300 hover:text-red-500 p-1 flex-shrink-0" title="Kop verwijderen">
-                    <X size={14} />
-                  </button>
-                </div>
-                <TekstStijlRij stijl={blok.kopStijl} onChange={patch => onChange({ kopStijl: { ...blok.kopStijl, ...patch } } as Partial<CampagneBlok>)} />
-              </div>
-            ) : (
-              <button type="button" onClick={() => onChange({ kop: "" } as Partial<CampagneBlok>)}
-                className="flex items-center gap-1.5 text-xs font-medium text-gray-400 hover:text-[#3D6B1A]">
-                <Heading size={13} /> Kop toevoegen
-              </button>
-            )}
+            <KopVeld kop={blok.kop} kopStijl={blok.kopStijl} onChange={patch => onChange(patch as Partial<CampagneBlok>)} />
 
             <RijkeTekstEditor
               html={blok.tekst}
@@ -430,13 +402,7 @@ function BlokKaart({
                 className={`${stijlVeld} w-16`} title="Tekstgrootte (px)" />
               <UitlijningKnoppen waarde={blok.uitlijning} onChange={u => onChange({ uitlijning: u } as Partial<CampagneBlok>)} />
             </StijlRij>
-            <StijlRij>
-              <LettertypeSelect waarde={blok.lettertype} onChange={v => onChange({ lettertype: v } as Partial<CampagneBlok>)} />
-              <input type="color" value={blok.kleur || "#1A2E0D"} onChange={e => onChange({ kleur: e.target.value } as Partial<CampagneBlok>)}
-                className="w-8 h-8 rounded border border-gray-200 cursor-pointer" title="Tekstkleur" />
-              <RijkeTekstBoldItalicKnoppen />
-              <RegelafstandVeld waarde={blok.regelafstand} onChange={v => onChange({ regelafstand: v } as Partial<CampagneBlok>)} />
-            </StijlRij>
+            <TekstStijlRij stijl={blok} onChange={patch => onChange(patch as Partial<CampagneBlok>)} toonRegelafstand rijkeTekst />
           </>
         )}
 
@@ -600,8 +566,8 @@ function LettertypeSelect({ waarde, onChange }: { waarde: string | undefined; on
 // hele blok. Ongecontroleerd element (zoals een textarea-vervanger hoort te
 // zijn) — React zet de inhoud alleen bij het laden/wisselen van blok, niet
 // bij elke toetsaanslag, anders springt de cursor steeds naar het begin.
-function RijkeTekstEditor({ html, onChange, placeholder, style }: {
-  html: string; onChange: (html: string) => void; placeholder: string; style: React.CSSProperties;
+function RijkeTekstEditor({ html, onChange, placeholder, style, className }: {
+  html: string; onChange: (html: string) => void; placeholder: string; style: React.CSSProperties; className?: string;
 }) {
   const ref = useRef<HTMLDivElement | null>(null);
   const laatsteHtml = useRef<string>("");
@@ -628,7 +594,7 @@ function RijkeTekstEditor({ html, onChange, placeholder, style }: {
       onFocus={() => { try { document.execCommand("defaultParagraphSeparator", false, "p"); } catch {} }}
       data-placeholder={placeholder}
       style={style}
-      className="rijke-tekst-editor w-full min-h-[90px] border-none focus:outline-none bg-transparent"
+      className={className ?? "rijke-tekst-editor w-full min-h-[90px] border-none focus:outline-none bg-transparent"}
     />
   );
 }
@@ -693,20 +659,68 @@ function RegelafstandVeld({ waarde, onChange }: { waarde: number | undefined; on
 }
 
 // Volledige stijl-rij (lettertype, kleur, vet/cursief, evt. regelafstand) voor
-// tekstvelden die de gedeelde TekstStijlVelden gebruiken.
-function TekstStijlRij({ stijl, onChange, toonRegelafstand }: {
+// tekstvelden die de gedeelde TekstStijlVelden gebruiken. rijkeTekst=true voor
+// velden met de RijkeTekstEditor: dan werken vet/cursief op de tekstselectie
+// i.p.v. op het hele veld (zie RijkeTekstBoldItalicKnoppen).
+function TekstStijlRij({ stijl, onChange, toonRegelafstand, rijkeTekst }: {
   stijl: TekstStijlVelden | undefined;
   onChange: (patch: Partial<TekstStijlVelden>) => void;
   toonRegelafstand?: boolean;
+  rijkeTekst?: boolean;
 }) {
   return (
     <StijlRij>
       <LettertypeSelect waarde={stijl?.lettertype} onChange={v => onChange({ lettertype: v })} />
       <input type="color" value={stijl?.kleur || "#1A2E0D"} onChange={e => onChange({ kleur: e.target.value })}
         className="w-8 h-8 rounded border border-gray-200 cursor-pointer" title="Tekstkleur" />
-      <BoldItalicKnoppen vet={stijl?.vet} cursief={stijl?.cursief} onVet={v => onChange({ vet: v })} onCursief={v => onChange({ cursief: v })} />
+      {rijkeTekst ? (
+        <RijkeTekstBoldItalicKnoppen />
+      ) : (
+        <BoldItalicKnoppen vet={stijl?.vet} cursief={stijl?.cursief} onVet={v => onChange({ vet: v })} onCursief={v => onChange({ cursief: v })} />
+      )}
       {toonRegelafstand && <RegelafstandVeld waarde={stijl?.regelafstand} onChange={v => onChange({ regelafstand: v })} />}
     </StijlRij>
+  );
+}
+
+// Herbruikbare "kop toevoegen"-knop + kopveld, voor elk blok/kolom met een
+// optioneel kop-veld (kop als string | undefined — undefined = nog geen kop).
+function KopVeld({ kop, kopStijl, onChange }: {
+  kop: string | undefined;
+  kopStijl: Omit<TekstStijlVelden, "regelafstand"> | undefined;
+  onChange: (patch: { kop?: string; kopStijl?: Omit<TekstStijlVelden, "regelafstand"> }) => void;
+}) {
+  if (kop === undefined) {
+    return (
+      <button type="button" onClick={() => onChange({ kop: "" })}
+        className="flex items-center gap-1.5 text-xs font-medium text-gray-400 hover:text-[#3D6B1A]">
+        <Heading size={13} /> Kop toevoegen
+      </button>
+    );
+  }
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center gap-2">
+        <input
+          value={kop}
+          onChange={e => onChange({ kop: e.target.value })}
+          placeholder="Kop..."
+          style={{
+            fontFamily: kopStijl?.lettertype || LETTERTYPEN[0].waarde,
+            color: kopStijl?.kleur || "#1A2E0D",
+            fontWeight: kopStijl?.vet === false ? 400 : 700,
+            fontStyle: kopStijl?.cursief ? "italic" : "normal",
+            fontSize: "20px",
+          }}
+          className="w-full border-none focus:outline-none bg-transparent"
+        />
+        <button type="button" onClick={() => onChange({ kop: undefined, kopStijl: undefined })}
+          className="text-gray-300 hover:text-red-500 p-1 flex-shrink-0" title="Kop verwijderen">
+          <X size={14} />
+        </button>
+      </div>
+      <TekstStijlRij stijl={kopStijl} onChange={patch => onChange({ kopStijl: { ...kopStijl, ...patch } })} />
+    </div>
   );
 }
 
@@ -745,15 +759,19 @@ function ReclameBlokVeld({ blok, onChange, uploadBezig, onUpload, fileInputRef }
         }}
         className={veld} />
       <TekstStijlRij stijl={blok.titelStijl} onChange={patch => onChange({ titelStijl: { ...blok.titelStijl, ...patch } } as Partial<CampagneBlok>)} />
-      <textarea value={blok.tekst} onChange={e => onChange({ tekst: e.target.value } as Partial<CampagneBlok>)} placeholder="Korte tekst" rows={2}
+      <RijkeTekstEditor
+        html={blok.tekst}
+        onChange={tekst => onChange({ tekst } as Partial<CampagneBlok>)}
+        placeholder="Korte tekst"
+        className={`rijke-tekst-editor ${veld} min-h-[52px]`}
         style={{
           fontFamily: blok.tekstStijl?.lettertype || LETTERTYPEN[0].waarde, color: blok.tekstStijl?.kleur || "#5B7A44",
           fontWeight: blok.tekstStijl?.vet ? 700 : 400, fontStyle: blok.tekstStijl?.cursief ? "italic" : "normal",
           lineHeight: blok.tekstStijl?.regelafstand ?? 1.4,
         }}
-        className={veld} />
+      />
       <input value={blok.link} onChange={e => onChange({ link: e.target.value } as Partial<CampagneBlok>)} placeholder="Link (https://...)" className={veld} />
-      <TekstStijlRij stijl={blok.tekstStijl} onChange={patch => onChange({ tekstStijl: { ...blok.tekstStijl, ...patch } } as Partial<CampagneBlok>)} toonRegelafstand />
+      <TekstStijlRij stijl={blok.tekstStijl} onChange={patch => onChange({ tekstStijl: { ...blok.tekstStijl, ...patch } } as Partial<CampagneBlok>)} toonRegelafstand rijkeTekst />
     </div>
   );
 }
@@ -821,13 +839,18 @@ function KolomEditor({ kant, kolom, uploadBezig, onChange, onUpload }: {
 
       {kolom.soort === "tekst" && (
         <>
-          <textarea value={kolom.tekst} onChange={e => onChange({ tekst: e.target.value })} placeholder="Tekst..." rows={4}
+          <KopVeld kop={kolom.kop} kopStijl={kolom.kopStijl} onChange={patch => onChange(patch)} />
+          <RijkeTekstEditor
+            html={kolom.tekst}
+            onChange={tekst => onChange({ tekst })}
+            placeholder="Tekst... (selecteer tekst om vet/cursief te maken)"
+            className="rijke-tekst-editor w-full min-h-[70px] border-none focus:outline-none text-sm bg-transparent"
             style={{
               fontFamily: kolom.lettertype || LETTERTYPEN[0].waarde, color: kolom.kleur || "#1A2E0D",
               fontWeight: kolom.vet ? 700 : 400, fontStyle: kolom.cursief ? "italic" : "normal", lineHeight: kolom.regelafstand ?? 1.5,
             }}
-            className="w-full resize-none border-none focus:outline-none text-sm bg-transparent" />
-          <TekstStijlRij stijl={kolom} onChange={patch => onChange(patch)} toonRegelafstand />
+          />
+          <TekstStijlRij stijl={kolom} onChange={patch => onChange(patch)} toonRegelafstand rijkeTekst />
           <KnopOnderVeld knopOnder={kolom.knopOnder} onChange={knopOnder => onChange({ knopOnder })} />
         </>
       )}
@@ -893,15 +916,19 @@ function KolomEditor({ kant, kolom, uploadBezig, onChange, onUpload }: {
             }}
             className={kolomVeld} />
           <TekstStijlRij stijl={kolom.titelStijl} onChange={patch => onChange({ titelStijl: { ...kolom.titelStijl, ...patch } })} />
-          <textarea value={kolom.tekst} onChange={e => onChange({ tekst: e.target.value })} placeholder="Korte tekst" rows={2}
+          <RijkeTekstEditor
+            html={kolom.tekst}
+            onChange={tekst => onChange({ tekst })}
+            placeholder="Korte tekst"
+            className={`rijke-tekst-editor ${kolomVeld} min-h-[44px]`}
             style={{
               fontFamily: kolom.tekstStijl?.lettertype || LETTERTYPEN[0].waarde, color: kolom.tekstStijl?.kleur || "#5B7A44",
               fontWeight: kolom.tekstStijl?.vet ? 700 : 400, fontStyle: kolom.tekstStijl?.cursief ? "italic" : "normal",
               lineHeight: kolom.tekstStijl?.regelafstand ?? 1.4,
             }}
-            className={kolomVeld} />
+          />
           <input value={kolom.link} onChange={e => onChange({ link: e.target.value })} placeholder="Link" className={kolomVeld} />
-          <TekstStijlRij stijl={kolom.tekstStijl} onChange={patch => onChange({ tekstStijl: { ...kolom.tekstStijl, ...patch } })} toonRegelafstand />
+          <TekstStijlRij stijl={kolom.tekstStijl} onChange={patch => onChange({ tekstStijl: { ...kolom.tekstStijl, ...patch } })} toonRegelafstand rijkeTekst />
         </div>
       )}
     </div>

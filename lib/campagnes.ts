@@ -154,7 +154,7 @@ export interface SocialsBlok {
 
 // Eén kant van een CombinatieBlok: elk los blok-type kan hier staan.
 export type Kolom =
-  | ({ soort: 'tekst'; tekst: string; knopOnder?: KnopInhoud } & TekstStijlVelden)
+  | ({ soort: 'tekst'; tekst: string; knopOnder?: KnopInhoud; kop?: string; kopStijl?: Omit<TekstStijlVelden, 'regelafstand'> } & TekstStijlVelden)
   | ({ soort: 'afbeelding'; knopOnder?: KnopInhoud } & AfbeeldingInhoud)
   | ({ soort: 'knop' } & KnopInhoud)
   | ({ soort: 'reclame' } & ReclameInhoud)
@@ -289,7 +289,7 @@ function leegKnopInhoud(k: KnopInhoud): KnopInhoud {
 function leegKolomInhoud(kolom: Kolom): Kolom {
   switch (kolom.soort) {
     case 'tekst':
-      return { ...kolom, tekst: '', knopOnder: kolom.knopOnder ? leegKnopInhoud(kolom.knopOnder) : undefined }
+      return { ...kolom, tekst: '', ...(kolom.kop !== undefined ? { kop: '' } : {}), knopOnder: kolom.knopOnder ? leegKnopInhoud(kolom.knopOnder) : undefined }
     case 'afbeelding':
       return { ...kolom, pad: null, bijschrift: '', link: '', knopOnder: kolom.knopOnder ? leegKnopInhoud(kolom.knopOnder) : undefined }
     case 'knop':
@@ -460,7 +460,7 @@ function reclameNaarHtml(reclame: ReclameInhoud): string {
   const titelCss = tekstStijlCss(reclame.titelStijl ? { ...reclame.titelStijl, vet: reclame.titelStijl.vet ?? true } : { vet: true }, { grootte: 14 })
   const titel = reclame.titel ? `<div style="${titelCss}margin:0 0 4px;">${escapeHtml(reclame.titel)}</div>` : ''
   const tekstCss = tekstStijlCss(reclame.tekstStijl, { grootte: 13, regelafstandStandaard: 1.4, kleurStandaard: '#5B7A44' })
-  const tekst = reclame.tekst ? `<div style="${tekstCss}">${escapeHtml(reclame.tekst)}</div>` : ''
+  const tekst = reclame.tekst ? `<div style="${tekstCss}">${tekstNaarHtml(reclame.tekst)}</div>` : ''
   const inhoud = `${afbeelding}${titel}${tekst}`
   const binnenkant = reclame.link ? `<a href="${escapeHtml(reclame.link)}" target="_blank" rel="noopener noreferrer" style="text-decoration:none;display:block;">${inhoud}</a>` : inhoud
   return `
@@ -482,7 +482,9 @@ function kolomNaarHtml(kolom: Kolom, maxBreedtePx: number): string {
   switch (kolom.soort) {
     case 'tekst': {
       const css = tekstStijlCss(kolom, { grootte: 14, regelafstandStandaard: 1.5 })
-      return `<div style="${css}">${tekstNaarHtml(kolom.tekst)}</div>${knopOnderNaarHtml(kolom.knopOnder)}`
+      const kopCss = tekstStijlCss({ vet: true, ...kolom.kopStijl }, { grootte: 18 })
+      const kop = kolom.kop?.trim() ? `<div style="${kopCss}margin:0 0 8px;">${escapeHtml(kolom.kop)}</div>` : ''
+      return `${kop}<div style="${css}">${tekstNaarHtml(kolom.tekst)}</div>${knopOnderNaarHtml(kolom.knopOnder)}`
     }
     case 'afbeelding':
       return `${afbeeldingInhoudNaarHtml(kolom, 'left', maxBreedtePx)}${knopOnderNaarHtml(kolom.knopOnder)}`
@@ -633,10 +635,10 @@ export function campagneNaarHtml(
 
 function kolomHeeftInhoud(kolom: Kolom): boolean {
   switch (kolom.soort) {
-    case 'tekst': return !!kolom.tekst.trim()
+    case 'tekst': return !!rijkeTekstNaarPlat(kolom.tekst) || !!kolom.kop?.trim()
     case 'afbeelding': return !!kolom.pad
     case 'knop': return !!kolom.label.trim() && !!kolom.url.trim()
-    case 'reclame': return !!kolom.pad || !!kolom.titel.trim() || !!kolom.tekst.trim()
+    case 'reclame': return !!kolom.pad || !!kolom.titel.trim() || !!rijkeTekstNaarPlat(kolom.tekst)
   }
 }
 
@@ -646,7 +648,7 @@ export function heeftBlokInhoud(blok: CampagneBlok): boolean {
     case 'afbeelding': return !!blok.pad
     case 'knop': return !!blok.label.trim() && !!blok.url.trim()
     case 'qr': return !!blok.waarde.trim()
-    case 'reclame': return !!blok.pad || !!blok.titel.trim() || !!blok.tekst.trim()
+    case 'reclame': return !!blok.pad || !!blok.titel.trim() || !!rijkeTekstNaarPlat(blok.tekst)
     case 'scheiding': return true
     case 'socials': return blok.links.some(l => l.url.trim())
     case 'rij': return kolomHeeftInhoud(blok.links) || kolomHeeftInhoud(blok.rechts)
