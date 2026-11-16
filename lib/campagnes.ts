@@ -171,10 +171,10 @@ export interface SocialsBlok {
 
 // Eén kant van een CombinatieBlok: elk los blok-type kan hier staan.
 export type Kolom =
-  | ({ soort: 'tekst'; tekst: string; knopOnder?: KnopInhoud; kop?: string; kopStijl?: Omit<TekstStijlVelden, 'regelafstand'> } & TekstStijlVelden)
+  | ({ soort: 'tekst'; tekst: string; knopOnder?: KnopInhoud; kop?: string; kopStijl?: Omit<TekstStijlVelden, 'regelafstand'>; extraAfbeelding?: BlokAfbeelding } & TekstStijlVelden)
   | ({ soort: 'afbeelding'; knopOnder?: KnopInhoud } & AfbeeldingInhoud)
-  | ({ soort: 'knop' } & KnopInhoud)
-  | ({ soort: 'reclame' } & ReclameInhoud)
+  | ({ soort: 'knop'; extraAfbeelding?: BlokAfbeelding } & KnopInhoud)
+  | ({ soort: 'reclame'; extraAfbeelding?: BlokAfbeelding } & ReclameInhoud)
 
 // Combinatieblok: twee onderdelen naast elkaar (horizontaal, elk met een
 // aandeel in de breedte) of onder elkaar (verticaal, in deze volgorde).
@@ -188,7 +188,6 @@ export interface CombinatieBlok {
   breedteEerste?: number // percentage van de eerste kolom bij horizontaal, 20-80
   links: Kolom
   rechts: Kolom
-  extraAfbeelding?: BlokAfbeelding
 }
 
 export type CampagneBlok = TekstBlok | AfbeeldingBlok | KnopBlok | QrBlok | ReclameBlok | ScheidingBlok | SocialsBlok | CombinatieBlok
@@ -305,6 +304,12 @@ function leegKnopInhoud(k: KnopInhoud): KnopInhoud {
 }
 
 function leegKolomInhoud(kolom: Kolom): Kolom {
+  const leeg = leegKolomInhoudKern(kolom)
+  if (leeg.soort === 'afbeelding' || !leeg.extraAfbeelding) return leeg
+  return { ...leeg, extraAfbeelding: { ...leeg.extraAfbeelding, pad: null } }
+}
+
+function leegKolomInhoudKern(kolom: Kolom): Kolom {
   switch (kolom.soort) {
     case 'tekst':
       return { ...kolom, tekst: '', ...(kolom.kop !== undefined ? { kop: '' } : {}), knopOnder: kolom.knopOnder ? leegKnopInhoud(kolom.knopOnder) : undefined }
@@ -324,7 +329,7 @@ function leegKolomInhoud(kolom: Kolom): Kolom {
 // markeert.
 export function leegBlokInhoud(blok: CampagneBlok): CampagneBlok {
   const leeg = leegBlokInhoudKern(blok)
-  if (leeg.type === 'afbeelding' || leeg.type === 'scheiding' || !leeg.extraAfbeelding) return leeg
+  if (leeg.type === 'afbeelding' || leeg.type === 'scheiding' || leeg.type === 'rij' || !leeg.extraAfbeelding) return leeg
   return { ...leeg, extraAfbeelding: { ...leeg.extraAfbeelding, pad: null } }
 }
 
@@ -514,7 +519,7 @@ function knopOnderNaarHtml(knopOnder: KnopInhoud | undefined): string {
   return `<div style="margin-top:12px;">${knopInhoudNaarHtml(knopOnder, 'left')}</div>`
 }
 
-function kolomNaarHtml(kolom: Kolom, maxBreedtePx: number): string {
+function kolomKernNaarHtml(kolom: Kolom, maxBreedtePx: number): string {
   switch (kolom.soort) {
     case 'tekst': {
       const css = tekstStijlCss(kolom, { grootte: 14, regelafstandStandaard: 1.5 })
@@ -529,6 +534,19 @@ function kolomNaarHtml(kolom: Kolom, maxBreedtePx: number): string {
     case 'reclame':
       return reclameNaarHtml(kolom)
   }
+}
+
+// 'afbeelding' is zelf al een foto, die slaan we over (net als bij blokken).
+function kolomExtraAfbeelding(kolom: Kolom): BlokAfbeelding | undefined {
+  return kolom.soort === 'afbeelding' ? undefined : kolom.extraAfbeelding
+}
+
+function kolomNaarHtml(kolom: Kolom, maxBreedtePx: number): string {
+  const kern = kolomKernNaarHtml(kolom, maxBreedtePx)
+  const extra = kolomExtraAfbeelding(kolom)
+  const img = extraAfbeeldingNaarHtml(extra, maxBreedtePx)
+  if (!img) return kern
+  return extra?.positie === 'onder' ? `${kern}${img}` : `${img}${kern}`
 }
 
 // Kerninhoud van een blok (de eigen switch per type), zonder de optionele
@@ -624,10 +642,13 @@ function blokKernNaarHtml(blok: CampagneBlok, qrDataUrls: Record<string, string>
 
 // Bloktypen waar een extraAfbeelding boven/onder bij past — 'afbeelding'
 // (is zelf al een foto) en 'scheiding' (een lege/lijn-spacer) slaan we over.
+// 'rij' (combinatieblok) heeft de extraAfbeelding per kant (zie Kolom), niet
+// voor het hele blok — zie kolomNaarHtml.
 function blokExtraAfbeelding(blok: CampagneBlok): BlokAfbeelding | undefined {
   switch (blok.type) {
     case 'afbeelding':
     case 'scheiding':
+    case 'rij':
       return undefined
     default:
       return blok.extraAfbeelding
@@ -692,6 +713,7 @@ export function campagneNaarHtml(
 }
 
 function kolomHeeftInhoud(kolom: Kolom): boolean {
+  if (kolom.soort !== 'afbeelding' && kolom.extraAfbeelding?.pad) return true
   switch (kolom.soort) {
     case 'tekst': return !!rijkeTekstNaarPlat(kolom.tekst) || !!kolom.kop?.trim()
     case 'afbeelding': return !!kolom.pad
@@ -701,7 +723,7 @@ function kolomHeeftInhoud(kolom: Kolom): boolean {
 }
 
 export function heeftBlokInhoud(blok: CampagneBlok): boolean {
-  if (blok.type !== 'afbeelding' && blok.type !== 'scheiding' && blok.extraAfbeelding?.pad) return true
+  if (blok.type !== 'afbeelding' && blok.type !== 'scheiding' && blok.type !== 'rij' && blok.extraAfbeelding?.pad) return true
   switch (blok.type) {
     case 'tekst': return !!rijkeTekstNaarPlat(blok.tekst) || !!blok.kop?.trim()
     case 'afbeelding': return !!blok.pad

@@ -151,8 +151,22 @@ export default function CampagneBouwer({
     setUploadBezig(null);
     if (error) { alert("Upload mislukt: " + error.message); return; }
     const huidig = blokken.find(b => b.id === blokId);
-    const bestaand = huidig && huidig.type !== "afbeelding" && huidig.type !== "scheiding" ? huidig.extraAfbeelding : undefined;
+    const bestaand = huidig && huidig.type !== "afbeelding" && huidig.type !== "scheiding" && huidig.type !== "rij" ? huidig.extraAfbeelding : undefined;
     updateBlok(blokId, { extraAfbeelding: { ...bestaand, pad, positie: bestaand?.positie ?? "boven" } } as Partial<CampagneBlok>);
+  }
+
+  async function uploadKolomExtraAfbeelding(blokId: string, kant: "links" | "rechts", bestand: File) {
+    const sleutel = `${blokId}-${kant}-extra`;
+    setUploadBezig(sleutel);
+    const ext = bestand.name.split(".").pop() || "jpg";
+    const pad = `campagnes/${sleutel}.${ext}`;
+    const { error } = await getSupabase().storage.from(CAMPAGNE_AFBEELDINGEN_BUCKET).upload(pad, bestand, { upsert: true });
+    setUploadBezig(null);
+    if (error) { alert("Upload mislukt: " + error.message); return; }
+    const huidigBlok = blokken.find(b => b.id === blokId);
+    const huidigeKolom = huidigBlok?.type === "rij" ? huidigBlok[kant] : undefined;
+    const bestaand = huidigeKolom && huidigeKolom.soort !== "afbeelding" ? huidigeKolom.extraAfbeelding : undefined;
+    updateRijKolom(blokId, kant, { extraAfbeelding: { ...bestaand, pad, positie: bestaand?.positie ?? "boven" } });
   }
 
   async function uploadKolomAfbeelding(blokId: string, kant: "links" | "rechts", bestand: File) {
@@ -250,6 +264,7 @@ export default function CampagneBouwer({
                     uploadBezig={uploadBezig === blok.id}
                     uploadBezigKolom={kant => uploadBezig === `${blok.id}-${kant}`}
                     uploadBezigExtra={uploadBezig === `${blok.id}-extra`}
+                    uploadBezigKolomExtra={kant => uploadBezig === `${blok.id}-${kant}-extra`}
                     qrDataUrl={qrDataUrls[blok.id]}
                     onSelect={() => setActief(blok.id)}
                     onChange={patch => updateBlok(blok.id, patch)}
@@ -258,6 +273,7 @@ export default function CampagneBouwer({
                     onUploadExtra={bestand => uploadExtraAfbeelding(blok.id, bestand)}
                     onKolomChange={(kant, patch) => updateRijKolom(blok.id, kant, patch)}
                     onKolomUpload={(kant, bestand) => uploadKolomAfbeelding(blok.id, kant, bestand)}
+                    onKolomUploadExtra={(kant, bestand) => uploadKolomExtraAfbeelding(blok.id, kant, bestand)}
                     onWisselKanten={() => wisselRijKanten(blok.id)}
                     onDupliceren={() => dupliceerBlok(blok.id)}
                     onOpslaanAlsSjabloon={onSjabloonOpslaan ? () => onSjabloonOpslaan(blok) : undefined}
@@ -350,8 +366,8 @@ function useDroppableSafe(id: string) {
 }
 
 function BlokKaart({
-  blok, actief, magBewerken, uploadBezig, uploadBezigKolom, uploadBezigExtra, qrDataUrl, onSelect, onChange, onVerwijder, onUpload,
-  onUploadExtra, onKolomChange, onKolomUpload, onWisselKanten, onDupliceren, onOpslaanAlsSjabloon, fileInputRef,
+  blok, actief, magBewerken, uploadBezig, uploadBezigKolom, uploadBezigExtra, uploadBezigKolomExtra, qrDataUrl, onSelect, onChange, onVerwijder, onUpload,
+  onUploadExtra, onKolomChange, onKolomUpload, onKolomUploadExtra, onWisselKanten, onDupliceren, onOpslaanAlsSjabloon, fileInputRef,
 }: {
   blok: CampagneBlok;
   actief: boolean;
@@ -359,6 +375,7 @@ function BlokKaart({
   uploadBezig: boolean;
   uploadBezigKolom: (kant: "links" | "rechts") => boolean;
   uploadBezigExtra: boolean;
+  uploadBezigKolomExtra: (kant: "links" | "rechts") => boolean;
   qrDataUrl?: string;
   onSelect: () => void;
   onChange: (patch: Partial<CampagneBlok>) => void;
@@ -367,6 +384,7 @@ function BlokKaart({
   onUploadExtra: (bestand: File) => void;
   onKolomChange: (kant: "links" | "rechts", patch: Record<string, unknown>) => void;
   onKolomUpload: (kant: "links" | "rechts", bestand: File) => void;
+  onKolomUploadExtra: (kant: "links" | "rechts", bestand: File) => void;
   onWisselKanten: () => void;
   onDupliceren: () => void;
   onOpslaanAlsSjabloon?: () => void;
@@ -506,8 +524,8 @@ function BlokKaart({
         )}
 
         {blok.type === "rij" && (
-          <RijBlokVeld blok={blok} onChange={onChange} uploadBezigKolom={uploadBezigKolom}
-            onKolomChange={onKolomChange} onKolomUpload={onKolomUpload} onWisselKanten={onWisselKanten} />
+          <RijBlokVeld blok={blok} onChange={onChange} uploadBezigKolom={uploadBezigKolom} uploadBezigKolomExtra={uploadBezigKolomExtra}
+            onKolomChange={onKolomChange} onKolomUpload={onKolomUpload} onKolomUploadExtra={onKolomUploadExtra} onWisselKanten={onWisselKanten} />
         )}
 
         {blok.type === "scheiding" && (
@@ -538,7 +556,7 @@ function BlokKaart({
           <SocialsBlokVeld blok={blok} onChange={onChange} />
         )}
 
-        {blok.type !== "afbeelding" && blok.type !== "scheiding" && (
+        {blok.type !== "afbeelding" && blok.type !== "scheiding" && blok.type !== "rij" && (
           <ExtraAfbeeldingVeld
             afbeelding={blok.extraAfbeelding}
             uploadBezig={uploadBezigExtra}
@@ -843,12 +861,14 @@ function KnopOnderVeld({ knopOnder, onChange }: {
   );
 }
 
-function KolomEditor({ kant, kolom, uploadBezig, onChange, onUpload }: {
+function KolomEditor({ kant, kolom, uploadBezig, uploadBezigExtra, onChange, onUpload, onUploadExtra }: {
   kant: "links" | "rechts";
   kolom: Kolom;
   uploadBezig: boolean;
+  uploadBezigExtra: boolean;
   onChange: (patch: Record<string, unknown>) => void;
   onUpload: (bestand: File) => void;
+  onUploadExtra: (bestand: File) => void;
 }) {
   const inputRef = useRef<HTMLInputElement | null>(null);
 
@@ -959,16 +979,29 @@ function KolomEditor({ kant, kolom, uploadBezig, onChange, onUpload }: {
           <TekstStijlRij stijl={kolom.tekstStijl} onChange={patch => onChange({ tekstStijl: { ...kolom.tekstStijl, ...patch } })} toonRegelafstand rijkeTekst />
         </div>
       )}
+
+      {kolom.soort !== "afbeelding" && (
+        <ExtraAfbeeldingVeld
+          afbeelding={kolom.extraAfbeelding}
+          uploadBezig={uploadBezigExtra}
+          onUpload={onUploadExtra}
+          onChange={patch => onChange({
+            extraAfbeelding: patch === undefined ? undefined : { ...kolom.extraAfbeelding, ...patch },
+          })}
+        />
+      )}
     </div>
   );
 }
 
-function RijBlokVeld({ blok, onChange, uploadBezigKolom, onKolomChange, onKolomUpload, onWisselKanten }: {
+function RijBlokVeld({ blok, onChange, uploadBezigKolom, uploadBezigKolomExtra, onKolomChange, onKolomUpload, onKolomUploadExtra, onWisselKanten }: {
   blok: Extract<CampagneBlok, { type: "rij" }>;
   onChange: (patch: Partial<CampagneBlok>) => void;
   uploadBezigKolom: (kant: "links" | "rechts") => boolean;
+  uploadBezigKolomExtra: (kant: "links" | "rechts") => boolean;
   onKolomChange: (kant: "links" | "rechts", patch: Record<string, unknown>) => void;
   onKolomUpload: (kant: "links" | "rechts", bestand: File) => void;
+  onKolomUploadExtra: (kant: "links" | "rechts", bestand: File) => void;
   onWisselKanten: () => void;
 }) {
   const horizontaal = (blok.richting ?? "horizontaal") === "horizontaal";
@@ -999,10 +1032,12 @@ function RijBlokVeld({ blok, onChange, uploadBezigKolom, onKolomChange, onKolomU
         </button>
       </div>
       <div className={horizontaal ? "grid grid-cols-2 gap-3" : "space-y-3"}>
-        <KolomEditor kant="links" kolom={blok.links} uploadBezig={uploadBezigKolom("links")}
-          onChange={patch => onKolomChange("links", patch)} onUpload={bestand => onKolomUpload("links", bestand)} />
-        <KolomEditor kant="rechts" kolom={blok.rechts} uploadBezig={uploadBezigKolom("rechts")}
-          onChange={patch => onKolomChange("rechts", patch)} onUpload={bestand => onKolomUpload("rechts", bestand)} />
+        <KolomEditor kant="links" kolom={blok.links} uploadBezig={uploadBezigKolom("links")} uploadBezigExtra={uploadBezigKolomExtra("links")}
+          onChange={patch => onKolomChange("links", patch)} onUpload={bestand => onKolomUpload("links", bestand)}
+          onUploadExtra={bestand => onKolomUploadExtra("links", bestand)} />
+        <KolomEditor kant="rechts" kolom={blok.rechts} uploadBezig={uploadBezigKolom("rechts")} uploadBezigExtra={uploadBezigKolomExtra("rechts")}
+          onChange={patch => onKolomChange("rechts", patch)} onUpload={bestand => onKolomUpload("rechts", bestand)}
+          onUploadExtra={bestand => onKolomUploadExtra("rechts", bestand)} />
       </div>
     </div>
   );
