@@ -41,6 +41,12 @@ rechten/locatietoegang (`SessionStore` spiegelt `components/AuthProvider.tsx`):
 - **Agenda** — persoonlijke + algemene kalenders bekijken, afspraken aanmaken/bewerken/
   verwijderen, per-afspraak herinnering (of kalenderdefault) die een pushmelding stuurt;
   geen maand/week/dag-grid (lijstweergave), geen ICS-import/-abonneren
+- **Evenementen** — volledige pariteit met `app/evenementen`: evenement aanmaken/bewerken/
+  annuleren/verwijderen, aanmeldlink kopiëren/delen/openen, aanmeldingen inzien (zoeken,
+  sorteren, filteren op keuzevelden), handmatig aanmelden, aanmeldingen verwijderen,
+  aanvullende velden beheren (tekst/dropdown, verplicht, volgorde) en exporteren als CSV.
+  Tab alleen zichtbaar met recht `pagina_evenementen`. De aanmeldlink gebruikt het
+  webadres uit `TheepotWebappURL` in `project.yml` (daarna `xcodegen generate`).
 
 Niet meegenomen (bewust buiten scope): Activiteitenbeheer, Beleidsstukken,
 Nieuwsbrieven, Brandoefening, Medewerkers, Rechtenbeheer, 10-minutengesprekken, VE Planning.

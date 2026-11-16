@@ -26,6 +26,7 @@ struct Rechten: Codable {
     var paginaWeekplanningen: Toegang = .geen
     var paginaGesprekken: Toegang = .geen
     var paginaAgenda: Toegang = .geen
+    var paginaEvenementen: Toegang = .geen
     var prikbordToevoegen: Bool = false
     var chatStarten: Bool = false
     var agendaAlgemeenBewerken: Bool = false
@@ -41,6 +42,7 @@ struct Rechten: Codable {
         case paginaWeekplanningen = "pagina_weekplanningen"
         case paginaGesprekken = "pagina_gesprekken"
         case paginaAgenda = "pagina_agenda"
+        case paginaEvenementen = "pagina_evenementen"
         case prikbordToevoegen = "prikbord_toevoegen"
         case chatStarten = "chat_starten"
         case agendaAlgemeenBewerken = "agenda_algemeen_bewerken"
@@ -53,6 +55,7 @@ struct Rechten: Codable {
         paginaChat: .bewerken, paginaPrikbord: .bewerken,
         paginaMaaltijdlijst: .bewerken, paginaWeekplanningen: .bewerken,
         paginaGesprekken: .bewerken, paginaAgenda: .bewerken,
+        paginaEvenementen: .bewerken,
         prikbordToevoegen: true, chatStarten: true,
         agendaAlgemeenBewerken: true, agendaPersoneelInzien: true,
         weekplanningGroepenBeheren: true
@@ -74,6 +77,7 @@ extension Rechten {
             "maaltijdlijst": paginaMaaltijdlijst,
             "vakantie": paginaVakantieplanningen,
             "weekplanning": paginaWeekplanningen,
+            "evenementen": paginaEvenementen,
         ]
     }
 
@@ -110,6 +114,7 @@ extension Rechten {
             paginaWeekplanningen: toegang(.paginaWeekplanningen),
             paginaGesprekken: toegang(.paginaGesprekken),
             paginaAgenda: toegang(.paginaAgenda),
+            paginaEvenementen: toegang(.paginaEvenementen),
             prikbordToevoegen: vlag(.prikbordToevoegen),
             chatStarten: vlag(.chatStarten),
             agendaAlgemeenBewerken: vlag(.agendaAlgemeenBewerken),

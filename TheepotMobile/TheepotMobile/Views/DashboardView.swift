@@ -5,7 +5,7 @@ import SwiftUI
 /// scherm. Rechten/locatietoegang bepalen per module wat zichtbaar/bewerkbaar is
 /// (zie SessionStore + AuthProvider.tsx).
 enum HoofdTab: Int, CaseIterable, Identifiable {
-    case dashboard, meldingen, chat, agenda, taken, kasboek, maaltijdlijst, vakantie, weekplanning, kilometers, account
+    case dashboard, meldingen, chat, agenda, taken, kasboek, maaltijdlijst, vakantie, weekplanning, evenementen, kilometers, account
 
     var id: Int { rawValue }
 
@@ -21,6 +21,7 @@ enum HoofdTab: Int, CaseIterable, Identifiable {
         case .maaltijdlijst: return "Maaltijden"
         case .vakantie: return "Vakantie"
         case .weekplanning: return "Weekplan"
+        case .evenementen: return "Evenementen"
         case .kilometers: return "Kilometers"
         case .account: return "Account"
         }
@@ -47,6 +48,7 @@ enum HoofdTab: Int, CaseIterable, Identifiable {
         case .maaltijdlijst: return "fork.knife.circle"
         case .vakantie: return "sun.max"
         case .weekplanning: return "calendar.circle"
+        case .evenementen: return "ticket"
         case .kilometers: return "car"
         case .account: return "person.crop.circle"
         }
@@ -63,6 +65,7 @@ enum HoofdTab: Int, CaseIterable, Identifiable {
         case .maaltijdlijst: return "fork.knife.circle.fill"
         case .vakantie: return "sun.max.fill"
         case .weekplanning: return "calendar.circle.fill"
+        case .evenementen: return "ticket.fill"
         case .kilometers: return "car.fill"
         case .account: return "person.crop.circle.fill"
         }
@@ -79,6 +82,7 @@ enum HoofdTab: Int, CaseIterable, Identifiable {
         case .maaltijdlijst: return "maaltijdlijst"
         case .vakantie: return "vakantie"
         case .weekplanning: return "weekplanning"
+        case .evenementen: return "evenementen"
         case .dashboard, .taken, .kilometers, .account: return nil
         }
     }
@@ -96,7 +100,10 @@ struct DashboardView: View {
     /// altijd zichtbaar blijft). Spiegelt lib/paginaRechten.ts + Sidebar.tsx.
     private var zichtbareTabs: [HoofdTab] {
         guard let enkeleNaam = session.rechten.enkeleToegangTabNaam(isSuperadmin: session.isSuperadmin) else {
-            return HoofdTab.allCases
+            // Evenementen is een beheermodule (zoals in de webapp-sidebar): alleen
+            // tonen aan wie er rechten voor heeft.
+            let magEvenementen = session.isSuperadmin || session.rechten.paginaEvenementen != .geen
+            return HoofdTab.allCases.filter { $0 != .evenementen || magEvenementen }
         }
         return HoofdTab.allCases.filter { $0.sleutel == enkeleNaam || $0 == .account }
     }
@@ -114,6 +121,7 @@ struct DashboardView: View {
                 case .maaltijdlijst: MaaltijdlijstView()
                 case .vakantie: VakantieplanningenView()
                 case .weekplanning: WeekplanningenView()
+                case .evenementen: EvenementenView()
                 case .kilometers: KilometerstandenView()
                 case .account: AccountView()
                 }

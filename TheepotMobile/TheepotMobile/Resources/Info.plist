@@ -29,6 +29,8 @@
 	<string>Theepot gebruikt de camera om bonnetjes te scannen voor het kasboek.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Theepot gebruikt je foto's om bestanden te versturen in de chat.</string>
+	<key>TheepotWebappURL</key>
+	<string></string>
 	<key>UILaunchScreen</key>
 	<dict/>
 </dict>

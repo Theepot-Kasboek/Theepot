@@ -26,6 +26,9 @@ targets:
           NSAllowsArbitraryLoads: false
         NSCameraUsageDescription: Theepot gebruikt de camera om bonnetjes te scannen voor het kasboek.
         NSPhotoLibraryUsageDescription: Theepot gebruikt je foto's om bestanden te versturen in de chat.
+        # Webadres van het dashboard (zonder / aan het eind). Gebruikt voor de
+        # publieke aanmeldlink van evenementen: <adres>/evenementen/<id>/aanmelden
+        TheepotWebappURL: ""
     entitlements:
       path: TheepotMobile/TheepotMobile.entitlements
       properties:
