@@ -420,6 +420,14 @@ export default function WeekplanningenPage() {
   // Bij locatiewissel terug naar de algemene planning
   useEffect(() => { setActieveGroepId(null) }, [actieveLocatie])
 
+  // Zodra er groepen zijn, verdwijnt "Algemeen": kies dan altijd een echte groep
+  useEffect(() => {
+    if (groepen.length === 0) return
+    if (!actieveGroepId || !groepen.some(g => g.id === actieveGroepId)) {
+      setActieveGroepId(groepen[0].id)
+    }
+  }, [groepen, actieveGroepId])
+
   // ── Planning ophalen of aanmaken ────────────────────────────────────────────
   const haalPlanningOp = useCallback(async () => {
     if (!actieveLocatie) return
@@ -605,7 +613,7 @@ export default function WeekplanningenPage() {
         {locaties.length > 0 && (
           <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
             <Users size={14} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
-            {[{ id: null as string | null, naam: 'Algemeen' }, ...groepen].map(g => (
+            {(groepen.length === 0 ? [{ id: null as string | null, naam: 'Algemeen' }] : groepen).map(g => (
               <button
                 key={g.id ?? 'algemeen'}
                 onClick={() => setActieveGroepId(g.id)}
@@ -1165,7 +1173,7 @@ function GroepenModal({ locatie, groepen, onToevoegen, onHernoemen, onVerwijdere
         <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: 0, lineHeight: 1.6 }}>
             Elke groep heeft haar eigen weekactiviteiten en thema, bijvoorbeeld een 4+ en een 8+ groep.
-            De planning onder &quot;Algemeen&quot; blijft gewoon bestaan voor de hele locatie.
+            Zodra je de eerste groep toevoegt, verdwijnt het tabblad &quot;Algemeen&quot; — de planning die daar al onder stond blijft bewaard en komt terug zodra je alle groepen weer verwijdert.
           </p>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
