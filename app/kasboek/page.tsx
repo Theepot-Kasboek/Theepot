@@ -29,6 +29,11 @@ function fmt(n: number): string {
   return `€ ${Math.abs(n).toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, '.')}`
 }
 
+// Zoals fmt(), maar met een min-teken ervoor als het bedrag negatief is (voor saldi die negatief kunnen zijn)
+function fmtSigned(n: number): string {
+  return `${n < 0 ? '-' : ''}${fmt(n)}`
+}
+
 function periodeLabel(datum: Date): string {
   return datum.toLocaleDateString('nl-NL', { month: 'long', year: 'numeric' })
 }
@@ -126,7 +131,7 @@ async function exportKasboekPDF(
   y += 6
   doc.setFontSize(9)
   doc.setTextColor(...grijs)
-  doc.text(`Beginsaldo (overgenomen van vorige maand): ${fmt(beginsaldo)}`, marge, y)
+  doc.text(`Beginsaldo (overgenomen van vorige maand): ${fmtSigned(beginsaldo)}`, marge, y)
   y += 10
 
   // Samenvatting blokken
@@ -149,7 +154,7 @@ async function exportKasboekPDF(
     doc.setTextColor(...b.kleur)
     doc.text(b.label.toUpperCase(), x + 4, y + 7)
     doc.setFontSize(14)
-    doc.text(fmt(b.bedrag), x + 4, y + 17)
+    doc.text(fmtSigned(b.bedrag), x + 4, y + 17)
   })
   y += 30
 
@@ -188,7 +193,7 @@ async function exportKasboekPDF(
       doc.setTextColor(220, 38, 38)
       doc.text(bedragen.uitgave > 0 ? `−${fmt(bedragen.uitgave)}` : '—', marge + 125, y + 4.8)
       doc.setTextColor(catSaldo >= 0 ? 61 : 220, catSaldo >= 0 ? 107 : 38, catSaldo >= 0 ? 26 : 38)
-      doc.text(fmt(catSaldo), marge + 158, y + 4.8)
+      doc.text(fmtSigned(catSaldo), marge + 158, y + 4.8)
       y += 7
     })
     y += 8
@@ -887,7 +892,7 @@ export default function KasboekPage() {
                     <span style={{ fontSize: 16, fontWeight: 700, color: k.kleur }}>{k.icoon}</span>
                     <span style={{ fontSize: 11, fontWeight: 600, color: k.kleur, textTransform: 'uppercase', letterSpacing: '0.06em', opacity: 0.8 }}>{k.label}</span>
                   </div>
-                  <div style={{ fontFamily: 'Sora, sans-serif', fontSize: 22, fontWeight: 700, color: k.kleur }}>{fmt(k.bedrag)}</div>
+                  <div style={{ fontFamily: 'Sora, sans-serif', fontSize: 22, fontWeight: 700, color: k.kleur }}>{fmtSigned(k.bedrag)}</div>
                 </div>
               ))}
             </div>
