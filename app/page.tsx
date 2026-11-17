@@ -590,13 +590,24 @@ function AgendaVandaagWidget({ profielId }: { profielId: string }) {
 
 // ─── Weekplanning Widget ──────────────────────────────────────────────────────
 
+const DAG_NAMEN_WIDGET = ['Maandag', 'Dinsdag', 'Woensdag', 'Donderdag', 'Vrijdag']
+
+// 0 = maandag .. 6 = zondag
+function huidigeDagIndex(): number {
+  const d = new Date().getDay()
+  return d === 0 ? 6 : d - 1
+}
+
 function WeekplanningWidget({ profielId, isSuperadmin, profiel }: { profielId: string; isSuperadmin: boolean; profiel: { rol?: string } | null }) {
   const [locaties, setLocaties] = useState<string[]>([])
   const [actieveLocatie, setActieveLocatie] = useState('')
   const [planningen, setPlanningen] = useState<{ id: string; groepNaam: string | null; thema: string | null; acts: Record<string, string> }[]>([])
+  const [weergave, setWeergave] = useState<'week' | 'dag'>('week')
   const [laden, setLaden] = useState(true)
   const maandag = startVanWeek(new Date())
   const weekStart = `${maandag.getFullYear()}-${String(maandag.getMonth()+1).padStart(2,'0')}-${String(maandag.getDate()).padStart(2,'0')}`
+  const vandaagDagIndex = huidigeDagIndex()
+  const isWeekend = vandaagDagIndex > 4
 
   useEffect(() => {
     if (!profiel) return
@@ -621,6 +632,11 @@ function WeekplanningWidget({ profielId, isSuperadmin, profiel }: { profielId: s
   async function laadPlanning(locatie: string) {
     setLaden(true)
     const supabase = getSupabase()
+
+    const { data: weergaveData } = await supabase.from('week_weergave_instellingen').select('weergave').eq('locatie_naam', locatie).maybeSingle()
+    const huidigeWeergave: 'week' | 'dag' = (weergaveData?.weergave as 'week' | 'dag') ?? 'week'
+    setWeergave(huidigeWeergave)
+
     // Per groep kan er een eigen planning zijn (bijv. 4+ en 8+), plus de algemene planning
     const { data: planningData } = await supabase.from('week_planningen').select('id,thema,groep_id').eq('locatie_naam', locatie).eq('week_start', weekStart).eq('gepubliceerd', true)
     if (!planningData || planningData.length === 0) { setPlanningen([]); setLaden(false); return }
@@ -632,10 +648,14 @@ function WeekplanningWidget({ profielId, isSuperadmin, profiel }: { profielId: s
       for (const g of groepen ?? []) groepNamen[g.id] = g.naam
     }
 
-    const { data: acts } = await supabase.from('week_activiteiten').select('planning_id,naam,type').in('planning_id', planningData.map((p: { id: string }) => p.id))
+    const { data: acts } = await supabase.from('week_activiteiten').select('planning_id,naam,type,dag').in('planning_id', planningData.map((p: { id: string }) => p.id))
     setPlanningen(planningData.map((p: { id: string; thema: string | null; groep_id: string | null }) => {
       const actMap: Record<string, string> = {}
-      for (const a of (acts ?? []).filter((a: { planning_id: string }) => a.planning_id === p.id)) actMap[a.type] = a.naam
+      const vanPlanning = (acts ?? []).filter((a: { planning_id: string }) => a.planning_id === p.id)
+      const relevant = huidigeWeergave === 'dag'
+        ? vanPlanning.filter((a: { dag: number | null }) => a.dag === vandaagDagIndex)
+        : vanPlanning.filter((a: { dag: number | null }) => a.dag === null)
+      for (const a of relevant) actMap[a.type] = a.naam
       return { id: p.id, groepNaam: p.groep_id ? groepNamen[p.groep_id] ?? null : null, thema: p.thema, acts: actMap }
     }))
     setLaden(false)
@@ -653,7 +673,11 @@ function WeekplanningWidget({ profielId, isSuperadmin, profiel }: { profielId: s
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <Scissors size={15} color="var(--primary)" />
           <span className="card-title">Weekplanning</span>
-          <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{maandag.toLocaleDateString('nl-NL', { day: 'numeric', month: 'long' })} – {new Date(maandag.getTime() + 4*86400000).toLocaleDateString('nl-NL', { day: 'numeric', month: 'long' })}</span>
+          <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+            {weergave === 'dag' && !isWeekend
+              ? `${DAG_NAMEN_WIDGET[vandaagDagIndex]} ${new Date(maandag.getTime() + vandaagDagIndex*86400000).toLocaleDateString('nl-NL', { day: 'numeric', month: 'long' })}`
+              : `${maandag.toLocaleDateString('nl-NL', { day: 'numeric', month: 'long' })} – ${new Date(maandag.getTime() + 4*86400000).toLocaleDateString('nl-NL', { day: 'numeric', month: 'long' })}`}
+          </span>
         </div>
         <Link href="/weekplanningen" className="btn btn-sm" style={{ fontSize: 11, padding: '4px 10px', textDecoration: 'none' }}>Openen <ChevronRight size={12} /></Link>
       </div>
@@ -671,6 +695,7 @@ function WeekplanningWidget({ profielId, isSuperadmin, profiel }: { profielId: s
 
       <div style={{ padding: '12px 14px' }}>
         {laden ? <div style={{ color: 'var(--text-muted)', fontSize: 12 }}>Laden...</div>
+          : weergave === 'dag' && isWeekend ? <div style={{ color: 'var(--text-muted)', fontSize: 13 }}>Geen activiteiten in het weekend.</div>
           : planningen.length === 0 ? <div style={{ color: 'var(--text-muted)', fontSize: 13 }}>Geen gepubliceerde planning voor deze week.</div>
           : planningen.map(planning => (
             <div key={planning.id} style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: planningen.length > 1 ? 14 : 0 }}>
