@@ -9,7 +9,7 @@ import Toast from '@/components/Toast'
 import GeenToegang from '@/components/GeenToegang'
 import {
   Plus, X, ChevronLeft, ChevronRight, Scissors,
-  Users, Download, BookOpen, Pencil, Trash2, MapPin, Upload, FileDown, Check
+  Users, Download, BookOpen, Pencil, Trash2, MapPin, Upload, FileDown, Check, Settings
 } from 'lucide-react'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -41,7 +41,10 @@ interface WeekActiviteit {
   materialen: string[]
   activiteit_id: string | null
   afbeelding_url: string | null
+  dag: number | null
 }
+
+type Weergave = 'week' | 'dag'
 
 interface BibliotheekActiviteit {
   id: string
@@ -79,6 +82,8 @@ const TYPE_CONFIG: Record<ActType, { label: string; icon: React.ReactNode; kleur
 
 const ACTIVITEIT_SLOTS: ActType[] = ['knutsel', 'groepsspel']
 
+const DAG_NAMEN = ['Maandag', 'Dinsdag', 'Woensdag', 'Donderdag', 'Vrijdag']
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function maandaagVanWeek(d: Date): Date {
@@ -106,6 +111,16 @@ function fmtMaand(weekStart: string): string {
   return new Date(weekStart).toLocaleDateString('nl-NL', { month: 'long', year: 'numeric' })
 }
 
+function dagDatum(weekStart: string, dagIndex: number): Date {
+  const d = new Date(weekStart)
+  d.setDate(d.getDate() + dagIndex)
+  return d
+}
+
+function fmtDag(weekStart: string, dagIndex: number): string {
+  return dagDatum(weekStart, dagIndex).toLocaleDateString('nl-NL', { day: 'numeric', month: 'long' })
+}
+
 // ─── PDF Export ───────────────────────────────────────────────────────────────
 
 type PdfDoc = import('jspdf').jsPDF
@@ -114,6 +129,7 @@ interface ExportItem {
   planning: WeekPlanning
   activiteiten: WeekActiviteit[]
   groepNaam: string | null
+  weergave: Weergave
 }
 
 // Haalt een afbeelding op en zet 'm om naar een JPEG-dataURL die jsPDF aankan.
@@ -163,6 +179,69 @@ async function haalAfbeelding(url: string): Promise<{ data: string; verhouding: 
       return null
     }
   }
+}
+
+// Tekent naam/foto/beschrijving/materialen van één activiteit, geeft de nieuwe y-positie terug
+async function tekenActiviteitInhoud(
+  doc: PdfDoc,
+  act: WeekActiviteit,
+  startY: number,
+  marge: number,
+  breedte: number,
+  metFotos: boolean,
+  nieuwePagina: () => void,
+  zwart: [number, number, number],
+): Promise<number> {
+  let y = startY
+
+  doc.setTextColor(...zwart)
+  doc.setFontSize(14)
+  doc.setFont('helvetica', 'bold')
+  doc.text(act.naam, marge, y)
+  y += 8
+
+  if (metFotos && act.afbeelding_url) {
+    const foto = await haalAfbeelding(act.afbeelding_url)
+    if (foto) {
+      const fotoBreedte = 80
+      const fotoHoogte = Math.min(70, fotoBreedte * foto.verhouding)
+      if (y + fotoHoogte > 272) nieuwePagina()
+      try {
+        doc.addImage(foto.data, 'JPEG', marge, y, fotoBreedte, fotoHoogte)
+        y += fotoHoogte + 7
+      } catch {
+        // Afbeelding kon niet worden toegevoegd — sla 'm over
+      }
+    }
+  }
+
+  if (act.beschrijving) {
+    doc.setFontSize(10)
+    doc.setFont('helvetica', 'normal')
+    doc.setTextColor(60, 60, 60)
+    const regels: string[] = doc.splitTextToSize(act.beschrijving, breedte)
+    if (y + regels.length * 5.5 > 272) nieuwePagina()
+    doc.text(regels, marge, y)
+    y += regels.length * 5.5 + 6
+  }
+
+  if (act.materialen.length > 0) {
+    if (y > 262) nieuwePagina()
+    doc.setFontSize(10)
+    doc.setFont('helvetica', 'bold')
+    doc.setTextColor(...zwart)
+    doc.text('Benodigdheden:', marge, y)
+    y += 6
+    doc.setFont('helvetica', 'normal')
+    act.materialen.forEach(m => {
+      if (y > 270) nieuwePagina()
+      doc.text(`• ${m}`, marge + 3, y)
+      y += 5.5
+    })
+    y += 4
+  }
+
+  return y + 6
 }
 
 // Tekent één weekplanning op de huidige pagina van het document
@@ -215,13 +294,52 @@ async function tekenWeekplanning(doc: PdfDoc, item: ExportItem, metFotos: boolea
   }
   y += 14
 
-  // Per activiteit type
+  const typenVolgorde: ActType[] = ['knutsel', 'kook_bak', 'groepsspel']
+
+  if (item.weergave === 'dag') {
+    for (let dagIndex = 0; dagIndex < DAG_NAMEN.length; dagIndex++) {
+      const dagActiviteiten = activiteiten.filter(a => a.dag === dagIndex)
+
+      if (y > 250) nieuwePagina()
+      doc.setFillColor(61, 107, 26)
+      doc.rect(marge, y, breedte, 8, 'F')
+      doc.setTextColor(...wit)
+      doc.setFontSize(10)
+      doc.setFont('helvetica', 'bold')
+      doc.text(`${DAG_NAMEN[dagIndex]} ${fmtDag(planning.week_start, dagIndex)}`, marge + 4, y + 5.5)
+      y += 13
+
+      if (dagActiviteiten.length === 0) {
+        doc.setTextColor(...grijs)
+        doc.setFont('helvetica', 'italic')
+        doc.setFontSize(9)
+        doc.text('Nog niet ingevuld', marge + 4, y)
+        y += 12
+        continue
+      }
+
+      for (const type of typenVolgorde) {
+        const act = dagActiviteiten.find(a => a.type === type)
+        if (!act) continue
+        const config = TYPE_CONFIG[type]
+        if (y > 260) nieuwePagina()
+        doc.setFontSize(9)
+        doc.setFont('helvetica', 'bold')
+        const kleurRGB = type === 'knutsel' ? [124, 58, 237] : type === 'kook_bak' ? [217, 119, 6] : [5, 150, 105]
+        doc.setTextColor(...kleurRGB as [number, number, number])
+        doc.text(config.label.toUpperCase(), marge, y)
+        y += 5
+        y = await tekenActiviteitInhoud(doc, act, y, marge, breedte, metFotos, nieuwePagina, zwart)
+      }
+    }
+    return
+  }
+
+  // Per activiteit type (weekweergave)
   const typen = activiteiten.reduce((acc, a) => {
     if (!acc[a.type]) acc[a.type] = a
     return acc
   }, {} as Record<string, WeekActiviteit>)
-
-  const typenVolgorde: ActType[] = ['knutsel', 'kook_bak', 'groepsspel']
 
   for (const type of typenVolgorde) {
     const act = typen[type]
@@ -253,58 +371,7 @@ async function tekenWeekplanning(doc: PdfDoc, item: ExportItem, metFotos: boolea
       continue
     }
 
-    // Naam
-    doc.setTextColor(...zwart)
-    doc.setFontSize(14)
-    doc.setFont('helvetica', 'bold')
-    doc.text(act.naam, marge, y)
-    y += 8
-
-    // Foto (optioneel)
-    if (metFotos && act.afbeelding_url) {
-      const foto = await haalAfbeelding(act.afbeelding_url)
-      if (foto) {
-        const fotoBreedte = 80
-        const fotoHoogte = Math.min(70, fotoBreedte * foto.verhouding)
-        if (y + fotoHoogte > 272) nieuwePagina()
-        try {
-          doc.addImage(foto.data, 'JPEG', marge, y, fotoBreedte, fotoHoogte)
-          y += fotoHoogte + 7
-        } catch {
-          // Afbeelding kon niet worden toegevoegd — sla 'm over
-        }
-      }
-    }
-
-    // Beschrijving
-    if (act.beschrijving) {
-      doc.setFontSize(10)
-      doc.setFont('helvetica', 'normal')
-      doc.setTextColor(60, 60, 60)
-      const regels: string[] = doc.splitTextToSize(act.beschrijving, breedte)
-      if (y + regels.length * 5.5 > 272) nieuwePagina()
-      doc.text(regels, marge, y)
-      y += regels.length * 5.5 + 6
-    }
-
-    // Materialen
-    if (act.materialen.length > 0) {
-      if (y > 262) nieuwePagina()
-      doc.setFontSize(10)
-      doc.setFont('helvetica', 'bold')
-      doc.setTextColor(...zwart)
-      doc.text('Benodigdheden:', marge, y)
-      y += 6
-      doc.setFont('helvetica', 'normal')
-      act.materialen.forEach(m => {
-        if (y > 270) nieuwePagina()
-        doc.text(`• ${m}`, marge + 3, y)
-        y += 5.5
-      })
-      y += 4
-    }
-
-    y += 6
+    y = await tekenActiviteitInhoud(doc, act, y, marge, breedte, metFotos, nieuwePagina, zwart)
   }
 }
 
@@ -344,9 +411,9 @@ async function exportPDF(
 }
 
 // Export van de week die nu op het scherm staat
-async function exportHuidigeWeek(planning: WeekPlanning, activiteiten: WeekActiviteit[], groepNaam: string | null, metFotos: boolean) {
+async function exportHuidigeWeek(planning: WeekPlanning, activiteiten: WeekActiviteit[], groepNaam: string | null, weergave: Weergave, metFotos: boolean) {
   const naamDeel = groepNaam ? `_${groepNaam.replace(/[^a-zA-Z0-9]+/g, '-')}` : ''
-  await exportPDF([{ planning, activiteiten, groepNaam }], {
+  await exportPDF([{ planning, activiteiten, groepNaam, weergave }], {
     metFotos,
     bestandsnaam: `Weekplanning_${planning.locatie_naam}${naamDeel}_${planning.week_start}.pdf`,
     ondertitel: `De Theepot — Weekplanning ${planning.locatie_naam}${groepNaam ? ` · ${groepNaam}` : ''}`,
@@ -360,6 +427,7 @@ export default function WeekplanningenPage() {
   const magZien = isSuperadmin || rechten.pagina_weekplanningen === 'lezen' || rechten.pagina_weekplanningen === 'bewerken'
   const magExporteren = isSuperadmin || rechten.weekplanning_exporteren === true
   const magGroepenBeheren = isSuperadmin || (rechten.pagina_weekplanningen === 'bewerken' && rechten.weekplanning_groepen_beheren === true)
+  const magInstellingenBeheren = isSuperadmin || rechten.pagina_weekplanningen === 'bewerken'
 
   async function getToegankelijkeLocaties(alleLocaties: string[]): Promise<string[]> {
     const magAllesZien = isSuperadmin || profiel?.rol === 'directie' || profiel?.rol === 'leidinggevende'
@@ -384,10 +452,12 @@ export default function WeekplanningenPage() {
   const [thema, setThema] = useState('')
   const [themaBewerken, setThemaBewerken] = useState(false)
   const [laden, setLaden] = useState(false)
-  const [actieveSlot, setActieveSlot] = useState<ActType | null>(null)
+  const [actieveSlot, setActieveSlot] = useState<{ type: ActType; dag: number | null } | null>(null)
   const [detailActiviteit, setDetailActiviteit] = useState<WeekActiviteit | null>(null)
   const [toast, setToast] = useState<{ bericht: string; type: 'success' | 'error' } | null>(null)
   const [exportOpen, setExportOpen] = useState(false)
+  const [weergave, setWeergave] = useState<Weergave>('week')
+  const [instellingenOpen, setInstellingenOpen] = useState(false)
 
   // ── Locaties ophalen — wacht op profiel ────────────────────────────────────
   useEffect(() => {
@@ -416,6 +486,27 @@ export default function WeekplanningenPage() {
   }, [actieveLocatie])
 
   useEffect(() => { haalGroepenOp() }, [haalGroepenOp])
+
+  // ── Weergave-instelling (week/dag) van de locatie ophalen ───────────────────
+  const haalWeergaveOp = useCallback(async () => {
+    if (!actieveLocatie) { setWeergave('week'); return }
+    const { data } = await getSupabase()
+      .from('week_weergave_instellingen')
+      .select('weergave')
+      .eq('locatie_naam', actieveLocatie)
+      .maybeSingle()
+    setWeergave((data?.weergave as Weergave) ?? 'week')
+  }, [actieveLocatie])
+
+  useEffect(() => { haalWeergaveOp() }, [haalWeergaveOp])
+
+  async function slaWeergaveOp(nieuweWeergave: Weergave) {
+    setWeergave(nieuweWeergave)
+    await getSupabase()
+      .from('week_weergave_instellingen')
+      .upsert({ locatie_naam: actieveLocatie, weergave: nieuweWeergave, aangepast_op: new Date().toISOString() })
+    setToast({ bericht: `Weergave ingesteld op "${nieuweWeergave === 'week' ? 'Per week' : 'Per dag'}".`, type: 'success' })
+  }
 
   // Bij locatiewissel terug naar de algemene planning
   useEffect(() => { setActieveGroepId(null) }, [actieveLocatie])
@@ -489,17 +580,17 @@ export default function WeekplanningenPage() {
   }
 
   // ── Activiteit opslaan ──────────────────────────────────────────────────────
-  async function slaActiviteitOp(type: ActType, naam: string, beschrijving: string, materialen: string[], activiteitId: string | null, afbeeldingUrl: string | null) {
+  async function slaActiviteitOp(type: ActType, naam: string, beschrijving: string, materialen: string[], activiteitId: string | null, afbeeldingUrl: string | null, dag: number | null) {
     const planningId = await zorgVoorPlanning()
     if (!planningId) return
 
-    const bestaand = activiteiten.find(a => a.type === type)
+    const bestaand = activiteiten.find(a => a.type === type && a.dag === dag)
     const supabase = getSupabase()
 
     if (bestaand) {
       await supabase.from('week_activiteiten').update({ naam, beschrijving: beschrijving || null, materialen, activiteit_id: activiteitId, afbeelding_url: afbeeldingUrl }).eq('id', bestaand.id)
     } else {
-      await supabase.from('week_activiteiten').insert({ planning_id: planningId, type, naam, beschrijving: beschrijving || null, materialen, activiteit_id: activiteitId, afbeelding_url: afbeeldingUrl })
+      await supabase.from('week_activiteiten').insert({ planning_id: planningId, type, naam, beschrijving: beschrijving || null, materialen, activiteit_id: activiteitId, afbeelding_url: afbeeldingUrl, dag })
     }
 
     setActieveSlot(null)
@@ -557,14 +648,19 @@ export default function WeekplanningenPage() {
   const isHuidigeWeek = huidigWeekStart === toDateStr(maandaagVanWeek(new Date()))
 
   // ── SLOTS: knutsel kan worden vervangen door kook_bak ──────────────────────
-  // Bepaal de actieve slots (knutsel OF kook_bak, plus groepsspel)
-  const knutselAct = activiteiten.find(a => a.type === 'knutsel')
-  const kookAct = activiteiten.find(a => a.type === 'kook_bak')
-  const groepAct = activiteiten.find(a => a.type === 'groepsspel')
+  // Bepaalt de actieve slots (knutsel OF kook_bak, plus groepsspel) voor een dag
+  // (of voor de hele week als dag = null, de oude weekweergave)
+  function bepaalSlots(dag: number | null) {
+    const vanDag = activiteiten.filter(a => a.dag === dag)
+    const knutselAct = vanDag.find(a => a.type === 'knutsel') ?? null
+    const kookAct = vanDag.find(a => a.type === 'kook_bak') ?? null
+    const groepAct = vanDag.find(a => a.type === 'groepsspel') ?? null
+    const slot1Type: ActType = kookAct && !knutselAct ? 'kook_bak' : 'knutsel'
+    const slot1Act = knutselAct ?? kookAct ?? null
+    return { slot1Type, slot1Act, groepAct }
+  }
 
-  // Slot 1: knutsel of kook_bak
-  const slot1Type: ActType = kookAct && !knutselAct ? 'kook_bak' : 'knutsel'
-  const slot1Act = knutselAct ?? kookAct ?? null
+  const { slot1Type, slot1Act, groepAct } = bepaalSlots(null)
 
   // ─── RENDER ─────────────────────────────────────────────────────────────────
 
@@ -578,13 +674,18 @@ export default function WeekplanningenPage() {
         acties={
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             {planning && magExporteren && (
-              <button className="btn" onClick={() => exportHuidigeWeek(planning, activiteiten, actieveGroep?.naam ?? null, true)}>
+              <button className="btn" onClick={() => exportHuidigeWeek(planning, activiteiten, actieveGroep?.naam ?? null, weergave, true)}>
                 <Download size={14} /> PDF
               </button>
             )}
             {magExporteren && locaties.length > 0 && (
               <button className="btn" onClick={() => setExportOpen(true)}>
                 <FileDown size={14} /> Exporteren
+              </button>
+            )}
+            {magInstellingenBeheren && locaties.length > 0 && (
+              <button className="btn" onClick={() => setInstellingenOpen(true)}>
+                <Settings size={14} /> Instellingen
               </button>
             )}
           </div>
@@ -692,7 +793,7 @@ export default function WeekplanningenPage() {
             {/* Activiteiten slots */}
             {laden ? (
               <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>Laden...</div>
-            ) : (
+            ) : weergave === 'week' ? (
               <div className="grid-2col">
 
                 {/* Slot 1: Knutsel / Koken */}
@@ -702,10 +803,10 @@ export default function WeekplanningenPage() {
                   alternatiefType={slot1Type === 'knutsel' ? 'kook_bak' : 'knutsel'}
                   onWijzigType={async (nieuwType) => {
                     if (slot1Act) await verwijderActiviteit(slot1Act.id)
-                    setActieveSlot(nieuwType)
+                    setActieveSlot({ type: nieuwType, dag: null })
                   }}
                   onBekijk={() => slot1Act && setDetailActiviteit(slot1Act)}
-                  onBewerk={() => setActieveSlot(slot1Type)}
+                  onBewerk={() => setActieveSlot({ type: slot1Type, dag: null })}
                   onVerwijder={() => slot1Act && verwijderActiviteit(slot1Act.id)}
                 />
 
@@ -714,9 +815,46 @@ export default function WeekplanningenPage() {
                   type="groepsspel"
                   activiteit={groepAct ?? null}
                   onBekijk={() => groepAct && setDetailActiviteit(groepAct)}
-                  onBewerk={() => setActieveSlot('groepsspel')}
+                  onBewerk={() => setActieveSlot({ type: 'groepsspel', dag: null })}
                   onVerwijder={() => groepAct && verwijderActiviteit(groepAct.id)}
                 />
+              </div>
+            ) : (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(220px, 1fr))', gap: 14, overflowX: 'auto' }}>
+                {DAG_NAMEN.map((dagNaam, dagIndex) => {
+                  const dagSlots = bepaalSlots(dagIndex)
+                  return (
+                    <div key={dagIndex} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                      <div style={{ textAlign: 'center', padding: '6px 0' }}>
+                        <div style={{ fontFamily: 'Sora, sans-serif', fontSize: 13, fontWeight: 700 }}>{dagNaam}</div>
+                        <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>{fmtDag(huidigWeekStart, dagIndex)}</div>
+                      </div>
+
+                      <ActiviteitSlot
+                        type={dagSlots.slot1Type}
+                        activiteit={dagSlots.slot1Act}
+                        compact
+                        alternatiefType={dagSlots.slot1Type === 'knutsel' ? 'kook_bak' : 'knutsel'}
+                        onWijzigType={async (nieuwType) => {
+                          if (dagSlots.slot1Act) await verwijderActiviteit(dagSlots.slot1Act.id)
+                          setActieveSlot({ type: nieuwType, dag: dagIndex })
+                        }}
+                        onBekijk={() => dagSlots.slot1Act && setDetailActiviteit(dagSlots.slot1Act)}
+                        onBewerk={() => setActieveSlot({ type: dagSlots.slot1Type, dag: dagIndex })}
+                        onVerwijder={() => dagSlots.slot1Act && verwijderActiviteit(dagSlots.slot1Act.id)}
+                      />
+
+                      <ActiviteitSlot
+                        type="groepsspel"
+                        activiteit={dagSlots.groepAct}
+                        compact
+                        onBekijk={() => dagSlots.groepAct && setDetailActiviteit(dagSlots.groepAct)}
+                        onBewerk={() => setActieveSlot({ type: 'groepsspel', dag: dagIndex })}
+                        onVerwijder={() => dagSlots.groepAct && verwijderActiviteit(dagSlots.groepAct.id)}
+                      />
+                    </div>
+                  )
+                })}
               </div>
             )}
           </>
@@ -726,8 +864,9 @@ export default function WeekplanningenPage() {
       {/* Modal voor activiteit toevoegen/bewerken */}
       {actieveSlot && (
         <ActiviteitModal
-          type={actieveSlot}
-          bestaand={activiteiten.find(a => a.type === actieveSlot) ?? null}
+          type={actieveSlot.type}
+          dag={actieveSlot.dag}
+          bestaand={activiteiten.find(a => a.type === actieveSlot.type && a.dag === actieveSlot.dag) ?? null}
           onSave={slaActiviteitOp}
           onClose={() => setActieveSlot(null)}
         />
@@ -761,9 +900,20 @@ export default function WeekplanningenPage() {
           groepen={groepen}
           actieveGroepId={actieveGroepId}
           startWeek={huidigWeekStart}
+          weergave={weergave}
           onKlaar={bericht => setToast({ bericht, type: 'success' })}
           onFout={bericht => setToast({ bericht, type: 'error' })}
           onClose={() => setExportOpen(false)}
+        />
+      )}
+
+      {/* Instellingen */}
+      {instellingenOpen && (
+        <InstellingenModal
+          locatie={actieveLocatie}
+          weergave={weergave}
+          onWijzig={slaWeergaveOp}
+          onClose={() => setInstellingenOpen(false)}
         />
       )}
 
@@ -774,7 +924,7 @@ export default function WeekplanningenPage() {
 
 // ─── Activiteit Slot Card ─────────────────────────────────────────────────────
 
-function ActiviteitSlot({ type, activiteit, alternatiefType, onWijzigType, onBekijk, onBewerk, onVerwijder }: {
+function ActiviteitSlot({ type, activiteit, alternatiefType, onWijzigType, onBekijk, onBewerk, onVerwijder, compact }: {
   type: ActType
   activiteit: WeekActiviteit | null
   alternatiefType?: ActType
@@ -782,6 +932,7 @@ function ActiviteitSlot({ type, activiteit, alternatiefType, onWijzigType, onBek
   onBekijk?: () => void
   onBewerk: () => void
   onVerwijder: () => void
+  compact?: boolean
 }) {
   const config = TYPE_CONFIG[type]
   const altConfig = alternatiefType ? TYPE_CONFIG[alternatiefType] : null
@@ -790,14 +941,14 @@ function ActiviteitSlot({ type, activiteit, alternatiefType, onWijzigType, onBek
       {/* Gekleurde bovenbalk */}
       <div style={{ height: 5, background: config.kleur }} />
 
-      <div className="card-header">
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <div style={{ width: 32, height: 32, borderRadius: 8, background: config.bg, color: config.kleur, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            {config.icon}
+      <div className="card-header" style={compact ? { padding: '8px 10px' } : undefined}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: compact ? 6 : 8 }}>
+          <div style={{ width: compact ? 24 : 32, height: compact ? 24 : 32, borderRadius: 7, background: config.bg, color: config.kleur, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            {compact ? (type === 'groepsspel' ? <Users size={13} /> : type === 'kook_bak' ? <span style={{ fontSize: 13 }}>🍳</span> : <Scissors size={13} />) : config.icon}
           </div>
           <div>
-            <div className="card-title">{config.label}</div>
-            <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{config.beschrijving}</div>
+            <div className="card-title" style={compact ? { fontSize: 12 } : undefined}>{config.label}</div>
+            {!compact && <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{config.beschrijving}</div>}
           </div>
         </div>
 
@@ -805,44 +956,46 @@ function ActiviteitSlot({ type, activiteit, alternatiefType, onWijzigType, onBek
         {altConfig && onWijzigType && (
           <button
             className="btn btn-sm"
-            style={{ fontSize: 11, padding: '3px 10px' }}
+            style={{ fontSize: compact ? 10 : 11, padding: compact ? '2px 6px' : '3px 10px' }}
             onClick={() => onWijzigType(alternatiefType!)}
             title={`Wissel naar ${altConfig.label}`}
           >
-            ⇄ {altConfig.label}
+            ⇄{!compact && ` ${altConfig.label}`}
           </button>
         )}
       </div>
 
-      <div className="card-body">
+      <div className="card-body" style={compact ? { padding: 10 } : undefined}>
         {!activiteit ? (
           /* Leeg slot */
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '24px 0', gap: 10 }}>
-            <div style={{ fontSize: 32, opacity: 0.3 }}>{type === 'groepsspel' ? '🎮' : type === 'kook_bak' ? '🍳' : '✂️'}</div>
-            <p style={{ fontSize: 13, color: 'var(--text-muted)', textAlign: 'center', margin: 0 }}>
-              Nog geen {config.label.toLowerCase()} gepland
-            </p>
-            <button className="btn btn-primary btn-sm" onClick={onBewerk}>
-              <Plus size={13} /> {config.label} toevoegen
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: compact ? '10px 0' : '24px 0', gap: compact ? 6 : 10 }}>
+            {!compact && <div style={{ fontSize: 32, opacity: 0.3 }}>{type === 'groepsspel' ? '🎮' : type === 'kook_bak' ? '🍳' : '✂️'}</div>}
+            {!compact && (
+              <p style={{ fontSize: 13, color: 'var(--text-muted)', textAlign: 'center', margin: 0 }}>
+                Nog geen {config.label.toLowerCase()} gepland
+              </p>
+            )}
+            <button className="btn btn-primary btn-sm" style={compact ? { fontSize: 11, padding: '4px 8px' } : undefined} onClick={onBewerk}>
+              <Plus size={compact ? 11 : 13} /> {compact ? 'Toevoegen' : `${config.label} toevoegen`}
             </button>
           </div>
         ) : (
           /* Gevuld slot */
           <div>
-            {activiteit.afbeelding_url && (
+            {!compact && activiteit.afbeelding_url && (
               <div style={{ margin: '-2px -2px 10px', borderRadius: '8px 8px 0 0', overflow: 'hidden' }}>
                 <img src={activiteit.afbeelding_url} alt={activiteit.naam} style={{ width: '100%', height: 'auto', display: 'block' }} onError={e => { (e.target as HTMLImageElement).parentElement!.style.display = 'none' }} />
               </div>
             )}
-            <div style={{ fontFamily: 'Sora, sans-serif', fontSize: 15, fontWeight: 700, marginBottom: 6 }}>
+            <div style={{ fontFamily: 'Sora, sans-serif', fontSize: compact ? 13 : 15, fontWeight: 700, marginBottom: compact ? 4 : 6 }}>
               {activiteit.naam}
             </div>
-            {activiteit.beschrijving && (
+            {!compact && activiteit.beschrijving && (
               <p style={{ fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.6, marginBottom: 10, display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
                 {activiteit.beschrijving}
               </p>
             )}
-            {activiteit.materialen.length > 0 && (
+            {!compact && activiteit.materialen.length > 0 && (
               <div style={{ marginBottom: 12 }}>
                 <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>Benodigdheden</div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
@@ -852,10 +1005,10 @@ function ActiviteitSlot({ type, activiteit, alternatiefType, onWijzigType, onBek
                 </div>
               </div>
             )}
-            <div style={{ display: 'flex', gap: 8, paddingTop: 8, borderTop: '1px solid var(--border)' }}>
-              {onBekijk && <button className="btn btn-sm" onClick={onBekijk}>👁 Bekijken</button>}
-              <button className="btn btn-sm" onClick={onBewerk}><Pencil size={12} /> Bewerken</button>
-              <button className="btn btn-sm" style={{ color: '#DC2626', borderColor: '#FECACA', marginLeft: 'auto' }} onClick={onVerwijder}><Trash2 size={12} /> Verwijderen</button>
+            <div style={{ display: 'flex', gap: compact ? 4 : 8, paddingTop: compact ? 6 : 8, borderTop: '1px solid var(--border)', flexWrap: 'wrap' }}>
+              {onBekijk && <button className="btn btn-sm" style={compact ? { fontSize: 10, padding: '2px 6px' } : undefined} onClick={onBekijk}>👁{!compact && ' Bekijken'}</button>}
+              <button className="btn btn-sm" style={compact ? { fontSize: 10, padding: '2px 6px' } : undefined} onClick={onBewerk}><Pencil size={compact ? 10 : 12} />{!compact && ' Bewerken'}</button>
+              <button className="btn btn-sm" style={{ color: '#DC2626', borderColor: '#FECACA', marginLeft: 'auto', ...(compact ? { fontSize: 10, padding: '2px 6px' } : {}) }} onClick={onVerwijder}><Trash2 size={compact ? 10 : 12} />{!compact && ' Verwijderen'}</button>
             </div>
           </div>
         )}
@@ -866,10 +1019,11 @@ function ActiviteitSlot({ type, activiteit, alternatiefType, onWijzigType, onBek
 
 // ─── Activiteit Modal ─────────────────────────────────────────────────────────
 
-function ActiviteitModal({ type, bestaand, onSave, onClose }: {
+function ActiviteitModal({ type, dag, bestaand, onSave, onClose }: {
   type: ActType
+  dag: number | null
   bestaand: WeekActiviteit | null
-  onSave: (type: ActType, naam: string, beschrijving: string, materialen: string[], activiteitId: string | null, afbeeldingUrl: string | null) => void
+  onSave: (type: ActType, naam: string, beschrijving: string, materialen: string[], activiteitId: string | null, afbeeldingUrl: string | null, dag: number | null) => void
   onClose: () => void
 }) {
   const config = TYPE_CONFIG[type]
@@ -939,7 +1093,7 @@ function ActiviteitModal({ type, bestaand, onSave, onClose }: {
   function handleSave() {
     if (!naam.trim()) return
     const materialen = materialenRaw.split(',').map(s => s.trim()).filter(Boolean)
-    onSave(type, naam.trim(), beschrijving.trim(), materialen, activiteitId, afbeeldingUrl)
+    onSave(type, naam.trim(), beschrijving.trim(), materialen, activiteitId, afbeeldingUrl, dag)
   }
 
   return (
@@ -950,7 +1104,7 @@ function ActiviteitModal({ type, bestaand, onSave, onClose }: {
             <div style={{ width: 30, height: 30, borderRadius: 7, background: config.bg, color: config.kleur, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               {config.icon}
             </div>
-            <span className="card-title">{bestaand ? 'Bewerken' : 'Toevoegen'} — {config.label}</span>
+            <span className="card-title">{bestaand ? 'Bewerken' : 'Toevoegen'} — {config.label}{dag !== null ? ` (${DAG_NAMEN[dag]})` : ''}</span>
           </div>
           <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex' }}><X size={18} /></button>
         </div>
@@ -1231,6 +1385,71 @@ function GroepenModal({ locatie, groepen, onToevoegen, onHernoemen, onVerwijdere
   )
 }
 
+// ─── Instellingen Modal — week- of dagweergave ───────────────────────────────
+
+function InstellingenModal({ locatie, weergave, onWijzig, onClose }: {
+  locatie: string
+  weergave: Weergave
+  onWijzig: (weergave: Weergave) => void | Promise<void>
+  onClose: () => void
+}) {
+  return (
+    <div className="modal-backdrop" onClick={e => { if (e.target === e.currentTarget) onClose() }}>
+      <div className="modal-box" style={{ maxWidth: 440 }} onClick={e => e.stopPropagation()}>
+        <div className="card-header">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ width: 30, height: 30, borderRadius: 7, background: 'var(--primary-xlight)', color: 'var(--primary-text)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Settings size={16} />
+            </div>
+            <div>
+              <span className="card-title">Instellingen</span>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{locatie}</div>
+            </div>
+          </div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex' }}><X size={18} /></button>
+        </div>
+
+        <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>
+              Weekactiviteiten invullen
+            </div>
+            <div style={{ display: 'flex', gap: 8, padding: 4, background: 'var(--bg)', borderRadius: 10, border: '1px solid var(--border)' }}>
+              {([
+                { waarde: 'week' as const, label: '📅 Per week' },
+                { waarde: 'dag' as const, label: '🗓️ Per dag' },
+              ]).map(optie => (
+                <button
+                  key={optie.waarde}
+                  onClick={() => onWijzig(optie.waarde)}
+                  style={{
+                    flex: 1, padding: '9px 10px', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 600,
+                    background: weergave === optie.waarde ? 'var(--primary)' : 'transparent',
+                    color: weergave === optie.waarde ? '#fff' : 'var(--text)',
+                    transition: 'all 0.12s',
+                  }}
+                >
+                  {optie.label}
+                </button>
+              ))}
+            </div>
+            <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: '10px 0 0', lineHeight: 1.6 }}>
+              {weergave === 'week'
+                ? 'Eén knutsel-/kookactiviteit en één groepsspel voor de hele week.'
+                : 'Een eigen knutsel-/kookactiviteit en groepsspel voor elke doordeweekse dag (maandag t/m vrijdag).'}
+              {' '}Deze instelling geldt voor iedereen bij {locatie || 'deze locatie'}.
+            </p>
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+            <button className="btn" onClick={onClose}>Sluiten</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ─── Export Modal — meerdere weken in één PDF ─────────────────────────────────
 
 interface ExportRij {
@@ -1239,11 +1458,12 @@ interface ExportRij {
   aantalActiviteiten: number
 }
 
-function ExportModal({ locatie, groepen, actieveGroepId, startWeek, onKlaar, onFout, onClose }: {
+function ExportModal({ locatie, groepen, actieveGroepId, startWeek, weergave, onKlaar, onFout, onClose }: {
   locatie: string
   groepen: WeekGroep[]
   actieveGroepId: string | null
   startWeek: string
+  weergave: Weergave
   onKlaar: (bericht: string) => void
   onFout: (bericht: string) => void
   onClose: () => void
@@ -1332,6 +1552,7 @@ function ExportModal({ locatie, groepen, actieveGroepId, startWeek, onKlaar, onF
         planning: r.planning,
         activiteiten: perPlanning[r.planning.id] ?? [],
         groepNaam: r.groepNaam,
+        weergave,
       }))
 
       const eersteWeek = items[0].planning.week_start
